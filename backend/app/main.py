@@ -1,6 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import auth, wallets, transactions, ai
+from app.config import get_settings
+
+settings = get_settings()
 
 app = FastAPI(
     title="Norby API",
@@ -10,9 +13,9 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"], # (Vite)
+    allow_origins=settings.cors_origins_list, # configurável via CORS_ORIGINS no .env
     allow_credentials=True, # Permite enviar cookies e headers de autenticação
-    allow_methods=["*"], 
+    allow_methods=["*"],
     allow_headers=["*"], # Permite qualquer header
 )
 

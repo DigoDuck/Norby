@@ -1,3 +1,4 @@
+import uuid
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -38,10 +39,12 @@ async def get_current_user( # Autenticação
         user_id: str = payload.get("sub")
         if user_id is None:
             raise credentials_exception
-    except JWTError:
+        # Converte o sub p/ UUID aqui: um sub forjado/corrompido vira 401, não 500
+        user_uuid = uuid.UUID(user_id)
+    except (JWTError, ValueError, TypeError):
         raise credentials_exception
-    
-    result = await db.execute(select(User).where(User.id == user_id)) # Buscca usuário no banco
+
+    result = await db.execute(select(User).where(User.id == user_uuid)) # Buscca usuário no banco
     user = result.scalar_one_or_none()
     if user is None:
         raise credentials_exception

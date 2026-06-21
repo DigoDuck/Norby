@@ -13,10 +13,17 @@ class Settings(BaseSettings):
     
     # Gemini
     gemini_api_key: str
-    
+
+    # CORS — origens permitidas (separadas por vírgula). Default cobre o dev local.
+    cors_origins: str = "http://localhost:5173"
+
     class Config:
         env_file = "../.env"
         extra = "ignore"
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
 @lru_cache()  # Lê o env só uma vez depois reutiliza pra melhorar a perfomance
 def get_settings() -> Settings:
