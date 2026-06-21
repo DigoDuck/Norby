@@ -5,6 +5,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import AsyncSessionLocal, ai_insights_collection
 from app.models.sql_models import Transaction, TransactionType
 from app.config import get_settings
+import asyncio
+import json
+import re
+import logging
+
+logger = logging.getLogger(__name__)
 
 settings = get_settings()
 genai.configure(api_key=settings.gemini_api_key)
@@ -89,21 +95,34 @@ async def get_or_generate_insight(user_id: str, month: int, year: int) -> dict:
     }}
     """
     
-    response = model.generate_content(prompt)
-    import json, re
-    
-    raw = response.text.strip()
-    raw = re.sub(r"```json|```","", raw).strip() # Tira formatação markdown
-    data = json.loads(raw)
-    
+    # Chamada bloqueante do SDK -> offload p/ thread pra não travar o event loop
+    response = await asyncio.to_thread(model.generate_content, prompt)
+
+    # A IA pode devolver texto não-JSON, vazio ou ser bloqueada por safety filter.
+    # Parsing isolado: se falhar, loga o texto cru e propaga pro router tratar.
+    try:
+        raw = response.text.strip()
+        raw = re.sub(r"```json|```", "", raw).strip()  # Tira formatação markdown
+        data = json.loads(raw)
+        score = data["score"]
+        summary_text = data["summary_text"]
+        suggested_action = data["suggested_action"]
+    except (AttributeError, ValueError, KeyError, TypeError) as e:
+        raw_text = getattr(response, "text", None)
+        logger.exception(
+            "Resposta da IA inválida ao gerar insight (user=%s). Texto cru: %r",
+            user_id, raw_text,
+        )
+        raise ValueError("Resposta da IA em formato inesperado") from e
+
     # Salva no cache do MongoDB
     insight = {
         "user_id": user_id,
         "reference_month": reference,
-        "score": data["score"],
-        "summary_text": data["summary_text"],
-        "suggested_action": data["suggested_action"],
-        "generate_at": datetime.now(timezone.utc).isoformat(),
+        "score": score,
+        "summary_text": summary_text,
+        "suggested_action": suggested_action,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
     }
     await ai_insights_collection.insert_one(insight)
     insight.pop("_id", None)
@@ -131,5 +150,8 @@ async def chat_with_ai(user_id: str, message: str, history: list) -> str:
         chat_history.append({"role": role, "parts": [msg["content"]]})
         
     chat = model.start_chat(history=chat_history)
-    response = chat.send_message(f"{system_context}\n\nUsuário: {message}")
+    # Chamada bloqueante do SDK -> offload p/ thread
+    response = await asyncio.to_thread(
+        chat.send_message, f"{system_context}\n\nUsuário: {message}"
+    )
     return response.text

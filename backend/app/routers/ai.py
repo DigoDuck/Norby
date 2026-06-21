@@ -6,6 +6,9 @@ from app.dependencies import get_current_user
 from app.models.sql_models import User
 from app.services.ai_service import get_or_generate_insight, chat_with_ai
 from app.database import chat_history_collection
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/ai", tags=["AI"])
 
@@ -20,7 +23,10 @@ async def get_dashboard_insight(current_user: User = Depends(get_current_user)):
         now = datetime.now(timezone.utc)
         insight = await get_or_generate_insight(str(current_user.id), now.month, now.year)
         return insight
-    except Exception as e:
+    except Exception:
+        # Widget opcional do dashboard: degrada com elegância em vez de derrubar a tela.
+        # Status 200 proposital.
+        logger.exception("Falha ao gerar insight do dashboard (user=%s)", current_user.id)
         return {
             "score": None,
             "summary_text": "",
@@ -43,8 +49,15 @@ async def chat(payload: ChatMessage, current_user: User = Depends(get_current_us
     user_msg = { "role": "user", "content": payload.message, "timestamp": datetime.now(timezone.utc).isoformat()}
     messages.append(user_msg)
 
-    # Chama o Gemini
-    ai_response = await chat_with_ai(user_id, payload.message, messages[:-1])
+    # Chama o Gemini (se falhar, devolve 503 claro em vez de 500 sem headers de CORS)
+    try:
+        ai_response = await chat_with_ai(user_id, payload.message, messages[:-1])
+    except Exception:
+        logger.exception("Falha no chat com a IA (user=%s)", user_id)
+        raise HTTPException(
+            status_code=503,
+            detail="Norby AI está temporariamente indisponível. Tente novamente em instantes.",
+        )
 
     # Resposta da IA
     ai_msg = {"role": "assistant", "content": ai_response, "timestamp": datetime.now(timezone.utc).isoformat()}
