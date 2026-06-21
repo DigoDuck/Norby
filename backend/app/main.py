@@ -1,7 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 from app.routers import auth, wallets, transactions, ai
 from app.config import get_settings
+from app.limiter import limiter
 
 settings = get_settings()
 
@@ -10,6 +13,10 @@ app = FastAPI(
     description="Backend do Organizador Financeiro com IA",
     version="0.1.0",
 )
+
+# Rate limiting (anti brute-force). Respostas 429 passam pelo CORS normalmente.
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(
     CORSMiddleware,
