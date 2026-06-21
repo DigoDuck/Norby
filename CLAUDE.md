@@ -43,25 +43,29 @@ categoriza transações e dá conselhos via chat e resumos.
 > Brief canônico: `01 - Contexto IA/Projetos-Brief/Norby.md` (Second Brain),
 > com notas detalhadas em `02 - Projetos/Ativos/Norby.md`.
 
-### Identidade visual — "Âmbar Noturno"
+### Identidade visual — "Petróleo Confiável" (v3)
 
-A UI é **toda em inglês**. Substitui o antigo visual P&B por um tema escuro
-âmbar (dark-first), ainda com pegada glassmorphism/minimalista premium.
-Tipografia: **Inter**. Logo: monograma de estrela-âmbar (north-star), miolo
-escuro. Tagline: "seu norte financeiro". Tom de voz: orientador, acolhedor,
-claro e confiável — guia, não julga; sempre aponta o próximo passo.
+> A paleta **substitui a versão anterior "Âmbar Noturno"** (âmbar `#F5A623`). A
+> identidade definitiva é a v3 teal/petróleo. Onde encontrar referência a âmbar
+> no código ou em docs, considerar legado.
+
+A UI é **toda em inglês**. Tema escuro petróleo (dark-first), com pegada
+glassmorphism/minimalista premium. Tipografia: **Inter**. Logo: monograma
+**N + ponto-norte** (a letra N coroada pela estrela-norte) sobre fundo petróleo.
+Tagline: "seu norte financeiro". Tom de voz: orientador, acolhedor, claro e
+confiável — guia, não julga; sempre aponta o próximo passo.
 
 Tokens de cor (refletir no `tailwind.config`):
 
 | Token | Hex | Uso |
 |---|---|---|
-| Night | `#0D0B08` | Fundo dark |
-| Surface | `#1A150D` | Cards dark |
-| Surface 2 | `#241D12` | Superfície elevada |
-| Amber | `#F5A623` | Acento principal |
-| Amber Soft | `#FBCB6E` | Acento suave |
-| Ivory | `#FDF8EF` | Fundo light |
-| Income | `#3FA66B` | Receitas |
+| Night | `#07100F` | Fundo dark |
+| Surface | `#0E1B19` | Cards dark |
+| Surface 2 | `#152624` | Superfície elevada |
+| Teal | `#2DB5A3` | Acento principal |
+| Teal Soft | `#6FD4C6` | Acento suave |
+| Ivory | `#EFFAF8` | Fundo light |
+| Income | `#5FBF7E` | Receitas (verde distinto do teal de propósito) |
 | Expense | `#8A8580` | Despesas |
 | Danger | `#E06A4A` | Alertas |
 
@@ -81,7 +85,7 @@ Tokens de cor (refletir no `tailwind.config`):
 
 A lógica core já funciona. Em aberto, em ordem de prioridade (do brief):
 
-1. Aplicar as alterações de frontend do rebranding (Norby + paleta Âmbar Noturno).
+1. Aplicar as alterações de frontend do rebranding (Norby + paleta Petróleo Confiável).
 2. Listar e corrigir os bugs do frontend.
 3. Revisão de **segurança** (auth JWT, CRUD de transações).
 
