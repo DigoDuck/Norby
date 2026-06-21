@@ -1,13 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  DollarSign,
-  CreditCard,
-  TrendingUp,
-  MoonStar,
-  Plus,
-  BrainCircuit,
-} from "lucide-react";
+import { DollarSign, CreditCard, TrendingUp, Plus, BrainCircuit } from "lucide-react";
 import {
   LineChart,
   Line,
@@ -20,19 +13,25 @@ import {
   PieChart,
   Pie,
   Cell,
-  Legend,
+  CartesianGrid,
 } from "recharts";
 import KpiCard from "@/components/shared/KpiCard";
 import { transactionsApi } from "@/api/transactions";
 import { walletsApi } from "@/api/wallets";
 import { aiApi } from "@/api/ai";
-import { useAuthStore } from "@/store/authStore";
 import { Button } from "@/components/ui/button";
 
-const COLORS = ["#7C3AED", "#06B6D4", "#F59E0B", "#10B981", "#EF4444"];
+const COLORS = ["#2DB5A3", "#6FD4C6", "#5FBF7E", "#1F8C7E", "#E06A4A"];
+
+const tooltipStyle = {
+  background: "#0E1B19",
+  border: "1px solid rgba(255,255,255,0.10)",
+  borderRadius: 12,
+  color: "#EFFAF8",
+};
+const axisTick = { fill: "rgba(239,250,248,0.45)", fontSize: 12 };
 
 export default function Dashboard() {
-  const { user } = useAuthStore();
   const [wallets, setWallets] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [insight, setInsight] = useState(null);
@@ -125,7 +124,7 @@ export default function Dashboard() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="w-8 h-8 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-2 border-norby-teal border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -136,28 +135,28 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      {/*Header*/}
+      {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-black/80 text-sm">Bem-vindo de volta</p>
-          <h1 className="text-2xl font-bold text-black mt-0.5">
-            Dashboard Financeiro com IA
+          <p className="text-norby-ivory/50 text-sm">Bem-vindo de volta</p>
+          <h1 className="text-2xl font-bold text-norby-ivory mt-0.5 tracking-tight">
+            Dashboard
           </h1>
-          <p className="text-black/80 text-sm mt-1">
-            Acompanhe seus gastos, metas e recomendações automáticas
+          <p className="text-norby-ivory/50 text-sm mt-1">
+            Acompanhe seus gastos, metas e recomendações da IA
           </p>
         </div>
         <div className="flex gap-2">
           <Button
             variant="outline"
             onClick={() => navigate("/transactions")}
-            className="border-black/20 text-black/60 hover:text-black hover:bg-black/10"
+            className="border-white/10 text-norby-ivory/70 hover:text-norby-ivory hover:bg-white/5"
           >
             Buscar
           </Button>
           <Button
             onClick={() => navigate("/transactions")}
-            className="bg-violet-600 hover:bg-violet-500 text-white shadow-lg shadow-violet-600/30"
+            className="bg-norby-teal hover:bg-norby-teal-soft text-norby-night font-medium shadow-lg shadow-norby-teal/20"
           >
             <Plus size={16} /> Novo Lançamento
           </Button>
@@ -166,11 +165,7 @@ export default function Dashboard() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-4 gap-4">
-        <KpiCard
-          title="Saldo atual"
-          value={fmt(totalBalance)}
-          icon={DollarSign}
-        />
+        <KpiCard title="Saldo atual" value={fmt(totalBalance)} icon={DollarSign} />
         <KpiCard
           title="Gastos do mês"
           value={fmt(monthExpenses)}
@@ -187,69 +182,61 @@ export default function Dashboard() {
           title="Score da IA"
           value={`${insight?.score ?? "-"}/100`}
           icon={BrainCircuit}
-          accent="bg-violet-600/30"
+          accent="bg-norby-teal-soft/15 text-norby-teal-soft"
         />
       </div>
-      {/* Fluxo de Caixa */}
+
+      {/* Fluxo de Caixa + Leitura da IA */}
       <div className="grid grid-cols-3 gap-4">
         <div className="glass-card p-5 col-span-2">
-          <h2 className="font-semibold text-black mb-1">Fluxo de Caixa</h2>
-          <p className="text-xs text-black/80 mb-4">
+          <h2 className="font-semibold text-norby-ivory mb-1">Fluxo de Caixa</h2>
+          <p className="text-xs text-norby-ivory/50 mb-4">
             Comparativo entre entradas e saídas
           </p>
           {cashFlowData.length === 0 ? (
-            <div className="flex items-center justify-center h-48 text-black">
+            <div className="flex items-center justify-center h-48 text-norby-ivory/40 text-sm">
               Nenhuma transação registrada ainda
             </div>
           ) : (
             <ResponsiveContainer width="100%" height={220}>
               <LineChart data={cashFlowData}>
-                <XAxis
-                  dataKey="month"
-                  stroke="#00000020"
-                  tick={{ fill: "#00000060", fontSize: 12 }}
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="rgba(255,255,255,0.05)"
+                  vertical={false}
                 />
-                <YAxis
-                  stroke="#00000020"
-                  tick={{ fill: "#00000060", fontSize: 12 }}
-                />
-                <Tooltip
-                  contentStyle={{
-                    background: "#fff",
-                    border: "1px solid #00000015",
-                    borderRadius: 12,
-                    color: "#000",
-                  }}
-                />
+                <XAxis dataKey="month" stroke="rgba(255,255,255,0.10)" tick={axisTick} />
+                <YAxis stroke="rgba(255,255,255,0.10)" tick={axisTick} />
+                <Tooltip contentStyle={tooltipStyle} cursor={{ stroke: "rgba(255,255,255,0.1)" }} />
                 <Line
                   type="monotone"
                   dataKey="Entradas"
-                  stroke="#10B981"
-                  strokeWidth={2}
+                  stroke="#5FBF7E"
+                  strokeWidth={2.5}
                   dot={false}
                 />
                 <Line
                   type="monotone"
                   dataKey="Saídas"
-                  stroke="#7C3AED"
-                  strokeWidth={2}
+                  stroke="#2DB5A3"
+                  strokeWidth={2.5}
                   dot={false}
                 />
               </LineChart>
             </ResponsiveContainer>
           )}
         </div>
-        {/*Leitura da IA*/}
-        <div className="glass-card p-5 flex flex-col gap-3 mt-1">
+
+        {/* Leitura da IA */}
+        <div className="glass-card p-5 flex flex-col gap-3">
           <div>
-            <h2 className="font-semibold text-black">Leitura da IA</h2>
-            <p className="text-xs text-black/80">
-              {" "}
+            <h2 className="font-semibold text-norby-ivory">Leitura da IA</h2>
+            <p className="text-xs text-norby-ivory/50">
               Resumo automático do seu comportamento financeiro
             </p>
           </div>
           {insightItems.length === 0 ? (
-            <div className="flex-1 flex items-center justify-center text-black/50 text-xs text-center">
+            <div className="flex-1 flex items-center justify-center text-norby-ivory/40 text-xs text-center">
               Adicione transações para gerar sua análise de IA
             </div>
           ) : (
@@ -257,7 +244,7 @@ export default function Dashboard() {
               {insightItems.map((item, i) => (
                 <div
                   key={i}
-                  className="p-3 rounded-xl bg-black/5 text-xs text-black/80 leading-relaxed"
+                  className="p-3 rounded-xl bg-white/[0.03] text-xs text-norby-ivory/80 leading-relaxed"
                 >
                   {item.trim()}
                 </div>
@@ -266,29 +253,28 @@ export default function Dashboard() {
           )}
 
           {insight?.suggested_action && (
-            <div className="p-3 rounded-xl bg-violet-600/15 border border-violet-500/20">
-              <p className="text-xs font-semibold text-violet-400 mb-1 uppercase tracking-wider">
+            <div className="p-3 rounded-xl bg-norby-teal/10 border border-norby-teal/20">
+              <p className="text-xs font-semibold text-norby-teal mb-1 uppercase tracking-wider">
                 Sugestão prática
               </p>
-              <p className="text-xs text-black/80">
+              <p className="text-xs text-norby-ivory/80">
                 {insight.suggested_action}
               </p>
             </div>
           )}
         </div>
       </div>
+
       {/* Gastos por categoria + Movimentações Recentes */}
       <div className="grid grid-cols-3 gap-4">
         <div className="glass-card p-5 col-span-2">
-          <h2 className="font-semibold text-black mb-1">
-            Gastos por categoria
-          </h2>
-          <p className="text-xs text-black/80 mb-4">
+          <h2 className="font-semibold text-norby-ivory mb-1">Gastos por categoria</h2>
+          <p className="text-xs text-norby-ivory/50 mb-4">
             Concentração dos principais custos no período
           </p>
 
           {categoryData.length === 0 ? (
-            <div className="flex items-center justify-center h-40 text-black/80 text-sm">
+            <div className="flex items-center justify-center h-40 text-norby-ivory/40 text-sm">
               Nenhuma despesa registrada ainda
             </div>
           ) : (
@@ -300,27 +286,20 @@ export default function Dashboard() {
                     <YAxis
                       type="category"
                       dataKey="name"
-                      stroke="#00000020"
-                      tick={{ fill: "#00000060", fontSize: 11 }}
+                      stroke="rgba(255,255,255,0.10)"
+                      tick={{ fill: "rgba(239,250,248,0.55)", fontSize: 11 }}
                       width={90}
                     />
                     <Tooltip
-                      contentStyle={{
-                        background: "#fff",
-                        border: "1px solid #00000015",
-                        borderRadius: 12,
-                        color: "#000",
-                      }}
+                      contentStyle={tooltipStyle}
+                      cursor={{ fill: "rgba(255,255,255,0.04)" }}
                       formatter={(value) => [fmt(value), "Total"]}
                     />
-                    {categoryData.map((_, i) => (
-                      <Bar
-                        key={i}
-                        dataKey="value"
-                        fill={COLORS[i % COLORS.length]}
-                        radius={[0, 6, 6, 0]}
-                      />
-                    ))}
+                    <Bar dataKey="value" radius={[0, 6, 6, 0]}>
+                      {categoryData.map((_, i) => (
+                        <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                      ))}
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -334,18 +313,14 @@ export default function Dashboard() {
                       cy="50%"
                       innerRadius={35}
                       outerRadius={60}
+                      stroke="none"
                     >
                       {categoryData.map((_, i) => (
                         <Cell key={i} fill={COLORS[i % COLORS.length]} />
                       ))}
                     </Pie>
                     <Tooltip
-                      contentStyle={{
-                        background: "#fff",
-                        border: "1px solid #00000015",
-                        borderRadius: 12,
-                        color: "#000",
-                      }}
+                      contentStyle={tooltipStyle}
                       formatter={(value) => [fmt(value), "Total"]}
                     />
                   </PieChart>
@@ -357,45 +332,42 @@ export default function Dashboard() {
 
         <div className="glass-card p-5 flex flex-col gap-3">
           <div>
-            <h2 className="font-semibold text-black">Movimentações Recentes</h2>
-            <p className="text-xs text-black/80">
+            <h2 className="font-semibold text-norby-ivory">Movimentações Recentes</h2>
+            <p className="text-xs text-norby-ivory/50">
               Últimos lançamentos registrados
             </p>
           </div>
 
           <div className="flex flex-col gap-2 flex-1">
             {transactions.length === 0 ? (
-              <div className="flex-1 flex items-center justify-center text-black/50 text-xs text-center">
+              <div className="flex-1 flex items-center justify-center text-norby-ivory/40 text-xs text-center">
                 Nenhuma movimentação ainda
               </div>
             ) : (
               transactions.slice(0, 4).map((t) => (
                 <div
                   key={t.id}
-                  className="flex items-center justify-between py-2.5 border-b border-black/5 last:border-0"
+                  className="flex items-center justify-between py-2.5 border-b border-white/5 last:border-0"
                 >
                   <div>
-                    <p className="text-sm font-medium text-black">
+                    <p className="text-sm font-medium text-norby-ivory">
                       {t.category}
                     </p>
-                    <p className="text-xs text-black/40">
+                    <p className="text-xs text-norby-ivory/40">
                       {new Date(t.date).toLocaleDateString("pt-BR")}
                     </p>
                   </div>
                   <div className="text-right">
                     <p
-                      className={`text-sm font-semibold ${
-                        t.type === "INCOME" ? "text-emerald-600" : "text-black"
+                      className={`text-sm font-semibold tnum ${
+                        t.type === "INCOME" ? "text-norby-income" : "text-norby-ivory"
                       }`}
                     >
-                      {t.type === "INCOME" ? "+" : "-"}{" "}
-                      {fmt(parseFloat(t.amount))}
+                      {t.type === "INCOME" ? "+" : "-"} {fmt(parseFloat(t.amount))}
                     </p>
                     <p
                       className={`text-xs ${
-                        t.type === "EXPENSE"
-                          ? "text-red-500"
-                          : "text-emerald-600"
+                        t.type === "EXPENSE" ? "text-norby-danger" : "text-norby-income"
                       }`}
                     >
                       {t.type === "EXPENSE" ? "Variável" : "Fixo"}
@@ -407,13 +379,15 @@ export default function Dashboard() {
           </div>
 
           <div className="grid grid-cols-2 gap-2">
-            <div className="p-3 rounded-xl bg-black/5">
-              <p className="text-xs text-black/40">Saldo do mês</p>
-              <p className="text-sm font-bold text-black mt-1">{fmt(monthNet)}</p>
+            <div className="p-3 rounded-xl bg-white/[0.03]">
+              <p className="text-xs text-norby-ivory/40">Saldo do mês</p>
+              <p className="text-sm font-bold text-norby-ivory mt-1 tnum">
+                {fmt(monthNet)}
+              </p>
             </div>
-            <div className="p-3 rounded-xl bg-violet-600/15 border border-violet-500/20">
-              <p className="text-xs text-violet-600">Maior gasto</p>
-              <p className="text-sm font-bold text-black mt-1">
+            <div className="p-3 rounded-xl bg-norby-teal/10 border border-norby-teal/20">
+              <p className="text-xs text-norby-teal">Maior gasto</p>
+              <p className="text-sm font-bold text-norby-ivory mt-1">
                 {categoryData[0]?.name || "—"}
               </p>
             </div>
