@@ -7,7 +7,9 @@ import { authApi } from "../api/auth";
 import { useAuthStore } from "@/store/authStore";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
-import { MoonStar, Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
+import Aurora from "../components/Aurora";
+import NorbyMark from "../components/shared/Logo";
 
 const loginSchema = z.object({
   email: z.string().email("Email inválido"),
@@ -24,6 +26,9 @@ const registerSchema = loginSchema
     path: ["confirmPassword"],
   });
 
+const inputCls =
+  "bg-white/5 border-white/10 text-norby-ivory placeholder:text-norby-ivory/30 focus-visible:ring-norby-teal";
+
 export default function Auth() {
   const [mode, setMode] = useState("login"); // "login" | "register"
   const [showPass, setShowPass] = useState(false);
@@ -37,9 +42,7 @@ export default function Auth() {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm({
-    resolver: zodResolver(schema),
-  });
+  } = useForm({ resolver: zodResolver(schema) });
 
   async function onSubmit(data) {
     setLoading(true);
@@ -64,63 +67,56 @@ export default function Auth() {
   }
 
   return (
-    <div className="min-h-screen bg-[url('/bg_norby.png')] bg-cover bg-center bg-no-repeat flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
+    <div className="relative min-h-screen w-full overflow-hidden bg-norby-night flex items-center justify-center p-4">
+      {/* Fundo Aurora teal */}
+      <div className="fixed inset-0 z-0 pointer-events-none">
+        <Aurora colorStops={["#2DB5A3", "#6FD4C6", "#156358"]} amplitude={1} blend={0.6} />
+        <div className="absolute inset-0 bg-norby-night/70 backdrop-blur-[20px]" />
+      </div>
+
+      <div className="relative z-10 w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-600 to-violet-900 mb-4 shadow-lg shadow-violet-900/30">
-            <MoonStar size={28} className="text-white" />
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-norby-teal mb-4 shadow-lg shadow-norby-teal/30">
+            <NorbyMark size={30} color="#07100F" />
           </div>
-          <h1 className="text-2xl text-black">Norby</h1>
-          <p className="text-black/80">
-            Seu organizador financeiro inteligente
-          </p>
+          <h1 className="text-2xl font-bold text-norby-ivory">Norby</h1>
+          <p className="text-norby-ivory/60 text-sm mt-1">seu norte financeiro</p>
         </div>
+
         {/* Card */}
         <div className="glass-card p-8">
           {/* Tabs */}
-          <div className="flex gap-1 p-1 rounded-xl bg-black/15 mb-6">
+          <div className="flex gap-1 p-1 rounded-xl bg-white/5 mb-6">
             {["login", "register"].map((m) => (
               <button
                 key={m}
                 onClick={() => setMode(m)}
                 className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
                   mode === m
-                    ? "bg-violet-600 text-white shadow-sm"
-                    : "text-white/60 hover:text-white/100"
+                    ? "bg-norby-teal text-norby-night"
+                    : "text-norby-ivory/50 hover:text-norby-ivory"
                 }`}
               >
-                {m == "login" ? "Entrar" : "Cadastrar"}
+                {m === "login" ? "Entrar" : "Cadastrar"}
               </button>
             ))}
           </div>
+
           {/* Form */}
           <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
             {mode === "register" && (
               <div>
-                <Input
-                  placeholder="Seu nome"
-                  {...register("name")}
-                  className="bg-black/5 border-black/10 text-black placeholder:text-black/50 focus-visible:ring-violet-500 pr-10"
-                />
+                <Input placeholder="Seu nome" {...register("name")} className={inputCls} />
                 {errors.name && (
-                  <p className="text-red-500 text-xs mt-1">
-                    {errors.name.message}
-                  </p>
+                  <p className="text-norby-danger text-xs mt-1">{errors.name.message}</p>
                 )}
               </div>
             )}
             <div>
-              <Input
-                type="email"
-                placeholder="Email"
-                {...register("email")}
-                className="bg-black/5 border-black/10 text-black placeholder:text-black/50 focus-visible:ring-violet-500 pr-10"
-              />
+              <Input type="email" placeholder="Email" {...register("email")} className={inputCls} />
               {errors.email && (
-                <p className="text-red-500 text-xs mt-1">
-                  {errors.email.message}
-                </p>
+                <p className="text-norby-danger text-xs mt-1">{errors.email.message}</p>
               )}
             </div>
 
@@ -129,19 +125,17 @@ export default function Auth() {
                 type={showPass ? "text" : "password"}
                 placeholder="Senha"
                 {...register("password")}
-                className="bg-black/5 border-black/10 text-black placeholder:text-black/50 focus-visible:ring-violet-500 pr-10"
+                className={`${inputCls} pr-10`}
               />
               <button
                 type="button"
                 onClick={() => setShowPass(!showPass)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-black/30 hover:text-black/60"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-norby-ivory/30 hover:text-norby-ivory/70"
               >
                 {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
               {errors.password && (
-                <p className="text-red-500 text-xs mt-1">
-                  {errors.password.message}
-                </p>
+                <p className="text-norby-danger text-xs mt-1">{errors.password.message}</p>
               )}
             </div>
 
@@ -151,10 +145,10 @@ export default function Auth() {
                   type="password"
                   placeholder="Confirmar Senha"
                   {...register("confirmPassword")}
-                  className="bg-black/5 border-black/10 text-black placeholder:text-black/50 focus-visible:ring-violet-500 pr-10"
+                  className={inputCls}
                 />
                 {errors.confirmPassword && (
-                  <p className="text-red-500 text-xs mt-1">
+                  <p className="text-norby-danger text-xs mt-1">
                     {errors.confirmPassword.message}
                   </p>
                 )}
@@ -162,20 +156,16 @@ export default function Auth() {
             )}
 
             {error && (
-              <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500 text-sm">
+              <div className="p-3 rounded-lg bg-norby-danger/10 border border-norby-danger/20 text-norby-danger text-sm">
                 {error}
               </div>
             )}
             <Button
               type="submit"
               disabled={loading}
-              className="w-full bg-violet-600 hover:bg-violet-500 text-white font-medium shadow-lg shadow-violet-600/30"
+              className="w-full bg-norby-teal hover:bg-norby-teal-soft text-norby-night font-medium shadow-lg shadow-norby-teal/30"
             >
-              {loading
-                ? "Caregando..."
-                : mode === "login"
-                  ? "Entrar"
-                  : "Criar Conta"}
+              {loading ? "Carregando..." : mode === "login" ? "Entrar" : "Criar Conta"}
             </Button>
           </form>
         </div>
