@@ -28,9 +28,13 @@ export default function Wallets() {
 
   async function handleSave() {
     if (editing) {
-      await walletsApi.update(editing.id, form);
+      // Saldo não é editável: deriva das transações. Edita só o nome.
+      await walletsApi.update(editing.id, { name: form.name });
     } else {
-      await walletsApi.create(form);
+      await walletsApi.create({
+        name: form.name,
+        balance: form.balance === "" ? 0 : form.balance,
+      });
     }
     setOpen(false);
     setEditing(null);
@@ -88,13 +92,15 @@ export default function Wallets() {
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 className="bg-black-5 border-black/10 text-black placeholder:text-black/30"
               />
-              <Input
-                type="number"
-                placeholder="Saldo Inicial"
-                value={form.balance}
-                onChange={(e) => setForm({ ...form, balance: e.target.value })}
-                className="bg-black-5 border-black/10 text-black placeholder:text-black/30"
-              />
+              {!editing && (
+                <Input
+                  type="number"
+                  placeholder="Saldo Inicial"
+                  value={form.balance}
+                  onChange={(e) => setForm({ ...form, balance: e.target.value })}
+                  className="bg-black-5 border-black/10 text-black placeholder:text-black/30"
+                />
+              )}
               <Button
                 onClick={handleSave}
                 className="w-full bg-violet-600 hover:bg-violet-500 text-white"

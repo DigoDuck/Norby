@@ -8,8 +8,8 @@ class WalletCreate(BaseModel):
     balance: Decimal = Decimal("0.00")
 
 class WalletUpdate(BaseModel):
+    # Saldo NÃO é editável à mão: ele deriva das transações (fonte única de verdade).
     name: str | None = None
-    balance: Decimal | None = None
     
 class WalletResponse(BaseModel):
     id: UUID

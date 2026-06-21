@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Optional
 from app.dependencies import get_db, get_current_user
 from app.models.sql_models import User, Transaction, TransactionType, Wallet
-from app.schemas.transaction import TransactionCreate, TransactionResponse
+from app.schemas.transaction import TransactionCreate, TransactionUpdate, TransactionResponse
 from decimal import Decimal
 
 router = APIRouter(prefix="/transactions", tags=["Transactions"])
@@ -69,6 +69,76 @@ async def create_transaction(
     await db.refresh(transaction)
     return transaction
 
+@router.put("/{transaction_id}", response_model=TransactionResponse)
+async def update_transaction(
+    transaction_id: UUID,
+    payload: TransactionUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    # Busca a transação do usuário
+    result = await db.execute(
+        select(Transaction).where(
+            Transaction.id == transaction_id,
+            Transaction.user_id == current_user.id,
+        )
+    )
+    transaction = result.scalar_one_or_none()
+    if not transaction:
+        raise HTTPException(status_code=404, detail="Transação não encontrada")
+
+    data = payload.model_dump(exclude_unset=True)
+
+    # Valores finais: o que veio no payload sobrescreve o atual
+    new_wallet_id = data.get("wallet_id", transaction.wallet_id)
+    new_type = data.get("type", transaction.type)
+    new_amount = data.get("amount", transaction.amount)
+
+    # Carteira de origem (onde o efeito antigo está aplicado)
+    old_wallet_result = await db.execute(
+        select(Wallet).where(
+            Wallet.id == transaction.wallet_id,
+            Wallet.user_id == current_user.id,
+        )
+    )
+    old_wallet = old_wallet_result.scalar_one_or_none()
+
+    # Carteira de destino (pode ser a mesma)
+    if new_wallet_id == transaction.wallet_id:
+        new_wallet = old_wallet
+    else:
+        new_wallet_result = await db.execute(
+            select(Wallet).where(
+                Wallet.id == new_wallet_id,
+                Wallet.user_id == current_user.id,
+            )
+        )
+        new_wallet = new_wallet_result.scalar_one_or_none()
+        if not new_wallet:
+            raise HTTPException(status_code=404, detail="Carteira não encontrada")
+
+    # 1) Reverte o efeito antigo (usa os valores AINDA não alterados da transação)
+    if old_wallet:
+        if transaction.type == TransactionType.INCOME:
+            old_wallet.balance -= transaction.amount
+        else:
+            old_wallet.balance += transaction.amount
+
+    # 2) Aplica o efeito novo na carteira de destino
+    if new_wallet:
+        if new_type == TransactionType.INCOME:
+            new_wallet.balance += new_amount
+        else:
+            new_wallet.balance -= new_amount
+
+    # 3) Atualiza os campos da transação
+    for field, value in data.items():
+        setattr(transaction, field, value)
+
+    await db.commit()
+    await db.refresh(transaction)
+    return transaction
+
 @router.delete("/{transaction_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_transaction(
     transaction_id: UUID,
@@ -85,7 +155,12 @@ async def delete_transaction(
     if not transaction:
         raise HTTPException(status_code=404, detail="Transação não encontrada")
 
-    wallet_result = await db.execute(select(Wallet).where(Wallet.id == transaction.wallet_id))
+    wallet_result = await db.execute(
+        select(Wallet).where(
+            Wallet.id == transaction.wallet_id,
+            Wallet.user_id == current_user.id,
+        )
+    )
     wallet = wallet_result.scalar_one_or_none()
     if wallet:
         if transaction.type == TransactionType.INCOME:
