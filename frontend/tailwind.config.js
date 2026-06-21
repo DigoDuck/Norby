@@ -5,12 +5,16 @@ export default {
   theme: {
     extend: {
         colors: {
-          lumea: {
-            purple: "#7C3AED",
-            "purple-light": "#A78BFA",
-            dark: "#0A0A0A",
-            card: "rgba(255, 255, 255, 0.05)",
-            border: "rgba(255, 255, 255, 0.10)",
+          norby: {
+            night: "#07100F",
+            surface: "#0E1B19",
+            surface2: "#152624",
+            teal: "#2DB5A3",
+            "teal-soft": "#6FD4C6",
+            ivory: "#EFFAF8",
+            income: "#5FBF7E",
+            expense: "#8A8580",
+            danger: "#E06A4A",
           }
         }
     },
