@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   DollarSign,
   CreditCard,
@@ -36,52 +37,80 @@ export default function Dashboard() {
   const [transactions, setTransactions] = useState([]);
   const [insight, setInsight] = useState(null);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
     async function loadData() {
-      try {
-        const [wRes, tRes, iRes] = await Promise.all([
-          walletsApi.list(),
-          transactionsApi.list(),
-          aiApi.getInsight(),
-        ]);
-        setWallets(wRes.data);
-        setTransactions(tRes.data);
-        setInsight(iRes.data);
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setLoading(false);
-      }
+      // allSettled: falha da IA (insight) não derruba wallets/transactions
+      const [wRes, tRes, iRes] = await Promise.allSettled([
+        walletsApi.list(),
+        transactionsApi.list(),
+        aiApi.getInsight(),
+      ]);
+      if (wRes.status === "fulfilled") setWallets(wRes.value.data);
+      if (tRes.status === "fulfilled") setTransactions(tRes.value.data);
+      if (iRes.status === "fulfilled") setInsight(iRes.value.data);
+      setLoading(false);
     }
     loadData();
   }, []);
 
-  // Cálculos dos KPIs
-  const totalBalance = wallets.reduce((s, w) => s + parseFloat(w.balance), 0);
-  const totalIncome = transactions
-    .filter((t) => t.type === "INCOME")
-    .reduce((s, t) => s + parseFloat(t.amount), 0);
-  const totalExpenses = transactions
-    .filter((t) => t.type === "EXPENSE")
-    .reduce((s, t) => s + parseFloat(t.amount), 0);
+  // --- Recortes de tempo: mês atual e mês anterior ---
+  const now = new Date();
+  const curY = now.getFullYear();
+  const curM = now.getMonth();
+  const prevDate = new Date(curY, curM - 1, 1);
+  const prevY = prevDate.getFullYear();
+  const prevM = prevDate.getMonth();
 
-  // Dados para o gráfico de fluxo de caixa
+  const inMonth = (dateStr, y, m) => {
+    const d = new Date(dateStr);
+    return d.getFullYear() === y && d.getMonth() === m;
+  };
+  const sumBy = (list, type) =>
+    list
+      .filter((t) => t.type === type)
+      .reduce((s, t) => s + parseFloat(t.amount), 0);
+  const pctChange = (curr, prev) =>
+    prev > 0 ? ((curr - prev) / prev) * 100 : undefined;
+
+  // Saldo atual = soma das carteiras (estado real, não recorte de mês)
+  const totalBalance = wallets.reduce((s, w) => s + parseFloat(w.balance), 0);
+
+  // KPIs do MÊS atual + variação real vs mês anterior
+  const monthTx = transactions.filter((t) => inMonth(t.date, curY, curM));
+  const prevTx = transactions.filter((t) => inMonth(t.date, prevY, prevM));
+  const monthIncome = sumBy(monthTx, "INCOME");
+  const monthExpenses = sumBy(monthTx, "EXPENSE");
+  const incomeChange = pctChange(monthIncome, sumBy(prevTx, "INCOME"));
+  const expensesChange = pctChange(monthExpenses, sumBy(prevTx, "EXPENSE"));
+  const monthNet = monthIncome - monthExpenses;
+
+  // Fluxo de caixa: agrupa por ANO-MÊS (não mistura anos), ordena e pega os últimos 6
   const cashFlowData = (() => {
     const map = {};
     transactions.forEach((t) => {
       const d = new Date(t.date);
-      const label = d.toLocaleString("pt-BR", { month: "short" });
-      if (!map[label]) map[label] = { month: label, Entradas: 0, Saídas: 0 };
-      if (t.type === "INCOME") map[label].Entradas += parseFloat(t.amount);
-      if (t.type === "EXPENSE") map[label].Saídas += parseFloat(t.amount);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      if (!map[key]) {
+        map[key] = {
+          key,
+          month: d.toLocaleString("pt-BR", { month: "short" }),
+          Entradas: 0,
+          Saídas: 0,
+        };
+      }
+      if (t.type === "INCOME") map[key].Entradas += parseFloat(t.amount);
+      if (t.type === "EXPENSE") map[key].Saídas += parseFloat(t.amount);
     });
-    return Object.values(map).slice(-4);
+    return Object.values(map)
+      .sort((a, b) => a.key.localeCompare(b.key))
+      .slice(-6);
   })();
 
-  // Categorias
+  // Categorias de despesa DO MÊS atual
   const categoryData = Object.values(
-    transactions
+    monthTx
       .filter((t) => t.type === "EXPENSE")
       .reduce((acc, t) => {
         const key = t.category;
@@ -111,7 +140,7 @@ export default function Dashboard() {
       <div className="flex items-start justify-between">
         <div>
           <p className="text-black/80 text-sm">Bem-vindo de volta</p>
-          <h1 className="text-2l font-bold text-black mt-0.5">
+          <h1 className="text-2xl font-bold text-black mt-0.5">
             Dashboard Financeiro com IA
           </h1>
           <p className="text-black/80 text-sm mt-1">
@@ -121,11 +150,15 @@ export default function Dashboard() {
         <div className="flex gap-2">
           <Button
             variant="outline"
+            onClick={() => navigate("/transactions")}
             className="border-black/20 text-black/60 hover:text-black hover:bg-black/10"
           >
             Buscar
           </Button>
-          <Button className="bg-violet-600 hover:bg-violet-500 text-white shadow-lg shadow-violet-600/30">
+          <Button
+            onClick={() => navigate("/transactions")}
+            className="bg-violet-600 hover:bg-violet-500 text-white shadow-lg shadow-violet-600/30"
+          >
             <Plus size={16} /> Novo Lançamento
           </Button>
         </div>
@@ -134,27 +167,25 @@ export default function Dashboard() {
       {/* KPI Cards */}
       <div className="grid grid-cols-4 gap-4">
         <KpiCard
-          title="saldo atual"
+          title="Saldo atual"
           value={fmt(totalBalance)}
-          change={8.2}
           icon={DollarSign}
         />
         <KpiCard
           title="Gastos do mês"
-          value={fmt(totalExpenses)}
-          change={8.2}
+          value={fmt(monthExpenses)}
+          change={expensesChange}
           icon={CreditCard}
         />
         <KpiCard
-          title="Receitas"
-          value={fmt(totalIncome)}
-          change={8.2}
+          title="Receitas do mês"
+          value={fmt(monthIncome)}
+          change={incomeChange}
           icon={TrendingUp}
         />
         <KpiCard
           title="Score da IA"
-          value={`${insight?.score || "-"}/100`}
-          change={-6}
+          value={`${insight?.score ?? "-"}/100`}
           icon={BrainCircuit}
           accent="bg-violet-600/30"
         />
@@ -168,7 +199,7 @@ export default function Dashboard() {
           </p>
           {cashFlowData.length === 0 ? (
             <div className="flex items-center justify-center h-48 text-black">
-              Nenhuma transição registrada ainda
+              Nenhuma transação registrada ainda
             </div>
           ) : (
             <ResponsiveContainer width="100%" height={220}>
@@ -377,15 +408,13 @@ export default function Dashboard() {
 
           <div className="grid grid-cols-2 gap-2">
             <div className="p-3 rounded-xl bg-black/5">
-              <p className="text-xs text-black/40">Meta mensal</p>
-              <p className="text-sm font-bold text-black mt-1">
-                {fmt(totalIncome * 0.8 || 0)}
-              </p>
+              <p className="text-xs text-black/40">Saldo do mês</p>
+              <p className="text-sm font-bold text-black mt-1">{fmt(monthNet)}</p>
             </div>
             <div className="p-3 rounded-xl bg-violet-600/15 border border-violet-500/20">
-              <p className="text-xs text-violet-600">Reserva IA</p>
+              <p className="text-xs text-violet-600">Maior gasto</p>
               <p className="text-sm font-bold text-black mt-1">
-                {fmt(Math.max(totalIncome - totalExpenses, 0))}
+                {categoryData[0]?.name || "—"}
               </p>
             </div>
           </div>
