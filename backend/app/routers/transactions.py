@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
+from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from uuid import UUID
 from datetime import datetime
@@ -28,13 +28,11 @@ async def list_transactions(
     if type:
         filters.append(Transaction.type == type)
     if month and year:
-        filters.append(
-            and_(
-                Transaction.date >= datetime(year, month, 1),
-                Transaction.date < datetime(year, month % 12 + 1, 1) if month < 12
-                    else datetime(year + 1, 1, 1),
-            )
-        )
+        # Intervalo [início do mês, início do mês seguinte) — correto inclusive p/ dezembro
+        start = datetime(year, month, 1)
+        end = datetime(year + 1, 1, 1) if month == 12 else datetime(year, month + 1, 1)
+        filters.append(Transaction.date >= start)
+        filters.append(Transaction.date < end)
     result = await db.execute(
         select(Transaction)
         .where(*filters)

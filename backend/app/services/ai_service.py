@@ -49,6 +49,7 @@ async def _get_user_financial_summary(user_id: str) -> dict:
                 Transaction.user_id == user_id,
                 Transaction.type == TransactionType.EXPENSE,
                 func.extract("month", Transaction.date) == now.month,
+                func.extract("year", Transaction.date) == now.year,
             )
             .group_by(Transaction.category)
             .order_by(func.sum(Transaction.amount).desc())

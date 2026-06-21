@@ -39,19 +39,21 @@ async def chat(payload: ChatMessage, current_user: User = Depends(get_current_us
     session_id = payload.session_id or str(uuid4())
     user_id = str(current_user.id)
 
-    # Recupera histórico da sessão
+    # Recupera histórico da sessão (para dar contexto à IA)
     history_doc = await chat_history_collection.find_one(
         {"user_id": user_id, "session_id": session_id}
     )
-    messages = history_doc["messages"] if history_doc else []
-    
-    # Adiciona mensagem do usuário
-    user_msg = { "role": "user", "content": payload.message, "timestamp": datetime.now(timezone.utc).isoformat()}
-    messages.append(user_msg)
+    history = history_doc["messages"] if history_doc else []
+
+    user_msg = {
+        "role": "user",
+        "content": payload.message,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
 
     # Chama o Gemini (se falhar, devolve 503 claro em vez de 500 sem headers de CORS)
     try:
-        ai_response = await chat_with_ai(user_id, payload.message, messages[:-1])
+        ai_response = await chat_with_ai(user_id, payload.message, history)
     except Exception:
         logger.exception("Falha no chat com a IA (user=%s)", user_id)
         raise HTTPException(
@@ -59,31 +61,36 @@ async def chat(payload: ChatMessage, current_user: User = Depends(get_current_us
             detail="Norby AI está temporariamente indisponível. Tente novamente em instantes.",
         )
 
-    # Resposta da IA
-    ai_msg = {"role": "assistant", "content": ai_response, "timestamp": datetime.now(timezone.utc).isoformat()}
-    messages.append(ai_msg)
+    ai_msg = {
+        "role": "assistant",
+        "content": ai_response,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
 
-    # Salva histórico no MongoDB
+    # $push atômico: mensagens simultâneas não se sobrescrevem (sem last-write-wins)
     await chat_history_collection.update_one(
         {"user_id": user_id, "session_id": session_id},
-        {"$set": {"messages": messages, "update_at": datetime.now(timezone.utc)}},
-        upsert=True
+        {
+            "$push": {"messages": {"$each": [user_msg, ai_msg]}},
+            "$set": {"updated_at": datetime.now(timezone.utc)},
+        },
+        upsert=True,
     )
-    
+
     return {"response": ai_response, "session_id": session_id}
 
 @router.get("/chat/sessions")
 async def list_sessions(current_user: User = Depends(get_current_user)): # Lista sessões de chat do usuário
     cursor = chat_history_collection.find(
         {"user_id": str(current_user.id)},
-        {"session_id": 1, "update_at": 1, "messages": {"$slice": 1}},
-    ).sort("update_at", -1).limit(20)
-    
+        {"session_id": 1, "updated_at": 1, "messages": {"$slice": 1}},
+    ).sort("updated_at", -1).limit(20)
+
     sessions = []
     async for doc in cursor:
         sessions.append({
             "session_id": doc["session_id"],
-            "update_at": doc.get("update_at"),
+            "updated_at": doc.get("updated_at"),
             "first_message": doc["messages"][0]["content"] if doc.get("messages") else "",
         })
     return sessions
