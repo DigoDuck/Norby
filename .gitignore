@@ -68,6 +68,9 @@ dist/
 .idea/
 *.DS_Store
 
+# Claude Code
+.claude/
+
 # Django stuff:
 *.log
 local_settings.py
