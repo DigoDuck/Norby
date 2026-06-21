@@ -4,17 +4,17 @@ import Aurora from "../Aurora";
 
 export default function AppLayout() {
   return (
-    <div className="relative min-h-screen w-full overflow-hidden bg-white/80">
-      
-      {/* 1. Camada de Fundo (Aurora) */}
+    <div className="relative min-h-screen w-full overflow-hidden bg-norby-night">
+
+      {/* 1. Camada de Fundo (Aurora teal) */}
       <div className="fixed inset-0 z-0 pointer-events-none">
         <Aurora
-          colorStops={["#9252ff", "#bc6bf6", "#7d19f8"]}
+          colorStops={["#2DB5A3", "#6FD4C6", "#156358"]}
           amplitude={1}
           blend={0.75}
         />
-        {/* Overlay para suavizar e dar o tom "Light Mode" */}
-        <div className="absolute inset-0 bg-white/45 backdrop-blur-[20px]" />
+        {/* Overlay escuro: dark-first, deixa só o glow teal vazar */}
+        <div className="absolute inset-0 bg-norby-night/60 backdrop-blur-[20px]" />
       </div>
       
       <div className="relative z-10 flex h-screen">
