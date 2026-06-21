@@ -1,6 +1,16 @@
-export default function KpiCard({ title, value, change, icon: Icon, accent }) {
+export default function KpiCard({
+  title,
+  value,
+  suffix,
+  change,
+  changeInverted,
+  icon: Icon,
+  accent,
+}) {
   const hasChange = change !== undefined;
-  const isPositive = change >= 0;
+  const rising = change >= 0;
+  // Para "Gastos", subir é ruim → inverte a semântica de cor (não o ícone)
+  const isGood = changeInverted ? !rising : rising;
 
   return (
     <div className="group rounded-2xl bg-norby-surface/70 border border-white/[0.06] p-5 flex flex-col gap-3 transition-colors duration-200 hover:border-white/[0.14]">
@@ -18,14 +28,19 @@ export default function KpiCard({ title, value, change, icon: Icon, accent }) {
       </div>
       <p className="text-2xl font-semibold text-norby-ivory tracking-tight tnum">
         {value}
+        {suffix && (
+          <span className="text-sm font-medium text-norby-ivory/40 ml-0.5">
+            {suffix}
+          </span>
+        )}
       </p>
       {hasChange && (
         <p
           className={`text-xs font-medium flex items-center gap-1 tnum ${
-            isPositive ? "text-norby-income" : "text-norby-danger"
+            isGood ? "text-norby-income" : "text-norby-danger"
           }`}
         >
-          {isPositive ? "▲" : "▼"} {Math.abs(change).toFixed(1)}% vs. mês anterior
+          {rising ? "▲" : "▼"} {Math.abs(change).toFixed(1)}% vs. mês anterior
         </p>
       )}
     </div>

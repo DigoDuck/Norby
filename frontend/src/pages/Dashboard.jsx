@@ -1,15 +1,22 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { DollarSign, CreditCard, TrendingUp, Plus, BrainCircuit } from "lucide-react";
 import {
-  LineChart,
-  Line,
+  DollarSign,
+  CreditCard,
+  TrendingUp,
+  TrendingDown,
+  Plus,
+  BrainCircuit,
+  ArrowUpRight,
+  ArrowDownRight,
+} from "lucide-react";
+import {
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   Tooltip,
   ResponsiveContainer,
-  BarChart,
-  Bar,
   PieChart,
   Pie,
   Cell,
@@ -21,15 +28,51 @@ import { walletsApi } from "@/api/wallets";
 import { aiApi } from "@/api/ai";
 import { Button } from "@/components/ui/button";
 
-const COLORS = ["#2DB5A3", "#6FD4C6", "#5FBF7E", "#1F8C7E", "#E06A4A"];
+// Paleta categórica de hues distintos (resolve o "2 cores parecidas" do donut)
+const CATEGORY_COLORS = [
+  "#2DB5A3", // teal
+  "#5B8DEF", // azul
+  "#E0B341", // dourado
+  "#E0725C", // coral
+  "#7BD88F", // verde
+  "#6FD4C6", // teal-soft (reserva p/ 6ª categoria)
+];
 
-const tooltipStyle = {
-  background: "#0E1B19",
-  border: "1px solid rgba(255,255,255,0.10)",
-  borderRadius: 12,
-  color: "#EFFAF8",
-};
-const axisTick = { fill: "rgba(239,250,248,0.45)", fontSize: 12 };
+const INCOME_COLOR = "#5FBF7E";
+const EXPENSE_COLOR = "#E0725C";
+
+const axisTick = { fill: "rgba(239,250,248,0.40)", fontSize: 11 };
+
+const fmt = (v) =>
+  `R$ ${Number(v).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+const fmtShort = (v) =>
+  Number(v) >= 1000 ? `${(v / 1000).toFixed(1)}k` : `${v}`;
+
+// Tooltip escuro reutilizável, formatado em R$
+function ChartTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="rounded-xl bg-norby-surface2/95 backdrop-blur-md border border-white/10 px-3 py-2 shadow-xl">
+      {label && (
+        <p className="text-[11px] font-medium text-norby-ivory/50 mb-1 capitalize">
+          {label}
+        </p>
+      )}
+      {payload.map((p) => (
+        <div key={p.name} className="flex items-center gap-2 text-xs">
+          <span
+            className="w-2 h-2 rounded-full"
+            style={{ background: p.color || p.payload?.fill }}
+          />
+          <span className="text-norby-ivory/70">{p.name}</span>
+          <span className="ml-auto font-semibold text-norby-ivory tnum">
+            {fmt(p.value)}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function Dashboard() {
   const [wallets, setWallets] = useState([]);
@@ -107,7 +150,7 @@ export default function Dashboard() {
       .slice(-6);
   })();
 
-  // Categorias de despesa DO MÊS atual
+  // Categorias de despesa DO MÊS atual (já ordenado desc → maior fatia às 12h)
   const categoryData = Object.values(
     monthTx
       .filter((t) => t.type === "EXPENSE")
@@ -121,6 +164,8 @@ export default function Dashboard() {
     .sort((a, b) => b.value - a.value)
     .slice(0, 5);
 
+  const categoryTotal = categoryData.reduce((s, c) => s + c.value, 0);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -129,12 +174,10 @@ export default function Dashboard() {
     );
   }
 
-  const fmt = (v) =>
-    `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
   const insightItems = insight?.summary_text?.split("|") || [];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
@@ -142,36 +185,18 @@ export default function Dashboard() {
           <h1 className="text-2xl font-bold text-norby-ivory mt-0.5 tracking-tight">
             Dashboard
           </h1>
-          <p className="text-norby-ivory/50 text-sm mt-1">
-            Acompanhe seus gastos, metas e recomendações da IA
-          </p>
         </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={() => navigate("/transactions")}
-            className="border-white/10 text-norby-ivory/70 hover:text-norby-ivory hover:bg-white/5"
-          >
-            Buscar
-          </Button>
-          <Button
-            onClick={() => navigate("/transactions")}
-            className="bg-norby-teal hover:bg-norby-teal-soft text-norby-night font-medium shadow-lg shadow-norby-teal/20"
-          >
-            <Plus size={16} /> Novo Lançamento
-          </Button>
-        </div>
+        <Button
+          onClick={() => navigate("/transactions")}
+          className="bg-norby-teal hover:bg-norby-teal-soft text-norby-night font-medium shadow-lg shadow-norby-teal/20"
+        >
+          <Plus size={16} /> Novo Lançamento
+        </Button>
       </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-4 gap-4">
         <KpiCard title="Saldo atual" value={fmt(totalBalance)} icon={DollarSign} />
-        <KpiCard
-          title="Gastos do mês"
-          value={fmt(monthExpenses)}
-          change={expensesChange}
-          icon={CreditCard}
-        />
         <KpiCard
           title="Receitas do mês"
           value={fmt(monthIncome)}
@@ -179,8 +204,16 @@ export default function Dashboard() {
           icon={TrendingUp}
         />
         <KpiCard
+          title="Gastos do mês"
+          value={fmt(monthExpenses)}
+          change={expensesChange}
+          changeInverted
+          icon={CreditCard}
+        />
+        <KpiCard
           title="Score da IA"
-          value={`${insight?.score ?? "-"}/100`}
+          value={`${insight?.score ?? "—"}`}
+          suffix="/100"
           icon={BrainCircuit}
           accent="bg-norby-teal-soft/15 text-norby-teal-soft"
         />
@@ -189,40 +222,92 @@ export default function Dashboard() {
       {/* Fluxo de Caixa + Leitura da IA */}
       <div className="grid grid-cols-3 gap-4">
         <div className="glass-card p-5 col-span-2">
-          <h2 className="font-semibold text-norby-ivory mb-1">Fluxo de Caixa</h2>
-          <p className="text-xs text-norby-ivory/50 mb-4">
-            Comparativo entre entradas e saídas
-          </p>
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <h2 className="font-semibold text-norby-ivory">Fluxo de Caixa</h2>
+              <p className="text-xs text-norby-ivory/50 mt-0.5">
+                Entradas e saídas dos últimos meses
+              </p>
+            </div>
+            <div className="flex items-center gap-4 text-xs">
+              <span className="flex items-center gap-1.5 text-norby-ivory/60">
+                <span
+                  className="w-2.5 h-2.5 rounded-full"
+                  style={{ background: INCOME_COLOR }}
+                />
+                Entradas
+              </span>
+              <span className="flex items-center gap-1.5 text-norby-ivory/60">
+                <span
+                  className="w-2.5 h-2.5 rounded-full"
+                  style={{ background: EXPENSE_COLOR }}
+                />
+                Saídas
+              </span>
+            </div>
+          </div>
           {cashFlowData.length === 0 ? (
-            <div className="flex items-center justify-center h-48 text-norby-ivory/40 text-sm">
+            <div className="flex items-center justify-center h-[220px] text-norby-ivory/40 text-sm">
               Nenhuma transação registrada ainda
             </div>
           ) : (
             <ResponsiveContainer width="100%" height={220}>
-              <LineChart data={cashFlowData}>
+              <AreaChart
+                data={cashFlowData}
+                margin={{ top: 8, right: 8, left: -16, bottom: 0 }}
+              >
+                <defs>
+                  <linearGradient id="gIncome" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={INCOME_COLOR} stopOpacity={0.3} />
+                    <stop offset="100%" stopColor={INCOME_COLOR} stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="gExpense" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={EXPENSE_COLOR} stopOpacity={0.28} />
+                    <stop offset="100%" stopColor={EXPENSE_COLOR} stopOpacity={0} />
+                  </linearGradient>
+                </defs>
                 <CartesianGrid
                   strokeDasharray="3 3"
                   stroke="rgba(255,255,255,0.05)"
                   vertical={false}
                 />
-                <XAxis dataKey="month" stroke="rgba(255,255,255,0.10)" tick={axisTick} />
-                <YAxis stroke="rgba(255,255,255,0.10)" tick={axisTick} />
-                <Tooltip contentStyle={tooltipStyle} cursor={{ stroke: "rgba(255,255,255,0.1)" }} />
-                <Line
+                <XAxis
+                  dataKey="month"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={axisTick}
+                  className="capitalize"
+                />
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  tick={axisTick}
+                  tickFormatter={fmtShort}
+                  width={48}
+                />
+                <Tooltip
+                  content={<ChartTooltip />}
+                  cursor={{ stroke: "rgba(255,255,255,0.12)", strokeWidth: 1 }}
+                />
+                <Area
                   type="monotone"
                   dataKey="Entradas"
-                  stroke="#5FBF7E"
+                  stroke={INCOME_COLOR}
                   strokeWidth={2.5}
+                  fill="url(#gIncome)"
                   dot={false}
+                  activeDot={{ r: 4, strokeWidth: 0 }}
                 />
-                <Line
+                <Area
                   type="monotone"
                   dataKey="Saídas"
-                  stroke="#2DB5A3"
+                  stroke={EXPENSE_COLOR}
                   strokeWidth={2.5}
+                  fill="url(#gExpense)"
                   dot={false}
+                  activeDot={{ r: 4, strokeWidth: 0 }}
                 />
-              </LineChart>
+              </AreaChart>
             </ResponsiveContainer>
           )}
         </div>
@@ -232,7 +317,7 @@ export default function Dashboard() {
           <div>
             <h2 className="font-semibold text-norby-ivory">Leitura da IA</h2>
             <p className="text-xs text-norby-ivory/50">
-              Resumo automático do seu comportamento financeiro
+              Resumo do seu comportamento financeiro
             </p>
           </div>
           {insightItems.length === 0 ? (
@@ -254,7 +339,7 @@ export default function Dashboard() {
 
           {insight?.suggested_action && (
             <div className="p-3 rounded-xl bg-norby-teal/10 border border-norby-teal/20">
-              <p className="text-xs font-semibold text-norby-teal mb-1 uppercase tracking-wider">
+              <p className="text-[11px] font-semibold text-norby-teal mb-1 uppercase tracking-wider">
                 Sugestão prática
               </p>
               <p className="text-xs text-norby-ivory/80">
@@ -268,63 +353,82 @@ export default function Dashboard() {
       {/* Gastos por categoria + Movimentações Recentes */}
       <div className="grid grid-cols-3 gap-4">
         <div className="glass-card p-5 col-span-2">
-          <h2 className="font-semibold text-norby-ivory mb-1">Gastos por categoria</h2>
+          <h2 className="font-semibold text-norby-ivory">Gastos por categoria</h2>
           <p className="text-xs text-norby-ivory/50 mb-4">
-            Concentração dos principais custos no período
+            Distribuição das despesas do mês
           </p>
 
           {categoryData.length === 0 ? (
-            <div className="flex items-center justify-center h-40 text-norby-ivory/40 text-sm">
+            <div className="flex items-center justify-center h-[200px] text-norby-ivory/40 text-sm">
               Nenhuma despesa registrada ainda
             </div>
           ) : (
-            <div className="flex gap-6 items-center">
-              <div className="flex-1">
-                <ResponsiveContainer width="100%" height={180}>
-                  <BarChart data={categoryData} layout="vertical">
-                    <XAxis type="number" hide />
-                    <YAxis
-                      type="category"
-                      dataKey="name"
-                      stroke="rgba(255,255,255,0.10)"
-                      tick={{ fill: "rgba(239,250,248,0.55)", fontSize: 11 }}
-                      width={90}
-                    />
-                    <Tooltip
-                      contentStyle={tooltipStyle}
-                      cursor={{ fill: "rgba(255,255,255,0.04)" }}
-                      formatter={(value) => [fmt(value), "Total"]}
-                    />
-                    <Bar dataKey="value" radius={[0, 6, 6, 0]}>
-                      {categoryData.map((_, i) => (
-                        <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-              <div>
-                <ResponsiveContainer width={130} height={130}>
+            <div className="flex items-center gap-8">
+              {/* Donut com total no centro */}
+              <div className="relative w-[200px] h-[200px] shrink-0">
+                <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
                       data={categoryData}
                       dataKey="value"
+                      nameKey="name"
                       cx="50%"
                       cy="50%"
-                      innerRadius={35}
-                      outerRadius={60}
+                      innerRadius={66}
+                      outerRadius={92}
+                      paddingAngle={categoryData.length > 1 ? 3 : 0}
+                      cornerRadius={4}
+                      startAngle={90}
+                      endAngle={-270}
                       stroke="none"
                     >
                       {categoryData.map((_, i) => (
-                        <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                        <Cell key={i} fill={CATEGORY_COLORS[i % CATEGORY_COLORS.length]} />
                       ))}
                     </Pie>
                     <Tooltip
-                      contentStyle={tooltipStyle}
-                      formatter={(value) => [fmt(value), "Total"]}
+                      content={<ChartTooltip />}
+                      cursor={false}
                     />
                   </PieChart>
                 </ResponsiveContainer>
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                  <span className="text-[11px] text-norby-ivory/40 uppercase tracking-wider">
+                    Total
+                  </span>
+                  <span className="text-lg font-bold text-norby-ivory tnum">
+                    {fmt(categoryTotal)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Legenda-lista: cor + categoria + valor + % (fallback de acessibilidade) */}
+              <div className="flex-1 flex flex-col gap-2.5">
+                {categoryData.map((c, i) => {
+                  const pct = categoryTotal
+                    ? (c.value / categoryTotal) * 100
+                    : 0;
+                  return (
+                    <div key={c.name} className="flex items-center gap-3">
+                      <span
+                        className="w-2.5 h-2.5 rounded-full shrink-0"
+                        style={{
+                          background:
+                            CATEGORY_COLORS[i % CATEGORY_COLORS.length],
+                        }}
+                      />
+                      <span className="text-sm text-norby-ivory/80 flex-1 truncate">
+                        {c.name}
+                      </span>
+                      <span className="text-sm font-semibold text-norby-ivory tnum">
+                        {fmt(c.value)}
+                      </span>
+                      <span className="text-xs text-norby-ivory/40 tnum w-9 text-right">
+                        {pct.toFixed(0)}%
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -332,62 +436,82 @@ export default function Dashboard() {
 
         <div className="glass-card p-5 flex flex-col gap-3">
           <div>
-            <h2 className="font-semibold text-norby-ivory">Movimentações Recentes</h2>
+            <h2 className="font-semibold text-norby-ivory">
+              Movimentações Recentes
+            </h2>
             <p className="text-xs text-norby-ivory/50">
               Últimos lançamentos registrados
             </p>
           </div>
 
-          <div className="flex flex-col gap-2 flex-1">
+          <div className="flex flex-col gap-1 flex-1">
             {transactions.length === 0 ? (
               <div className="flex-1 flex items-center justify-center text-norby-ivory/40 text-xs text-center">
                 Nenhuma movimentação ainda
               </div>
             ) : (
-              transactions.slice(0, 4).map((t) => (
-                <div
-                  key={t.id}
-                  className="flex items-center justify-between py-2.5 border-b border-white/5 last:border-0"
-                >
-                  <div>
-                    <p className="text-sm font-medium text-norby-ivory">
-                      {t.category}
-                    </p>
-                    <p className="text-xs text-norby-ivory/40">
-                      {new Date(t.date).toLocaleDateString("pt-BR")}
-                    </p>
-                  </div>
-                  <div className="text-right">
+              transactions.slice(0, 4).map((t) => {
+                const isIncome = t.type === "INCOME";
+                return (
+                  <div
+                    key={t.id}
+                    className="flex items-center justify-between py-2.5 border-b border-white/5 last:border-0"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div
+                        className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                          isIncome
+                            ? "bg-norby-income/15 text-norby-income"
+                            : "bg-norby-danger/15 text-norby-danger"
+                        }`}
+                      >
+                        {isIncome ? (
+                          <ArrowUpRight size={16} />
+                        ) : (
+                          <ArrowDownRight size={16} />
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-norby-ivory truncate">
+                          {t.category}
+                        </p>
+                        <p className="text-xs text-norby-ivory/40">
+                          {new Date(t.date).toLocaleDateString("pt-BR")}
+                        </p>
+                      </div>
+                    </div>
                     <p
-                      className={`text-sm font-semibold tnum ${
-                        t.type === "INCOME" ? "text-norby-income" : "text-norby-ivory"
+                      className={`text-sm font-semibold tnum shrink-0 ${
+                        isIncome ? "text-norby-income" : "text-norby-ivory"
                       }`}
                     >
-                      {t.type === "INCOME" ? "+" : "-"} {fmt(parseFloat(t.amount))}
-                    </p>
-                    <p
-                      className={`text-xs ${
-                        t.type === "EXPENSE" ? "text-norby-danger" : "text-norby-income"
-                      }`}
-                    >
-                      {t.type === "EXPENSE" ? "Variável" : "Fixo"}
+                      {isIncome ? "+" : "−"} {fmt(parseFloat(t.amount))}
                     </p>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
 
           <div className="grid grid-cols-2 gap-2">
             <div className="p-3 rounded-xl bg-white/[0.03]">
               <p className="text-xs text-norby-ivory/40">Saldo do mês</p>
-              <p className="text-sm font-bold text-norby-ivory mt-1 tnum">
+              <p
+                className={`text-sm font-bold mt-1 tnum flex items-center gap-1 ${
+                  monthNet >= 0 ? "text-norby-income" : "text-norby-danger"
+                }`}
+              >
+                {monthNet >= 0 ? (
+                  <TrendingUp size={13} />
+                ) : (
+                  <TrendingDown size={13} />
+                )}
                 {fmt(monthNet)}
               </p>
             </div>
             <div className="p-3 rounded-xl bg-norby-teal/10 border border-norby-teal/20">
               <p className="text-xs text-norby-teal">Maior gasto</p>
-              <p className="text-sm font-bold text-norby-ivory mt-1">
+              <p className="text-sm font-bold text-norby-ivory mt-1 truncate">
                 {categoryData[0]?.name || "—"}
               </p>
             </div>
