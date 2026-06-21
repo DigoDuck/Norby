@@ -71,6 +71,10 @@ dist/
 # Claude Code
 .claude/
 
+# Playwright MCP / verification artifacts
+.playwright-mcp/
+rebrand-*.png
+
 # Django stuff:
 *.log
 local_settings.py

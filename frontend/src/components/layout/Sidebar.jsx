@@ -42,10 +42,10 @@ export default function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 flex flex-col gap-1">
-        {navItems.map(({ to, icon: Icon, label }) => (
+        {navItems.map((item) => (
           <NavLink
-            key={to}
-            to={to}
+            key={item.to}
+            to={item.to}
             className={({ isActive }) =>
               `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
                 isActive
@@ -54,8 +54,8 @@ export default function Sidebar() {
               }`
             }
           >
-            <Icon size={18} />
-            {label}
+            <item.icon size={18} />
+            {item.label}
           </NavLink>
         ))}
       </nav>
