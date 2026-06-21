@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, Search, Trash2 } from "lucide-react";
+import { Plus, Search, Trash2, Pencil } from "lucide-react";
 import { transactionsApi } from "@/api/transactions";
 import { walletsApi } from "@/api/wallets";
 import { Button } from "@/components/ui/button";
@@ -23,20 +23,25 @@ const CATEGORIES = [
   "Outros",
 ];
 
+const emptyForm = () => ({
+  wallet_id: "",
+  type: "EXPENSE",
+  amount: "",
+  category: CATEGORIES[0],
+  description: "",
+  date: new Date().toISOString().split("T")[0],
+});
+
 export default function Transactions() {
   const [transactions, setTransactions] = useState([]);
   const [wallets, setWallets] = useState([]);
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [error, setError] = useState(null);
+  const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState("");
-  const [form, setForm] = useState({
-    wallet_id: "",
-    type: "EXPENSE",
-    amount: "",
-    category: CATEGORIES[0],
-    description: "",
-    date: new Date().toISOString().split("T")[0],
-  });
+  const [form, setForm] = useState(emptyForm);
 
   async function load(params = {}) {
     const res = await transactionsApi.list(params);
@@ -56,15 +61,66 @@ export default function Transactions() {
     return () => clearTimeout(timer);
   }, [filterType]);
 
+  const reload = () => load(filterType ? { type: filterType } : {});
+
+  function openNew() {
+    setEditing(null);
+    setForm(emptyForm());
+    setError(null);
+    setOpen(true);
+  }
+
+  function openEdit(t) {
+    setEditing(t);
+    setForm({
+      wallet_id: t.wallet_id,
+      type: t.type,
+      amount: String(t.amount),
+      category: t.category,
+      description: t.description || "",
+      date: new Date(t.date).toISOString().split("T")[0],
+    });
+    setError(null);
+    setOpen(true);
+  }
+
   async function handleSave() {
-    await transactionsApi.create({ ...form, amount: parseFloat(form.amount) });
-    setOpen(false);
-    load();
+    if (!form.wallet_id) return setError("Selecione uma carteira.");
+    if (!form.amount || parseFloat(form.amount) <= 0)
+      return setError("Informe um valor maior que zero.");
+
+    setSaving(true);
+    setError(null);
+    try {
+      const payload = { ...form, amount: parseFloat(form.amount) };
+      if (editing) {
+        await transactionsApi.update(editing.id, payload);
+      } else {
+        await transactionsApi.create(payload);
+      }
+      setOpen(false);
+      setEditing(null);
+      setForm(emptyForm());
+      reload();
+    } catch (err) {
+      setError(
+        err.response?.data?.detail || "Não foi possível salvar a transação.",
+      );
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleDelete(id) {
-    await transactionsApi.delete(id);
-    load();
+    if (!confirm("Remover esta transação?")) return;
+    try {
+      await transactionsApi.delete(id);
+      reload();
+    } catch (err) {
+      alert(
+        err.response?.data?.detail || "Não foi possível remover a transação.",
+      );
+    }
   }
 
   const fmt = (v) =>
@@ -85,15 +141,29 @@ export default function Transactions() {
             Histórico completo de transações
           </p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog
+          open={open}
+          onOpenChange={(v) => {
+            setOpen(v);
+            if (!v) {
+              setEditing(null);
+              setError(null);
+            }
+          }}
+        >
           <DialogTrigger asChild>
-            <Button className="bg-violet-600 hover:bg-violet-500 text-white mt-1">
+            <Button
+              onClick={openNew}
+              className="bg-violet-600 hover:bg-violet-500 text-white mt-1"
+            >
               <Plus size={16} className="mr-1" /> Nova Transação
             </Button>
           </DialogTrigger>
-          <DialogContent className="bg-[#fff] border-black-10 text-black/10">
+          <DialogContent className="bg-white border-black/10 text-black">
             <DialogHeader>
-              <DialogTitle>Nova Transação</DialogTitle>
+              <DialogTitle>
+                {editing ? "Editar Transação" : "Nova Transação"}
+              </DialogTitle>
             </DialogHeader>
             <div className="space-y-3 mt-2">
               <div className="grid grid-cols-2 gap-3">
@@ -154,16 +224,22 @@ export default function Transactions() {
                 className="bg-black/5 border-white/20 text-black placeholder:text-black/80"
               />
               <Input
-                placeholder="date"
+                type="date"
                 value={form.date}
                 onChange={(e) => setForm({ ...form, date: e.target.value })}
                 className="bg-black/5 border-white/20 text-black"
               />
+              {error && <p className="text-red-500 text-xs">{error}</p>}
               <Button
                 onClick={handleSave}
+                disabled={saving}
                 className="w-full bg-violet-600 hover:bg-violet-500 text-white"
               >
-                Registrar Transação
+                {saving
+                  ? "Salvando..."
+                  : editing
+                    ? "Salvar alterações"
+                    : "Registrar Transação"}
               </Button>
             </div>
           </DialogContent>
@@ -226,9 +302,14 @@ export default function Transactions() {
                             {new Date(t.date).toLocaleDateString("pt-BR")}
                         </td>
                         <td className="px-4 py-3">
-                            <button onClick={() => handleDelete(t.id)} className="text-black/80 hover:text-red-400 transition-colors">
-                                <Trash2 size={16}/>
-                            </button>
+                            <div className="flex gap-2">
+                                <button onClick={() => openEdit(t)} className="text-black/60 hover:text-black transition-colors">
+                                    <Pencil size={16}/>
+                                </button>
+                                <button onClick={() => handleDelete(t.id)} className="text-black/80 hover:text-red-400 transition-colors">
+                                    <Trash2 size={16}/>
+                                </button>
+                            </div>
                         </td>
                     </tr>
                 ))}
