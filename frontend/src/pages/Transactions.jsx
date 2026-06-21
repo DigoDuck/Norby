@@ -32,6 +32,9 @@ const emptyForm = () => ({
   date: new Date().toISOString().split("T")[0],
 });
 
+const fieldCls =
+  "w-full p-2 rounded-lg bg-white/5 border border-white/10 text-norby-ivory text-sm";
+
 export default function Transactions() {
   const [transactions, setTransactions] = useState([]);
   const [wallets, setWallets] = useState([]);
@@ -136,8 +139,10 @@ export default function Transactions() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-black">Relatórios</h1>
-          <p className="text-black/80 text-sm mt-1">
+          <h1 className="text-2xl font-bold text-norby-ivory tracking-tight">
+            Relatórios
+          </h1>
+          <p className="text-norby-ivory/50 text-sm mt-1">
             Histórico completo de transações
           </p>
         </div>
@@ -155,13 +160,13 @@ export default function Transactions() {
             render={
               <Button
                 onClick={openNew}
-                className="bg-violet-600 hover:bg-violet-500 text-white mt-1"
+                className="bg-norby-teal hover:bg-norby-teal-soft text-norby-night font-medium"
               />
             }
           >
             <Plus size={16} className="mr-1" /> Nova Transação
           </DialogTrigger>
-          <DialogContent className="bg-white border-black/10 text-black">
+          <DialogContent className="bg-norby-surface border-white/10 text-norby-ivory">
             <DialogHeader>
               <DialogTitle>
                 {editing ? "Editar Transação" : "Nova Transação"}
@@ -176,9 +181,9 @@ export default function Transactions() {
                     className={`py-2 rounded-lg text-sm font-medium transition-all ${
                       form.type === t
                         ? t === "INCOME"
-                          ? "bg-emerald-600 text-white"
-                          : "bg-red-600 text-white"
-                        : "bg-black/5 text-black/80"
+                          ? "bg-norby-income text-norby-night"
+                          : "bg-norby-danger text-norby-ivory"
+                        : "bg-white/5 text-norby-ivory/70"
                     }`}
                   >
                     {t === "INCOME" ? "Receita" : "Despesa"}
@@ -187,14 +192,14 @@ export default function Transactions() {
               </div>
               <select
                 value={form.wallet_id}
-                onChange={(e) =>
-                  setForm({ ...form, wallet_id: e.target.value })
-                }
-                className="w-full p-2 rounded-lg bg-black/5 border border-white/20 text-black text-sm"
+                onChange={(e) => setForm({ ...form, wallet_id: e.target.value })}
+                className={fieldCls}
               >
-                <option value="">Selecionar carteira</option>
+                <option value="" className="bg-norby-surface">
+                  Selecionar carteira
+                </option>
                 {wallets.map((w) => (
-                  <option key={w.id} value={w.id}>
+                  <option key={w.id} value={w.id} className="bg-norby-surface">
                     {w.name}
                   </option>
                 ))}
@@ -204,38 +209,38 @@ export default function Transactions() {
                 placeholder="Valor"
                 value={form.amount}
                 onChange={(e) => setForm({ ...form, amount: e.target.value })}
-                className="bg-black/5 border-white/20 text-black placeholder:text-black/80 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                className="bg-white/5 border-white/10 text-norby-ivory placeholder:text-norby-ivory/40 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
               <select
                 value={form.category}
                 onChange={(e) => setForm({ ...form, category: e.target.value })}
-                className="w-full p-2 rounded-lg bg-black/5 border border-white/20 text-black text-sm"
+                className={fieldCls}
               >
                 {CATEGORIES.map((c) => (
-                  <option key={c} value={c}>
+                  <option key={c} value={c} className="bg-norby-surface">
                     {c}
                   </option>
                 ))}
               </select>
               <Input
-                placeholder="Descrição(opcional)"
+                placeholder="Descrição (opcional)"
                 value={form.description}
                 onChange={(e) =>
                   setForm({ ...form, description: e.target.value })
                 }
-                className="bg-black/5 border-white/20 text-black placeholder:text-black/80"
+                className="bg-white/5 border-white/10 text-norby-ivory placeholder:text-norby-ivory/40"
               />
               <Input
                 type="date"
                 value={form.date}
                 onChange={(e) => setForm({ ...form, date: e.target.value })}
-                className="bg-black/5 border-white/20 text-black"
+                className="bg-white/5 border-white/10 text-norby-ivory"
               />
-              {error && <p className="text-red-500 text-xs">{error}</p>}
+              {error && <p className="text-norby-danger text-xs">{error}</p>}
               <Button
                 onClick={handleSave}
                 disabled={saving}
-                className="w-full bg-violet-600 hover:bg-violet-500 text-white"
+                className="w-full bg-norby-teal hover:bg-norby-teal-soft text-norby-night font-medium"
               >
                 {saving
                   ? "Salvando..."
@@ -247,18 +252,16 @@ export default function Transactions() {
           </DialogContent>
         </Dialog>
       </div>
-      {/*Filtros*/}
+
+      {/* Filtros */}
       <div className="flex gap-3">
         <div className="relative flex-1 max-w-xs">
-          <Search
-            size={16}
-            className="absolute left-3 top-2 text-black/30"
-          />
+          <Search size={16} className="absolute left-3 top-2.5 text-norby-ivory/30" />
           <Input
             placeholder="Buscar..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 bg-white/5 border-white/10 text-black placeholder:text-black/30"
+            className="pl-9 bg-white/5 border-white/10 text-norby-ivory placeholder:text-norby-ivory/30"
           />
         </div>
         {["", "INCOME", "EXPENSE"].map((t) => (
@@ -267,58 +270,88 @@ export default function Transactions() {
             onClick={() => setFilterType(t)}
             className={`px-4 py-2 rounded-lg text-sm transition-all ${
               filterType === t
-                ? "bg-violet-600 text-white"
-                : "glass-card text-black/50 hover:text-black"
+                ? "bg-norby-teal text-norby-night font-medium"
+                : "glass-card text-norby-ivory/50 hover:text-norby-ivory"
             }`}
           >
             {t === "" ? "Todos" : t === "INCOME" ? "Receitas" : "Despesas"}
           </button>
         ))}
       </div>
-      {/*Tabela*/}
+
+      {/* Tabela */}
       <div className="glass-card overflow-hidden">
         <table className="w-full">
-            <thead>
-                <tr className="border-b border-white/20">
-                {["Categoria", "Descrição", "Tipo", "Valor", "Data", ""].map((h) => (
-                    <th key={h} className="text-left text-xs font-medium text-black/60 uppercase tracking-wider px-4 py-3">
-                        {h}
-                    </th>
-                ))}
-                </tr>
-            </thead>
-            <tbody>
-                {filtered.map((t) => (
-                    <tr key={t.id} className="border-b border-white/5 hover:bg-white/3 transition-colors">
-                        <td className="px-4 py-3 text-sm font-medium text-black/80">{t.category}</td>
-                        <td className="px-4 py-3 text-sm text-black/80">{t.description || "-"}</td>
-                        <td>
-                            <Badge className={ t.type === "INCOME" ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/20 rounded-lg" : "bg-red-500/15 text-red-400 border-red-500/20 rounded-lg"}>
-                                {t.type === "INCOME" ? "Receita" : "Despesa"}
-                            </Badge>
-                        </td>
-                        <td className={`px-4 py-4 text-sm font-semibold ${t.type === "INCOME" ? "text-emerald-400" : "text-red-600"}`}>
-                            {t.type === "INCOME" ? "+" : "-"}{fmt(t.amount)}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-black/80">
-                            {new Date(t.date).toLocaleDateString("pt-BR")}
-                        </td>
-                        <td className="px-4 py-3">
-                            <div className="flex gap-2">
-                                <button onClick={() => openEdit(t)} className="text-black/60 hover:text-black transition-colors">
-                                    <Pencil size={16}/>
-                                </button>
-                                <button onClick={() => handleDelete(t.id)} className="text-black/80 hover:text-red-400 transition-colors">
-                                    <Trash2 size={16}/>
-                                </button>
-                            </div>
-                        </td>
-                    </tr>
-                ))}
-            </tbody>
+          <thead>
+            <tr className="border-b border-white/10">
+              {["Categoria", "Descrição", "Tipo", "Valor", "Data", ""].map((h) => (
+                <th
+                  key={h}
+                  className="text-left text-xs font-medium text-norby-ivory/50 uppercase tracking-wider px-4 py-3"
+                >
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((t) => (
+              <tr
+                key={t.id}
+                className="border-b border-white/5 last:border-0 hover:bg-white/[0.03] transition-colors"
+              >
+                <td className="px-4 py-3 text-sm font-medium text-norby-ivory/90">
+                  {t.category}
+                </td>
+                <td className="px-4 py-3 text-sm text-norby-ivory/60">
+                  {t.description || "-"}
+                </td>
+                <td className="px-4 py-3">
+                  <Badge
+                    className={
+                      t.type === "INCOME"
+                        ? "bg-norby-income/15 text-norby-income border-norby-income/20 rounded-lg"
+                        : "bg-norby-danger/15 text-norby-danger border-norby-danger/20 rounded-lg"
+                    }
+                  >
+                    {t.type === "INCOME" ? "Receita" : "Despesa"}
+                  </Badge>
+                </td>
+                <td
+                  className={`px-4 py-3 text-sm font-semibold tnum ${
+                    t.type === "INCOME" ? "text-norby-income" : "text-norby-danger"
+                  }`}
+                >
+                  {t.type === "INCOME" ? "+" : "-"}
+                  {fmt(t.amount)}
+                </td>
+                <td className="px-4 py-3 text-sm text-norby-ivory/60">
+                  {new Date(t.date).toLocaleDateString("pt-BR")}
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => openEdit(t)}
+                      className="text-norby-ivory/50 hover:text-norby-ivory transition-colors"
+                    >
+                      <Pencil size={16} />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(t.id)}
+                      className="text-norby-ivory/50 hover:text-norby-danger transition-colors"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
         </table>
         {filtered.length === 0 && (
-            <div className="text-center py-12 text-black">Nenhuma Transação encontrada.</div>
+          <div className="text-center py-12 text-norby-ivory/40 text-sm">
+            Nenhuma transação encontrada.
+          </div>
         )}
       </div>
     </div>
