@@ -169,7 +169,7 @@ export default function Auth() {
             <Button
               type="submit"
               disabled={loading}
-              className="w-full bg-violet-600 hover:bg-violet-500 text-black font-medium shadow-lg shadow-violet-600/30"
+              className="w-full bg-violet-600 hover:bg-violet-500 text-white font-medium shadow-lg shadow-violet-600/30"
             >
               {loading
                 ? "Caregando..."

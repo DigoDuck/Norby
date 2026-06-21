@@ -1,7 +1,7 @@
 import api from "./axios";
 
 export const aiApi = {
-  getInsight: () => api.get("ai/insight"),
-  chat: (data) => api.post("ai/chat", data),
-  getSessions: () => api.get("ai/chat/sessions"),
+  getInsight: () => api.get("/ai/insight"),
+  chat: (data) => api.post("/ai/chat", data),
+  getSessions: () => api.get("/ai/chat/sessions"),
 };

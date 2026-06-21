@@ -14,6 +14,7 @@ export default function Settings() {
     email: user?.email || "",
   });
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState(null);
 
   function handleLogout() {
     logout();
@@ -21,10 +22,15 @@ export default function Settings() {
   }
 
   async function handleSave() {
-    // Em produção: chamar API para atualizar perfil
-    updateUser(form);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    setError(null);
+    try {
+      const res = await authApi.updateProfile(form);
+      updateUser(res.data); // só atualiza o store após sucesso no backend
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (err) {
+      setError(err.response?.data?.detail || "Não foi possível salvar.");
+    }
   }
 
   return (
@@ -60,8 +66,9 @@ export default function Settings() {
           placeholder="Email"
           value={form.email}
           onChange={(e) => setForm({ ...form, email: e.target.value })}
-          className="bg-white/10 text-black placeholder::text-black/60"
+          className="bg-white/10 text-black placeholder:text-black/60"
         />
+        {error && <p className="text-red-500 text-xs">{error}</p>}
         <Button
           onClick={handleSave}
           className="bg-violet-600 hover:bg-violet-500 text-white"

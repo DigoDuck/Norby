@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.dependencies import get_db, get_current_user
 from app.models.sql_models import User
-from app.schemas.user import UserRegister, UserLogin, Token, UserResponse
+from app.schemas.user import UserRegister, UserLogin, UserUpdate, Token, UserResponse
 from app.services.auth_service import hash_password, verify_password, create_access_token
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
@@ -40,4 +40,26 @@ async def login(payload: UserLogin, db: AsyncSession = Depends(get_db)):
 
 @router.get("/me", response_model=UserResponse)
 async def me(current_user: User = Depends(get_current_user)):
+    return current_user
+
+@router.put("/me", response_model=UserResponse)
+async def update_me(
+    payload: UserUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    data = payload.model_dump(exclude_unset=True)
+
+    # Se o email mudar, garante que não está em uso por outro usuário
+    new_email = data.get("email")
+    if new_email and new_email != current_user.email:
+        existing = await db.execute(select(User).where(User.email == new_email))
+        if existing.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="Email já cadastrado")
+
+    for field, value in data.items():
+        setattr(current_user, field, value)
+
+    await db.commit()
+    await db.refresh(current_user)
     return current_user

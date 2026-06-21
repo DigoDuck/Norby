@@ -15,6 +15,8 @@ export default function Wallets() {
   const [wallets, setWallets] = useState([]);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [error, setError] = useState(null);
+  const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ name: "", balance: "" });
 
   async function load() {
@@ -27,31 +29,48 @@ export default function Wallets() {
   }, []);
 
   async function handleSave() {
-    if (editing) {
-      // Saldo não é editável: deriva das transações. Edita só o nome.
-      await walletsApi.update(editing.id, { name: form.name });
-    } else {
-      await walletsApi.create({
-        name: form.name,
-        balance: form.balance === "" ? 0 : form.balance,
-      });
+    if (!form.name.trim()) return setError("Informe um nome.");
+    setSaving(true);
+    setError(null);
+    try {
+      if (editing) {
+        // Saldo não é editável: deriva das transações. Edita só o nome.
+        await walletsApi.update(editing.id, { name: form.name });
+      } else {
+        await walletsApi.create({
+          name: form.name,
+          balance: form.balance === "" ? 0 : form.balance,
+        });
+      }
+      setOpen(false);
+      setEditing(null);
+      setForm({ name: "", balance: "" });
+      load();
+    } catch (err) {
+      setError(
+        err.response?.data?.detail || "Não foi possível salvar a carteira.",
+      );
+    } finally {
+      setSaving(false);
     }
-    setOpen(false);
-    setEditing(null);
-    setForm({ name: "", balance: "" });
-    load();
   }
 
   async function handleDelete(id) {
-    if (confirm("Remover esta carteira e todas as informaçÕes?")) {
+    if (!confirm("Remover esta carteira e todas as transações?")) return;
+    try {
       await walletsApi.delete(id);
       load();
+    } catch (err) {
+      alert(
+        err.response?.data?.detail || "Não foi possível remover a carteira.",
+      );
     }
   }
 
   function openEdit(wallet) {
     setEditing(wallet);
     setForm({ name: wallet.name, balance: wallet.balance });
+    setError(null);
     setOpen(true);
   }
 
@@ -67,11 +86,21 @@ export default function Wallets() {
             Gerencie suas contas e cartões
           </p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog
+          open={open}
+          onOpenChange={(v) => {
+            setOpen(v);
+            if (!v) {
+              setEditing(null);
+              setError(null);
+            }
+          }}
+        >
           <DialogTrigger asChild>
             <Button
               onClick={() => {
                 setEditing(null);
+                setError(null);
                 setForm({ name: "", balance: "" });
               }}
               className="bg-violet-600 hover:bg-violet-500 text-white"
@@ -79,7 +108,7 @@ export default function Wallets() {
               <Plus size={16} className="mr-1" /> Nova Carteira
             </Button>
           </DialogTrigger>
-          <DialogContent className="bg-[#ffffff96] border-black-10 text-black">
+          <DialogContent className="bg-[#ffffff96] border-black/10 text-black">
             <DialogHeader>
               <DialogTitle>
                 {editing ? "Editar carteira" : "Nova carteira"}
@@ -90,7 +119,7 @@ export default function Wallets() {
                 placeholder="Nome (ex: Nubank, Caixa)"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className="bg-black-5 border-black/10 text-black placeholder:text-black/30"
+                className="bg-black/5 border-black/10 text-black placeholder:text-black/30"
               />
               {!editing && (
                 <Input
@@ -98,14 +127,20 @@ export default function Wallets() {
                   placeholder="Saldo Inicial"
                   value={form.balance}
                   onChange={(e) => setForm({ ...form, balance: e.target.value })}
-                  className="bg-black-5 border-black/10 text-black placeholder:text-black/30"
+                  className="bg-black/5 border-black/10 text-black placeholder:text-black/30"
                 />
               )}
+              {error && <p className="text-red-500 text-xs">{error}</p>}
               <Button
                 onClick={handleSave}
+                disabled={saving}
                 className="w-full bg-violet-600 hover:bg-violet-500 text-white"
               >
-                {editing ? "Salvar alteraçÕes " : "Criar carteira"}
+                {saving
+                  ? "Salvando..."
+                  : editing
+                    ? "Salvar alterações"
+                    : "Criar carteira"}
               </Button>
             </div>
           </DialogContent>
