@@ -106,7 +106,7 @@ export default function Wallets() {
         </Dialog>
       </div>
 
-      <div className="gri grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         {wallets.map((w) => (
           <div key={w.id} className="glass-card p-5 flex flex-col gap-4">
             <div className="flex items-start justify-between">
@@ -131,7 +131,7 @@ export default function Wallets() {
             <div>
               <p className="text-black/80">{w.name}</p>
               <p className="text-xl font-bold text-black mt-1">
-                R$ {w.balance}
+                {fmt(w.balance)}
               </p>
             </div>
             <p className="text-xs text-black/50">

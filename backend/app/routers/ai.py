@@ -69,7 +69,7 @@ async def list_sessions(current_user: User = Depends(get_current_user)): # Lista
     sessions = []
     async for doc in cursor:
         sessions.append({
-            "sessions_id": doc["session_id"],
+            "session_id": doc["session_id"],
             "update_at": doc.get("update_at"),
             "first_message": doc["messages"][0]["content"] if doc.get("messages") else "",
         })

@@ -179,7 +179,7 @@ export default function Transactions() {
           <Input
             placeholder="Buscar..."
             value={search}
-            onClick={() => setSearch(e.target.value)}
+            onChange={(e) => setSearch(e.target.value)}
             className="pl-9 bg-white/5 border-white/10 text-black placeholder:text-black/30"
           />
         </div>
