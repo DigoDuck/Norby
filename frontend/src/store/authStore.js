@@ -17,7 +17,7 @@ export const useAuthStore = create(
         })),
     }),
     {
-      name: "lumea-auth", // Salva no localStorage automaticamente
+      name: "norby-auth", // Salva no localStorage automaticamente
     },
   ),
 );

@@ -24,7 +24,7 @@ class Base(DeclarativeBase):
 
 # MongoDB
 mongo_client = AsyncIOMotorClient(settings.mongodb_url)
-mongo_db = mongo_client["lumea_db"]
+mongo_db = mongo_client["norby_db"]
 
 # Collections
 ai_insights_collection = mongo_db["ai_insights"]

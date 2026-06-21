@@ -35,7 +35,7 @@ export default function Sidebar() {
           <MoonStar size={18} className="text-white" />
         </div>
         <div>
-          <p className="font-bold text-zinc-900 leading-none">Lumea</p>
+          <p className="font-bold text-zinc-900 leading-none">Norby</p>
           <p className="text-xs text-zinc-500 mt-0.5">AI Finance</p>
         </div>
       </div>

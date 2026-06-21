@@ -4,7 +4,7 @@ services:
   # Relational database
   postgres:
     image: postgres:16-alpine # Alpine é leve e segura
-    container_name: lumea_postgres
+    container_name: norby_postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
@@ -24,12 +24,12 @@ services:
   # Document database
   mongodb:
     image: mongo:7.0
-    container_name: lumea_mongodb
+    container_name: norby_mongodb
     restart: unless-stopped
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
-      MONGO_INITDB_DATABASE: lumea_db
+      MONGO_INITDB_DATABASE: norby_db
     ports:
       - "${MONGO_PORT:-27017}:27017"
     volumes:
@@ -45,7 +45,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: lumea_backend
+    container_name: norby_backend
     restart: unless-stopped
     env_file:
       - .env

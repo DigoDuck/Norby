@@ -19,7 +19,7 @@ export default function AIAnalyst() {
       {
         role: "assistant",
         content:
-          "Olá, Sou Lumea, seu assistente financeiro. Posso analisar seus gastos, sugerir economias e responder dúvidas sobre suas finanças. Como posso te ajudar hoje?",
+          "Olá, Sou Norby, seu assistente financeiro. Posso analisar seus gastos, sugerir economias e responder dúvidas sobre suas finanças. Como posso te ajudar hoje?",
       },
     ]);
   }, []);
@@ -95,7 +95,7 @@ export default function AIAnalyst() {
             <MoonStar size={20} className="text-violet-600" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-black">Lumea AI</p>
+            <p className="text-sm font-semibold text-black">Norby AI</p>
             <p className="text-xs text-black/80"> Analista Financeiro</p>
           </div>
           <div className="ml-auto flex items-center gap-1.5">
@@ -163,7 +163,7 @@ export default function AIAnalyst() {
             </Button>
           </div>
           <p className="text-xs text-black/40 text-center mt-2">
-            Lumea AI lê seus dados financeiros para respostas personalizadas
+            Norby AI lê seus dados financeiros para respostas personalizadas
           </p>
         </div>
       </div>

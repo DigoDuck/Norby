@@ -64,14 +64,14 @@ export default function Auth() {
   }
 
   return (
-    <div className="min-h-screen bg-[url('/bg_lumea.png')] bg-cover bg-center bg-no-repeat flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[url('/bg_norby.png')] bg-cover bg-center bg-no-repeat flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-600 to-violet-900 mb-4 shadow-lg shadow-violet-900/30">
             <MoonStar size={28} className="text-white" />
           </div>
-          <h1 className="text-2xl text-black">Lumea</h1>
+          <h1 className="text-2xl text-black">Norby</h1>
           <p className="text-black/80">
             Seu organizador financeiro inteligente
           </p>

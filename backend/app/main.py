@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.routers import auth, wallets, transactions, ai
 
 app = FastAPI(
-    title="Lumea API",
+    title="Norby API",
     description="Backend do Organizador Financeiro com IA",
     version="0.1.0",
 )
@@ -23,4 +23,4 @@ app.include_router(ai.router)
 
 @app.get("/health", tags=["Health"]) 
 async def health_check():
-    return {"status": "ok", "service": "Lumea API"}
+    return {"status": "ok", "service": "Norby API"}

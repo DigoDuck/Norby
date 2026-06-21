@@ -114,7 +114,7 @@ async def chat_with_ai(user_id: str, message: str, history: list) -> str:
     summary = await _get_user_financial_summary(user_id)
 
     system_context = f"""
-    Você é o Lumea, um assistente financeiro inteligente e amigável. Responda sempre em português (pt-BR).
+    Você é o Norby, um assistente financeiro inteligente e amigável. Responda sempre em português (pt-BR).
     Contexto financeiro atual do usuário (mês {summary['month']}):
     - Receita: R$ {summary['total_income']:.2f}
     - Despesas: R$ {summary['total_expenses']:.2f}
