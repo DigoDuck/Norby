@@ -151,13 +151,15 @@ export default function Transactions() {
             }
           }}
         >
-          <DialogTrigger asChild>
-            <Button
-              onClick={openNew}
-              className="bg-violet-600 hover:bg-violet-500 text-white mt-1"
-            >
-              <Plus size={16} className="mr-1" /> Nova Transação
-            </Button>
+          <DialogTrigger
+            render={
+              <Button
+                onClick={openNew}
+                className="bg-violet-600 hover:bg-violet-500 text-white mt-1"
+              />
+            }
+          >
+            <Plus size={16} className="mr-1" /> Nova Transação
           </DialogTrigger>
           <DialogContent className="bg-white border-black/10 text-black">
             <DialogHeader>

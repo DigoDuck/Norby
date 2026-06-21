@@ -96,17 +96,19 @@ export default function Wallets() {
             }
           }}
         >
-          <DialogTrigger asChild>
-            <Button
-              onClick={() => {
-                setEditing(null);
-                setError(null);
-                setForm({ name: "", balance: "" });
-              }}
-              className="bg-violet-600 hover:bg-violet-500 text-white"
-            >
-              <Plus size={16} className="mr-1" /> Nova Carteira
-            </Button>
+          <DialogTrigger
+            render={
+              <Button
+                onClick={() => {
+                  setEditing(null);
+                  setError(null);
+                  setForm({ name: "", balance: "" });
+                }}
+                className="bg-violet-600 hover:bg-violet-500 text-white"
+              />
+            }
+          >
+            <Plus size={16} className="mr-1" /> Nova Carteira
           </DialogTrigger>
           <DialogContent className="bg-[#ffffff96] border-black/10 text-black">
             <DialogHeader>
