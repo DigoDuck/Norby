@@ -24,6 +24,10 @@ class RecurrenceFrequency(str, PyEnum):
     WEEKLY = "WEEKLY"
     MONTHLY = "MONTHLY"
 
+class GoalType(str, PyEnum):
+    SAVINGS = "SAVINGS"  # acumular até um alvo
+    BUDGET = "BUDGET"    # teto de gasto mensal por categoria
+
 class User(Base):
     __tablename__= "users"
 
@@ -36,7 +40,8 @@ class User(Base):
     wallets: Mapped[List["Wallet"]] = relationship("Wallet", back_populates="user", cascade="all, delete-orphan")
     transactions: Mapped[List["Transaction"]] = relationship("Transaction", back_populates="user", cascade="all, delete-orphan")
     recurring_transactions: Mapped[List["RecurringTransaction"]] = relationship("RecurringTransaction", back_populates="user", cascade="all, delete-orphan")
-    
+    goals: Mapped[List["Goal"]] = relationship("Goal", back_populates="user", cascade="all, delete-orphan")
+
 class Wallet(Base):
     __tablename__= "wallets"
     
@@ -85,3 +90,18 @@ class RecurringTransaction(Base):
 
     user: Mapped["User"] = relationship("User", back_populates="recurring_transactions")
     wallet: Mapped["Wallet"] = relationship("Wallet", back_populates="recurring_transactions")
+
+class Goal(Base):
+    __tablename__ = "goals"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"))
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    type: Mapped[GoalType] = mapped_column(Enum(GoalType), nullable=False)
+    target_amount: Mapped[Decimal] = mapped_column(Numeric(15, 2), nullable=False)
+    current_amount: Mapped[Decimal] = mapped_column(Numeric(15, 2), default=Decimal("0.00"))
+    category: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    deadline: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    user: Mapped["User"] = relationship("User", back_populates="goals")
