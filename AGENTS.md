@@ -64,6 +64,7 @@ npm run test     # Vitest
 - Frontend: **API client centralizado** em `src/api/` (axios em `axios.js`, um
   módulo fino por recurso). Componentes/páginas não chamam `axios` direto.
 - UI em **inglês**; tema teal "Petróleo Confiável" (classes `norby-*`).
+- **Mensagens de commit em inglês** (comentários de código e docs podem ser PT).
 - Specs e planos vivem no Second Brain (Obsidian), **não** no repo (`docs/` está
   no `.gitignore`).
 
