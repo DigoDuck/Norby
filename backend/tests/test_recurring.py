@@ -183,6 +183,36 @@ async def test_run_is_scoped_and_returns_count(make_auth_client):
     res = await ac.post("/recurring/run")
     assert res.status_code == 200
     assert "generated" in res.json()
+    bob = await make_auth_client("Bob")
+    bob_res = await bob.post("/recurring/run")
+    assert bob_res.status_code == 200
+    assert bob_res.json()["generated"] == 0
+
+
+@pytest.mark.asyncio
+async def test_update_cross_user_404(make_auth_client):
+    alice = await make_auth_client("Alice")
+    bob   = await make_auth_client("Bob")
+    w = await _wallet(alice)
+    rec = (await alice.post("/recurring/", json={
+        "wallet_id": w["id"], "type": "EXPENSE", "amount": "10.00",
+        "category": "Sub", "frequency": "MONTHLY", "day_of_month": 1,
+    })).json()
+    res = await bob.put(f"/recurring/{rec['id']}", json={"amount": "999.00"})
+    assert res.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_delete_cross_user_404(make_auth_client):
+    alice = await make_auth_client("Alice")
+    bob   = await make_auth_client("Bob")
+    w = await _wallet(alice)
+    rec = (await alice.post("/recurring/", json={
+        "wallet_id": w["id"], "type": "EXPENSE", "amount": "10.00",
+        "category": "Sub", "frequency": "MONTHLY", "day_of_month": 1,
+    })).json()
+    res = await bob.delete(f"/recurring/{rec['id']}")
+    assert res.status_code == 404
 
 
 @pytest.mark.asyncio
