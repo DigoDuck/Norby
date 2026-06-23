@@ -228,3 +228,6 @@ __marimo__/
 
 # Specs/brainstorming docs ficam no Second Brain (Obsidian), nao no repo
 docs/
+
+# Workspace de orquestracao do subagent-driven-development (scratch)
+.superpowers/
