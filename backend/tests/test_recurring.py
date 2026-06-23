@@ -9,7 +9,7 @@ from app.models.sql_models import (
 from app.services.recurring_service import (
     advance, compute_initial_next_run, materialize_due_recurring
 )
-from sqlalchemy import select, func
+from sqlalchemy import select
 
 
 def test_advance_weekly_adds_7_days():
@@ -20,6 +20,44 @@ def test_advance_weekly_adds_7_days():
 def test_advance_monthly_rolls_over_december():
     d = datetime(2026, 12, 10, tzinfo=timezone.utc)
     assert advance(d, RecurrenceFrequency.MONTHLY) == datetime(2027, 1, 10, tzinfo=timezone.utc)
+
+
+# ---------------------------------------------------------------------------
+# compute_initial_next_run — pure-Python unit tests (no DB needed)
+# ---------------------------------------------------------------------------
+
+def test_compute_initial_next_run_monthly_day_already_passed():
+    # now = 2026-06-15 12:00 UTC; day_of_month=1 → day 1 already passed this month
+    # → result should be 2026-07-01 00:00 UTC (next month)
+    now = datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc)
+    result = compute_initial_next_run(RecurrenceFrequency.MONTHLY, day_of_month=1, weekday=None, now=now)
+    assert result == datetime(2026, 7, 1, 0, 0, tzinfo=timezone.utc)
+
+
+def test_compute_initial_next_run_monthly_day_still_ahead():
+    # now = 2026-06-15 12:00 UTC; day_of_month=20 → day 20 is still ahead
+    # → result should be 2026-06-20 00:00 UTC (this month)
+    now = datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc)
+    result = compute_initial_next_run(RecurrenceFrequency.MONTHLY, day_of_month=20, weekday=None, now=now)
+    assert result == datetime(2026, 6, 20, 0, 0, tzinfo=timezone.utc)
+
+
+def test_compute_initial_next_run_weekly_today_time_passed():
+    # now = 2026-06-15 12:00 UTC; 2026-06-15 is a Monday (weekday=0)
+    # target weekday=0 (Monday): candidate = 2026-06-15 00:00 UTC < now (12:00) → push +7
+    # → result should be 2026-06-22 00:00 UTC (next Monday)
+    now = datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc)
+    result = compute_initial_next_run(RecurrenceFrequency.WEEKLY, day_of_month=None, weekday=0, now=now)
+    assert result == datetime(2026, 6, 22, 0, 0, tzinfo=timezone.utc)
+
+
+def test_compute_initial_next_run_weekly_later_this_week():
+    # now = 2026-06-15 12:00 UTC; 2026-06-15 is a Monday (weekday=0)
+    # target weekday=3 (Thursday): candidate = 2026-06-18 00:00 UTC > now → no push
+    # → result should be 2026-06-18 00:00 UTC (this Thursday)
+    now = datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc)
+    result = compute_initial_next_run(RecurrenceFrequency.WEEKLY, day_of_month=None, weekday=3, now=now)
+    assert result == datetime(2026, 6, 18, 0, 0, tzinfo=timezone.utc)
 
 
 async def _seed_user_wallet(db, balance="100.00"):
