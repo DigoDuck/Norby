@@ -64,7 +64,6 @@ npm run test     # Vitest
 - Frontend: **API client centralizado** em `src/api/` (axios em `axios.js`, um
   módulo fino por recurso). Componentes/páginas não chamam `axios` direto.
 - UI em **inglês**; tema teal "Petróleo Confiável" (classes `norby-*`).
-- **Mensagens de commit em inglês** (comentários de código e docs podem ser PT).
 - Specs e planos vivem no Second Brain (Obsidian), **não** no repo (`docs/` está
   no `.gitignore`).
 
@@ -75,6 +74,11 @@ npm run test     # Vitest
   perde dado) sem confirmar antes.
 - **Nunca** commitar segredos. `.env` (JWT secret, `GOOGLE_API_KEY`, credenciais
   de DB) fica fora do git.
+
+## Git commits
+
+- **Mensagens de commit em inglês** (comentários de código e docs do vault podem ser PT).
+- **NUNCA** adicione "Co-authored-by: Claude" ou qualquer trailer de coautoria em mensagens de commit. Comandos `git commit` devem conter apenas a mensagem solicitada, sem assinatura ou atribuição ao Claude.
 
 ## Escopo congelado — v1 (2026-06-23)
 
