@@ -225,3 +225,6 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Specs/brainstorming docs ficam no Second Brain (Obsidian), nao no repo
+docs/
