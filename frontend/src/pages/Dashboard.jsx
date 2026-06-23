@@ -26,6 +26,7 @@ import KpiCard from "@/components/shared/KpiCard";
 import { transactionsApi } from "@/api/transactions";
 import { walletsApi } from "@/api/wallets";
 import { aiApi } from "@/api/ai";
+import { recurringApi } from "@/api/recurring";
 import { Button } from "@/components/ui/button";
 
 // Paleta categórica de hues distintos (resolve o "2 cores parecidas" do donut)
@@ -83,6 +84,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     async function loadData() {
+      await recurringApi.run().catch(() => {}); // materializa recorrências vencidas
       // allSettled: falha da IA (insight) não derruba wallets/transactions
       const [wRes, tRes, iRes] = await Promise.allSettled([
         walletsApi.list(),

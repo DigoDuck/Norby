@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Plus, Search, Trash2, Pencil } from "lucide-react";
 import { transactionsApi } from "@/api/transactions";
 import { walletsApi } from "@/api/wallets";
+import { recurringApi } from "@/api/recurring";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -47,6 +48,7 @@ export default function Transactions() {
   const [form, setForm] = useState(emptyForm);
 
   async function load(params = {}) {
+    await recurringApi.run().catch(() => {});
     const res = await transactionsApi.list(params);
     setTransactions(res.data);
   }

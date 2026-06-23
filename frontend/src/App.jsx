@@ -9,6 +9,7 @@ import Wallets from "./pages/Wallets";
 import Transactions from "./pages/Transactions";
 import AIAnalyst from "./pages/AIAnalyst";
 import Settings from "./pages/Settings";
+import Recurring from "./pages/Recurring";
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated } = useAuthStore();
@@ -28,7 +29,10 @@ export default function App() {
     }
     authApi
       .me()
-      .then((res) => useAuthStore.getState().updateUser(res.data))
+      .then((res) => {
+        useAuthStore.getState().updateUser(res.data);
+        return import("./api/recurring").then((m) => m.recurringApi.run().catch(() => {}));
+      })
       .catch(() => useAuthStore.getState().logout())
       .finally(() => setBooting(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -57,6 +61,7 @@ export default function App() {
           <Route path="/wallets" element={<Wallets />} />
           <Route path="/transactions" element={<Transactions />} />
           <Route path="/ai" element={<AIAnalyst />} />
+          <Route path="/recurring" element={<Recurring />} />
           <Route path="/settings" element={<Settings />} />
         </Route>
       </Routes>
