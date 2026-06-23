@@ -61,7 +61,7 @@ async def client():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
-    app.dependency_overrides.clear()
+    app.dependency_overrides.pop(get_db, None)
 
 
 @pytest_asyncio.fixture
@@ -85,4 +85,4 @@ async def make_auth_client():
     yield _make
     for ac in created:
         await ac.aclose()
-    app.dependency_overrides.clear()
+    app.dependency_overrides.pop(get_db, None)
