@@ -125,3 +125,74 @@ async def test_materialize_skips_inactive(db_session):
     db_session.add(rec)
     await db_session.commit()
     assert await materialize_due_recurring(db_session, user) == 0
+
+
+# ---------------------------------------------------------------------------
+# API tests (Task 7) — use real Postgres via make_auth_client fixture
+# ---------------------------------------------------------------------------
+
+async def _wallet(ac):
+    return (await ac.post("/wallets/", json={"name": "Main", "balance": 100})).json()
+
+
+@pytest.mark.asyncio
+async def test_create_recurring_monthly(make_auth_client):
+    ac = await make_auth_client("Alice")
+    w = await _wallet(ac)
+    res = await ac.post("/recurring/", json={
+        "wallet_id": w["id"], "type": "EXPENSE", "amount": "50.00",
+        "category": "Rent", "frequency": "MONTHLY", "day_of_month": 5,
+    })
+    assert res.status_code == 201, res.text
+    body = res.json()
+    assert body["frequency"] == "MONTHLY" and body["day_of_month"] == 5
+    assert body["weekday"] is None and body["active"] is True
+
+
+@pytest.mark.asyncio
+async def test_create_recurring_weekly_requires_weekday(make_auth_client):
+    ac = await make_auth_client("Alice")
+    w = await _wallet(ac)
+    res = await ac.post("/recurring/", json={
+        "wallet_id": w["id"], "type": "EXPENSE", "amount": "10.00",
+        "category": "Market", "frequency": "WEEKLY",
+    })
+    assert res.status_code == 422  # weekday faltando
+
+
+@pytest.mark.asyncio
+async def test_create_recurring_other_user_wallet_404(make_auth_client):
+    alice = await make_auth_client("Alice")
+    bob = await make_auth_client("Bob")
+    w = await _wallet(alice)
+    res = await bob.post("/recurring/", json={
+        "wallet_id": w["id"], "type": "EXPENSE", "amount": "10.00",
+        "category": "X", "frequency": "MONTHLY", "day_of_month": 1,
+    })
+    assert res.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_run_is_scoped_and_returns_count(make_auth_client):
+    ac = await make_auth_client("Alice")
+    w = await _wallet(ac)
+    await ac.post("/recurring/", json={
+        "wallet_id": w["id"], "type": "EXPENSE", "amount": "10.00",
+        "category": "Sub", "frequency": "MONTHLY", "day_of_month": 1,
+    })
+    res = await ac.post("/recurring/run")
+    assert res.status_code == 200
+    assert "generated" in res.json()
+
+
+@pytest.mark.asyncio
+async def test_list_scoped_to_user(make_auth_client):
+    alice = await make_auth_client("Alice")
+    bob = await make_auth_client("Bob")
+    w = await _wallet(alice)
+    await alice.post("/recurring/", json={
+        "wallet_id": w["id"], "type": "EXPENSE", "amount": "10.00",
+        "category": "Sub", "frequency": "MONTHLY", "day_of_month": 1,
+    })
+    assert len((await alice.get("/recurring/")).json()) == 1
+    assert len((await bob.get("/recurring/")).json()) == 0
