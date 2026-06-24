@@ -10,6 +10,7 @@ import Transactions from "./pages/Transactions";
 import AIAnalyst from "./pages/AIAnalyst";
 import Settings from "./pages/Settings";
 import Recurring from "./pages/Recurring";
+import Goals from "./pages/Goals";
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated } = useAuthStore();
@@ -62,6 +63,7 @@ export default function App() {
           <Route path="/transactions" element={<Transactions />} />
           <Route path="/ai" element={<AIAnalyst />} />
           <Route path="/recurring" element={<Recurring />} />
+          <Route path="/goals" element={<Goals />} />
           <Route path="/settings" element={<Settings />} />
         </Route>
       </Routes>

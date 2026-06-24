@@ -8,6 +8,7 @@ import {
   Settings,
   LogOut,
   Repeat,
+  Target,
 } from "lucide-react";
 import NorbyMark from "../shared/Logo";
 
@@ -16,6 +17,7 @@ const navItems = [
   { to: "/wallets", icon: Wallet, label: "Carteiras" },
   { to: "/transactions", icon: FileText, label: "Relatórios" },
   { to: "/recurring", icon: Repeat, label: "Recurring" },
+  { to: "/goals", icon: Target, label: "Goals" },
   { to: "/ai", icon: BrainCircuit, label: "IA Analista" },
   { to: "/settings", icon: Settings, label: "Configurações" },
 ];
