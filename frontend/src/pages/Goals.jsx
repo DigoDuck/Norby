@@ -30,11 +30,11 @@ export default function Goals() {
   }, []);
 
   async function handleSave() {
-    if (!form.name.trim()) return setError("Name is required.");
+    if (!form.name.trim()) return setError("Informe o nome.");
     if (!form.target_amount || Number(form.target_amount) <= 0)
-      return setError("Target must be > 0.");
+      return setError("O alvo deve ser maior que zero.");
     if (form.type === "BUDGET" && !form.category.trim())
-      return setError("Category is required for a budget.");
+      return setError("Categoria é obrigatória para orçamento.");
     setSaving(true);
     setError(null);
     const payload = {
@@ -51,14 +51,14 @@ export default function Goals() {
       setForm(emptyForm);
       load();
     } catch (err) {
-      setError(err.response?.data?.detail || "Could not save the goal.");
+      setError(err.response?.data?.detail || "Não foi possível salvar a meta.");
     } finally {
       setSaving(false);
     }
   }
 
   async function handleContribute(goal) {
-    const raw = prompt(`Add contribution to "${goal.name}" (use negative to correct):`);
+    const raw = prompt(`Adicionar aporte em "${goal.name}" (use negativo para corrigir):`);
     if (raw === null) return;
     const amount = Number(raw);
     if (!amount) return;
@@ -66,17 +66,17 @@ export default function Goals() {
       await goalsApi.contribute(goal.id, amount);
       load();
     } catch (err) {
-      alert(err.response?.data?.detail || "Could not save contribution.");
+      alert(err.response?.data?.detail || "Não foi possível salvar o aporte.");
     }
   }
 
   async function handleDelete(id) {
-    if (!confirm("Delete this goal?")) return;
+    if (!confirm("Remover esta meta?")) return;
     try {
       await goalsApi.delete(id);
       load();
     } catch (err) {
-      alert(err.response?.data?.detail || "Could not delete goal.");
+      alert(err.response?.data?.detail || "Não foi possível remover a meta.");
     }
   }
 
@@ -84,9 +84,9 @@ export default function Goals() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-norby-ivory tracking-tight">Goals</h1>
+          <h1 className="text-2xl font-bold text-norby-ivory tracking-tight">Metas</h1>
           <p className="text-norby-ivory/50 text-sm mt-1">
-            Savings targets and monthly budgets
+            Objetivos de poupança e orçamentos mensais
           </p>
         </div>
         <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setError(null); }}>
@@ -98,11 +98,11 @@ export default function Goals() {
               />
             }
           >
-            <Plus size={16} className="mr-1" /> New Goal
+            <Plus size={16} className="mr-1" /> Nova Meta
           </DialogTrigger>
           <DialogContent className="bg-norby-surface border-white/10 text-norby-ivory">
             <DialogHeader>
-              <DialogTitle>New goal</DialogTitle>
+              <DialogTitle>Nova meta</DialogTitle>
             </DialogHeader>
             <div className="space-y-3 mt-2">
               <select
@@ -110,31 +110,31 @@ export default function Goals() {
                 onChange={(e) => setForm({ ...form, type: e.target.value })}
                 className={`w-full rounded-md px-3 py-2 ${inputCls}`}
               >
-                <option value="SAVINGS">Savings (accumulate)</option>
-                <option value="BUDGET">Budget (monthly cap)</option>
+                <option value="SAVINGS">Poupança (acumular)</option>
+                <option value="BUDGET">Orçamento (teto mensal)</option>
               </select>
               <Input
-                placeholder="Name" value={form.name}
+                placeholder="Nome" value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 className={inputCls}
               />
               <Input
                 type="number"
-                placeholder={form.type === "SAVINGS" ? "Target amount" : "Monthly cap"}
+                placeholder={form.type === "SAVINGS" ? "Valor-alvo" : "Teto mensal"}
                 value={form.target_amount}
                 onChange={(e) => setForm({ ...form, target_amount: e.target.value })}
                 className={inputCls}
               />
               {form.type === "SAVINGS" ? (
                 <Input
-                  type="number" placeholder="Already saved (optional)"
+                  type="number" placeholder="Já guardado (opcional)"
                   value={form.current_amount}
                   onChange={(e) => setForm({ ...form, current_amount: e.target.value })}
                   className={inputCls}
                 />
               ) : (
                 <Input
-                  placeholder="Category (e.g. Food)" value={form.category}
+                  placeholder="Categoria (ex: Alimentação)" value={form.category}
                   onChange={(e) => setForm({ ...form, category: e.target.value })}
                   className={inputCls}
                 />
@@ -144,7 +144,7 @@ export default function Goals() {
                 onClick={handleSave} disabled={saving}
                 className="w-full bg-norby-teal hover:bg-norby-teal-soft text-norby-night font-medium"
               >
-                {saving ? "Saving…" : "Create goal"}
+                {saving ? "Salvando…" : "Criar meta"}
               </Button>
             </div>
           </DialogContent>
@@ -153,7 +153,7 @@ export default function Goals() {
 
       <div className="grid grid-cols-2 gap-4">
         {goals.length === 0 && (
-          <p className="col-span-2 text-norby-ivory/40 text-sm">No goals yet.</p>
+          <p className="col-span-2 text-norby-ivory/40 text-sm">Nenhuma meta ainda.</p>
         )}
         {goals.map((g) => {
           const pct = Math.min(g.progress_pct, 100);
@@ -175,7 +175,7 @@ export default function Goals() {
                   <div>
                     <p className="text-norby-ivory font-medium">{g.name}</p>
                     <p className="text-xs text-norby-ivory/40">
-                      {g.type === "SAVINGS" ? "Savings" : `Budget · ${g.category}`}
+                      {g.type === "SAVINGS" ? "Poupança" : `Orçamento · ${g.category}`}
                     </p>
                   </div>
                 </div>
@@ -184,7 +184,7 @@ export default function Goals() {
                     <button
                       onClick={() => handleContribute(g)}
                       className="p-2 rounded-lg text-norby-ivory/40 hover:text-norby-teal hover:bg-white/5"
-                      title="Add contribution"
+                      title="Adicionar aporte"
                     >
                       <Plus size={14} />
                     </button>

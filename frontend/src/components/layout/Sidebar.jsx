@@ -16,8 +16,8 @@ const navItems = [
   { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/wallets", icon: Wallet, label: "Carteiras" },
   { to: "/transactions", icon: FileText, label: "Relatórios" },
-  { to: "/recurring", icon: Repeat, label: "Recurring" },
-  { to: "/goals", icon: Target, label: "Goals" },
+  { to: "/recurring", icon: Repeat, label: "Recorrências" },
+  { to: "/goals", icon: Target, label: "Metas" },
   { to: "/ai", icon: BrainCircuit, label: "IA Analista" },
   { to: "/settings", icon: Settings, label: "Configurações" },
 ];

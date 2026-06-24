@@ -63,7 +63,7 @@ npm run test     # Vitest
   e reuso de enums existentes (`create_type=False`).
 - Frontend: **API client centralizado** em `src/api/` (axios em `axios.js`, um
   módulo fino por recurso). Componentes/páginas não chamam `axios` direto.
-- UI em **inglês**; tema teal "Petróleo Confiável" (classes `norby-*`).
+- UI em **português** (pt-BR); tema teal "Petróleo Confiável" (classes `norby-*`).
 - Specs e planos vivem no Second Brain (Obsidian), **não** no repo (`docs/` está
   no `.gitignore`).
 
@@ -91,4 +91,4 @@ orçamento não-mensal; metas compartilhadas; notificações/push; multi-moeda; 
 Finance; anexos/recibos; export CSV/PDF; CRUD de categorias.
 
 **Adiado p/ próximas semanas (não é "nunca"):** deploy (Vercel + VPS/Docker);
-auditoria de segurança profunda; i18n. UI permanece em inglês.
+auditoria de segurança profunda; i18n. UI permanece em português.

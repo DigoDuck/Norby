@@ -8,7 +8,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 
-const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const WEEKDAYS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 const inputCls =
   "bg-white/5 border-white/10 text-norby-ivory placeholder:text-norby-ivory/30";
 const emptyForm = {
@@ -34,9 +34,9 @@ export default function Recurring() {
   }, []);
 
   async function handleSave() {
-    if (!form.wallet_id) return setError("Select a wallet.");
-    if (!form.amount || Number(form.amount) <= 0) return setError("Amount must be > 0.");
-    if (!form.category.trim()) return setError("Category is required.");
+    if (!form.wallet_id) return setError("Selecione uma carteira.");
+    if (!form.amount || Number(form.amount) <= 0) return setError("O valor deve ser maior que zero.");
+    if (!form.category.trim()) return setError("Informe a categoria.");
     setSaving(true);
     setError(null);
     const payload = {
@@ -55,7 +55,7 @@ export default function Recurring() {
       setForm(emptyForm);
       load();
     } catch (err) {
-      setError(err.response?.data?.detail || "Could not save the rule.");
+      setError(err.response?.data?.detail || "Não foi possível salvar a recorrência.");
     } finally {
       setSaving(false);
     }
@@ -67,7 +67,7 @@ export default function Recurring() {
   }
 
   async function handleDelete(id) {
-    if (!confirm("Delete this recurring rule?")) return;
+    if (!confirm("Remover esta recorrência?")) return;
     await recurringApi.delete(id);
     load();
   }
@@ -76,18 +76,18 @@ export default function Recurring() {
     `R$ ${parseFloat(v).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
   const cadence = (it) =>
     it.frequency === "MONTHLY"
-      ? `Monthly · day ${it.day_of_month}`
-      : `Weekly · ${WEEKDAYS[it.weekday]}`;
+      ? `Mensal · dia ${it.day_of_month}`
+      : `Semanal · ${WEEKDAYS[it.weekday]}`;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-norby-ivory tracking-tight">
-            Recurring
+            Recorrências
           </h1>
           <p className="text-norby-ivory/50 text-sm mt-1">
-            Bills and income that repeat automatically
+            Contas e receitas que se repetem automaticamente
           </p>
         </div>
         <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setError(null); }}>
@@ -99,11 +99,11 @@ export default function Recurring() {
               />
             }
           >
-            <Plus size={16} className="mr-1" /> New Rule
+            <Plus size={16} className="mr-1" /> Nova Recorrência
           </DialogTrigger>
           <DialogContent className="bg-norby-surface border-white/10 text-norby-ivory">
             <DialogHeader>
-              <DialogTitle>New recurring rule</DialogTitle>
+              <DialogTitle>Nova recorrência</DialogTitle>
             </DialogHeader>
             <div className="space-y-3 mt-2">
               <select
@@ -111,7 +111,7 @@ export default function Recurring() {
                 onChange={(e) => setForm({ ...form, wallet_id: e.target.value })}
                 className={`w-full rounded-md px-3 py-2 ${inputCls}`}
               >
-                <option value="">Select wallet…</option>
+                <option value="">Selecione a carteira…</option>
                 {wallets.map((w) => (
                   <option key={w.id} value={w.id}>{w.name}</option>
                 ))}
@@ -121,16 +121,16 @@ export default function Recurring() {
                 onChange={(e) => setForm({ ...form, type: e.target.value })}
                 className={`w-full rounded-md px-3 py-2 ${inputCls}`}
               >
-                <option value="EXPENSE">Expense</option>
-                <option value="INCOME">Income</option>
+                <option value="EXPENSE">Despesa</option>
+                <option value="INCOME">Receita</option>
               </select>
               <Input
-                type="number" placeholder="Amount" value={form.amount}
+                type="number" placeholder="Valor" value={form.amount}
                 onChange={(e) => setForm({ ...form, amount: e.target.value })}
                 className={inputCls}
               />
               <Input
-                placeholder="Category" value={form.category}
+                placeholder="Categoria" value={form.category}
                 onChange={(e) => setForm({ ...form, category: e.target.value })}
                 className={inputCls}
               />
@@ -139,12 +139,12 @@ export default function Recurring() {
                 onChange={(e) => setForm({ ...form, frequency: e.target.value })}
                 className={`w-full rounded-md px-3 py-2 ${inputCls}`}
               >
-                <option value="MONTHLY">Monthly</option>
-                <option value="WEEKLY">Weekly</option>
+                <option value="MONTHLY">Mensal</option>
+                <option value="WEEKLY">Semanal</option>
               </select>
               {form.frequency === "MONTHLY" ? (
                 <Input
-                  type="number" min="1" max="28" placeholder="Day of month (1-28)"
+                  type="number" min="1" max="28" placeholder="Dia do mês (1-28)"
                   value={form.day_of_month}
                   onChange={(e) => setForm({ ...form, day_of_month: e.target.value })}
                   className={inputCls}
@@ -165,7 +165,7 @@ export default function Recurring() {
                 onClick={handleSave} disabled={saving}
                 className="w-full bg-norby-teal hover:bg-norby-teal-soft text-norby-night font-medium"
               >
-                {saving ? "Saving…" : "Create rule"}
+                {saving ? "Salvando…" : "Criar recorrência"}
               </Button>
             </div>
           </DialogContent>
@@ -174,7 +174,7 @@ export default function Recurring() {
 
       <div className="grid grid-cols-2 gap-4">
         {items.length === 0 && (
-          <p className="text-norby-ivory/40 text-sm">No recurring rules yet.</p>
+          <p className="text-norby-ivory/40 text-sm">Nenhuma recorrência ainda.</p>
         )}
         {items.map((it) => (
           <div key={it.id} className="glass-card-hover p-5 flex items-center gap-4">
@@ -189,14 +189,14 @@ export default function Recurring() {
                 </span>
               </p>
               <p className="text-xs text-norby-ivory/40">
-                {cadence(it)} · next {new Date(it.next_run_date).toLocaleDateString("pt-BR")}
-                {!it.active && " · paused"}
+                {cadence(it)} · próx. {new Date(it.next_run_date).toLocaleDateString("pt-BR")}
+                {!it.active && " · pausada"}
               </p>
             </div>
             <button
               onClick={() => toggleActive(it)}
               className="p-2 rounded-lg text-norby-ivory/40 hover:text-norby-ivory hover:bg-white/5"
-              title={it.active ? "Pause" : "Resume"}
+              title={it.active ? "Pausar" : "Retomar"}
             >
               {it.active ? <Pause size={14} /> : <Play size={14} />}
             </button>
