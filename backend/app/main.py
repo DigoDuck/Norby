@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from app.routers import auth, wallets, transactions, ai, recurring
+from app.routers import auth, wallets, transactions, ai, recurring, goals
 from app.config import get_settings
 from app.limiter import limiter
 
@@ -31,6 +31,7 @@ app.include_router(wallets.router)
 app.include_router(transactions.router)
 app.include_router(ai.router)
 app.include_router(recurring.router)
+app.include_router(goals.router)
 
 @app.get("/health", tags=["Health"]) 
 async def health_check():

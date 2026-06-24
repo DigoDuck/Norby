@@ -3,8 +3,11 @@ import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
 
+from pydantic import ValidationError
+
 from app.models.sql_models import User, Wallet, Transaction, TransactionType, Goal, GoalType
-from app.services.goal_service import build_goal_response, month_spent
+from app.schemas.goal import GoalCreate, GoalContribute
+from app.services.goal_service import build_goal_response, month_spent, current_month_range
 
 
 async def _seed(db):
@@ -50,3 +53,108 @@ async def test_budget_progress_sums_month_expenses(db_session):
     view = await build_goal_response(db_session, goal)
     assert view["current_amount"] == Decimal("120")
     assert view["progress_pct"] == 40.0
+
+
+# ---------------------------------------------------------------------------
+# API tests
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_create_savings_goal(make_auth_client):
+    ac = await make_auth_client("Alice")
+    res = await ac.post("/goals/", json={
+        "name": "Trip", "type": "SAVINGS", "target_amount": "1000", "current_amount": "100",
+    })
+    assert res.status_code == 201, res.text
+    body = res.json()
+    assert body["category"] is None
+    assert body["progress_pct"] == 10.0
+
+
+@pytest.mark.asyncio
+async def test_create_budget_requires_category(make_auth_client):
+    ac = await make_auth_client("Alice")
+    res = await ac.post("/goals/", json={
+        "name": "Food cap", "type": "BUDGET", "target_amount": "300",
+    })
+    assert res.status_code == 422  # category faltando
+
+
+@pytest.mark.asyncio
+async def test_contribute_savings_updates_progress(make_auth_client):
+    ac = await make_auth_client("Alice")
+    goal = (await ac.post("/goals/", json={
+        "name": "Trip", "type": "SAVINGS", "target_amount": "1000",
+    })).json()
+    res = await ac.post(f"/goals/{goal['id']}/contribute", json={"amount": "400"})
+    assert res.status_code == 200
+    assert res.json()["current_amount"] == "400.00"
+    assert res.json()["progress_pct"] == 40.0
+
+
+@pytest.mark.asyncio
+async def test_contribute_on_budget_400(make_auth_client):
+    ac = await make_auth_client("Alice")
+    goal = (await ac.post("/goals/", json={
+        "name": "Cap", "type": "BUDGET", "target_amount": "300", "category": "Food",
+    })).json()
+    res = await ac.post(f"/goals/{goal['id']}/contribute", json={"amount": "10"})
+    assert res.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_goals_scoped_to_user(make_auth_client):
+    alice = await make_auth_client("Alice")
+    bob = await make_auth_client("Bob")
+    g = (await alice.post("/goals/", json={
+        "name": "Trip", "type": "SAVINGS", "target_amount": "1000",
+    })).json()
+    assert len((await bob.get("/goals/")).json()) == 0
+    res = await bob.post(f"/goals/{g['id']}/contribute", json={"amount": "10"})
+    assert res.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Pure-Python unit tests — schema validators and month rollover
+# ---------------------------------------------------------------------------
+
+def test_budget_without_category_raises():
+    with pytest.raises(ValidationError):
+        GoalCreate(
+            name="Cap",
+            type="BUDGET",
+            target_amount="300",
+        )
+
+
+def test_budget_clears_current_amount_and_deadline():
+    g = GoalCreate(
+        name="Food cap",
+        type="BUDGET",
+        category="Food",
+        target_amount="300",
+        current_amount="50",
+        deadline=datetime(2025, 12, 31, tzinfo=timezone.utc),
+    )
+    assert g.current_amount == Decimal("0")
+    assert g.deadline is None
+
+
+def test_savings_clears_category():
+    g = GoalCreate(
+        name="Trip",
+        type="SAVINGS",
+        category="X",
+        target_amount="1000",
+    )
+    assert g.category is None
+
+
+def test_contribute_zero_raises():
+    with pytest.raises(ValidationError):
+        GoalContribute(amount=Decimal("0"))
+
+
+def test_current_month_range_december_rollover():
+    _, end = current_month_range(datetime(2025, 12, 15, tzinfo=timezone.utc))
+    assert end == datetime(2026, 1, 1, tzinfo=timezone.utc)
