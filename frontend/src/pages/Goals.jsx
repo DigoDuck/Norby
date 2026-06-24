@@ -62,14 +62,22 @@ export default function Goals() {
     if (raw === null) return;
     const amount = Number(raw);
     if (!amount) return;
-    await goalsApi.contribute(goal.id, String(amount));
-    load();
+    try {
+      await goalsApi.contribute(goal.id, amount);
+      load();
+    } catch (err) {
+      alert(err.response?.data?.detail || "Could not save contribution.");
+    }
   }
 
   async function handleDelete(id) {
     if (!confirm("Delete this goal?")) return;
-    await goalsApi.delete(id);
-    load();
+    try {
+      await goalsApi.delete(id);
+      load();
+    } catch (err) {
+      alert(err.response?.data?.detail || "Could not delete goal.");
+    }
   }
 
   return (
@@ -145,7 +153,7 @@ export default function Goals() {
 
       <div className="grid grid-cols-2 gap-4">
         {goals.length === 0 && (
-          <p className="text-norby-ivory/40 text-sm">No goals yet.</p>
+          <p className="col-span-2 text-norby-ivory/40 text-sm">No goals yet.</p>
         )}
         {goals.map((g) => {
           const pct = Math.min(g.progress_pct, 100);
