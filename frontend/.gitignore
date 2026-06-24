@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Explicitly track src/lib (root .gitignore has lib/ for Python, but we need this)
+!src/lib/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
