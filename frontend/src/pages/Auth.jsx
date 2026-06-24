@@ -60,7 +60,13 @@ export default function Auth() {
       login(res.data.access_token, res.data.user);
       navigate("/dashboard");
     } catch (err) {
-      setError(err.response?.data?.detail || "Algo deu errado");
+      if (!err.response) {
+        setError("Não foi possível conectar ao servidor. Tente novamente em instantes.");
+      } else if (err.response.status === 401) {
+        setError("Email ou senha incorretos.");
+      } else {
+        setError(err.response.data?.detail || "Algo deu errado. Tente novamente.");
+      }
     } finally {
       setLoading(false);
     }
