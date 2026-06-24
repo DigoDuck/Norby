@@ -113,6 +113,12 @@ async def test_goals_scoped_to_user(make_auth_client):
     res = await bob.post(f"/goals/{g['id']}/contribute", json={"amount": "10"})
     assert res.status_code == 404
 
+    res = await bob.put(f"/goals/{g['id']}", json={"name": "Hijacked"})
+    assert res.status_code == 404
+
+    res = await bob.delete(f"/goals/{g['id']}")
+    assert res.status_code == 404
+
 
 # ---------------------------------------------------------------------------
 # Pure-Python unit tests — schema validators and month rollover
