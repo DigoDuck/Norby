@@ -28,7 +28,6 @@ class GoalCreate(BaseModel):
 class GoalUpdate(BaseModel):
     name: str | None = None
     target_amount: Decimal | None = Field(default=None, gt=0)
-    deadline: datetime | None = None
 
 
 class GoalContribute(BaseModel):

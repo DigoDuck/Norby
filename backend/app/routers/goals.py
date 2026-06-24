@@ -12,10 +12,11 @@ from app.services.goal_service import build_goal_response
 router = APIRouter(prefix="/goals", tags=["Goals"])
 
 
-async def _get_owned_goal(goal_id: UUID, user: User, db: AsyncSession) -> Goal:
-    goal = (await db.execute(
-        select(Goal).where(Goal.id == goal_id, Goal.user_id == user.id)
-    )).scalar_one_or_none()
+async def _get_owned_goal(goal_id: UUID, user: User, db: AsyncSession, for_update: bool = False) -> Goal:
+    stmt = select(Goal).where(Goal.id == goal_id, Goal.user_id == user.id)
+    if for_update:
+        stmt = stmt.with_for_update()
+    goal = (await db.execute(stmt)).scalar_one_or_none()
     if not goal:
         raise HTTPException(status_code=404, detail="Meta não encontrada")
     return goal
@@ -78,7 +79,7 @@ async def contribute(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    goal = await _get_owned_goal(goal_id, current_user, db)
+    goal = await _get_owned_goal(goal_id, current_user, db, for_update=True)
     if goal.type != GoalType.SAVINGS:
         raise HTTPException(status_code=400, detail="Aportes só em metas do tipo SAVINGS")
     goal.current_amount += payload.amount

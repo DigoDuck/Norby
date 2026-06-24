@@ -46,7 +46,7 @@ async def materialize_due_recurring(db: AsyncSession, user: User) -> int:
             RecurringTransaction.user_id == user.id,
             RecurringTransaction.active.is_(True),
             RecurringTransaction.next_run_date <= now,
-        )
+        ).with_for_update()
     )).scalars().all()
 
     generated = 0
