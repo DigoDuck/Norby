@@ -39,7 +39,7 @@ alembic upgrade head                                        # aplica migrations
 alembic revision -m "descricao"                             # nova migration (preencher upgrade/downgrade)
 uv pip install -r requirements.txt                          # instala deps
 ```
-Banco de teste (uma vez): `docker exec -it norby_postgres createdb -U $POSTGRES_USER norby_test`
+Banco de teste (uma vez, apenas em dev): criar um banco `norby_test` no Postgres local usando um usuário com permissão de criar bancos. Essa permissão é específica do ambiente de desenvolvimento — não replicar em produção.
 
 Frontend (rodar de `frontend/`):
 ```
@@ -72,8 +72,8 @@ npm run test     # Vitest
 - **Nunca** commitar direto na `main` — trabalhe em branch e abra PR.
 - **Nunca** rodar migration destrutiva (drop de tabela/coluna, alteração que
   perde dado) sem confirmar antes.
-- **Nunca** commitar segredos. `.env` (JWT secret, `GOOGLE_API_KEY`, credenciais
-  de DB) fica fora do git.
+- **Nunca** commitar segredos. Variáveis de API, autenticação e banco ficam fora
+  do git, apenas em `.env` (gitignored).
 
 ## Git commits
 
