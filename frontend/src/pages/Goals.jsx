@@ -1,59 +1,97 @@
 import { useEffect, useState } from "react";
+import { useForm, Controller, useWatch } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, Trash2, Target, PiggyBank } from "lucide-react";
+
 import { goalsApi } from "@/api/goals";
+import { CATEGORIES } from "@/lib/categories";
+import { goalSchema } from "@/lib/schemas";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Field } from "@/components/ui/field";
+import { Segmented } from "@/components/ui/segmented";
+import { Select } from "@/components/ui/select";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 
+const TYPE_OPTIONS = [
+  { value: "SAVINGS", label: "Poupança" },
+  { value: "BUDGET", label: "Orçamento" },
+];
+
+const CATEGORY_OPTIONS = CATEGORIES.map((c) => ({ value: c, label: c }));
+
 const inputCls =
-  "bg-white/5 border-white/10 text-norby-ivory placeholder:text-norby-ivory/30";
-const emptyForm = {
-  name: "", type: "SAVINGS", target_amount: "", current_amount: "", category: "",
-};
+  "w-full h-10 px-3 rounded-lg bg-white/5 border border-white/10 text-norby-ivory text-sm placeholder:text-norby-ivory/40 focus:outline-none focus:ring-2 focus:ring-norby-teal/40 transition";
+
 const fmt = (v) =>
   `R$ ${parseFloat(v).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
 
 export default function Goals() {
   const [goals, setGoals] = useState([]);
   const [open, setOpen] = useState(false);
-  const [error, setError] = useState(null);
-  const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState(emptyForm);
+  const [serverError, setServerError] = useState(null);
+
+  const {
+    register,
+    handleSubmit,
+    control,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm({
+    resolver: zodResolver(goalSchema),
+    defaultValues: {
+      name: "",
+      type: "SAVINGS",
+      target_amount: "",
+      current_amount: "",
+      category: "",
+    },
+  });
+
+  // Watch type to toggle conditional fields and label
+  const type = useWatch({ control, name: "type" });
 
   async function load() {
     setGoals((await goalsApi.list()).data);
   }
+
   useEffect(() => {
-    load();
+    load(); // eslint-disable-line react-hooks/set-state-in-effect
   }, []);
 
-  async function handleSave() {
-    if (!form.name.trim()) return setError("Informe o nome.");
-    if (!form.target_amount || Number(form.target_amount) <= 0)
-      return setError("O alvo deve ser maior que zero.");
-    if (form.type === "BUDGET" && !form.category.trim())
-      return setError("Categoria é obrigatória para orçamento.");
-    setSaving(true);
-    setError(null);
+  function handleOpenChange(v) {
+    setOpen(v);
+    if (!v) {
+      setServerError(null);
+      reset({
+        name: "",
+        type: "SAVINGS",
+        target_amount: "",
+        current_amount: "",
+        category: "",
+      });
+    }
+  }
+
+  async function onSubmit(data) {
+    setServerError(null);
     const payload = {
-      name: form.name,
-      type: form.type,
-      target_amount: form.target_amount,
-      ...(form.type === "SAVINGS"
-        ? { current_amount: form.current_amount === "" ? "0" : form.current_amount }
-        : { category: form.category }),
+      name: data.name,
+      type: data.type,
+      target_amount: data.target_amount,
+      ...(data.type === "SAVINGS"
+        ? { current_amount: data.current_amount || 0 }
+        : { category: data.category }),
     };
     try {
       await goalsApi.create(payload);
       setOpen(false);
-      setForm(emptyForm);
       load();
     } catch (err) {
-      setError(err.response?.data?.detail || "Não foi possível salvar a meta.");
-    } finally {
-      setSaving(false);
+      setServerError(err.response?.data?.detail || "Não foi possível salvar a meta.");
     }
   }
 
@@ -89,13 +127,10 @@ export default function Goals() {
             Objetivos de poupança e orçamentos mensais
           </p>
         </div>
-        <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setError(null); }}>
+        <Dialog open={open} onOpenChange={handleOpenChange}>
           <DialogTrigger
             render={
-              <Button
-                onClick={() => { setForm(emptyForm); setError(null); }}
-                className="bg-norby-teal hover:bg-norby-teal-soft text-norby-night font-medium"
-              />
+              <Button className="bg-norby-teal hover:bg-norby-teal-soft text-norby-night font-medium" />
             }
           >
             <Plus size={16} className="mr-1" /> Nova Meta
@@ -104,49 +139,101 @@ export default function Goals() {
             <DialogHeader>
               <DialogTitle>Nova meta</DialogTitle>
             </DialogHeader>
-            <div className="space-y-3 mt-2">
-              <select
-                value={form.type}
-                onChange={(e) => setForm({ ...form, type: e.target.value })}
-                className={`w-full rounded-md px-3 py-2 ${inputCls}`}
+
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-3 mt-2">
+              {/* Tipo */}
+              <Field label="Tipo" error={errors.type?.message}>
+                <Controller
+                  name="type"
+                  control={control}
+                  render={({ field }) => (
+                    <Segmented
+                      value={field.value}
+                      onChange={field.onChange}
+                      options={TYPE_OPTIONS}
+                    />
+                  )}
+                />
+              </Field>
+
+              {/* Nome */}
+              <Field label="Nome" htmlFor="name" error={errors.name?.message}>
+                <Input
+                  id="name"
+                  placeholder="Ex: Fundo de emergência"
+                  className={inputCls}
+                  {...register("name")}
+                />
+              </Field>
+
+              {/* Valor-alvo / Teto mensal */}
+              <Field
+                label={type === "BUDGET" ? "Teto mensal" : "Valor-alvo"}
+                htmlFor="target_amount"
+                error={errors.target_amount?.message}
               >
-                <option value="SAVINGS">Poupança (acumular)</option>
-                <option value="BUDGET">Orçamento (teto mensal)</option>
-              </select>
-              <Input
-                placeholder="Nome" value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className={inputCls}
-              />
-              <Input
-                type="number"
-                placeholder={form.type === "SAVINGS" ? "Valor-alvo" : "Teto mensal"}
-                value={form.target_amount}
-                onChange={(e) => setForm({ ...form, target_amount: e.target.value })}
-                className={inputCls}
-              />
-              {form.type === "SAVINGS" ? (
                 <Input
-                  type="number" placeholder="Já guardado (opcional)"
-                  value={form.current_amount}
-                  onChange={(e) => setForm({ ...form, current_amount: e.target.value })}
-                  className={inputCls}
+                  id="target_amount"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0,00"
+                  className={`${inputCls} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+                  {...register("target_amount")}
                 />
+              </Field>
+
+              {/* Condicional: SAVINGS → já guardado; BUDGET → categoria */}
+              {type === "SAVINGS" ? (
+                <Field
+                  label="Já guardado (opcional)"
+                  htmlFor="current_amount"
+                  error={errors.current_amount?.message}
+                >
+                  <Input
+                    id="current_amount"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0,00"
+                    className={`${inputCls} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+                    {...register("current_amount")}
+                  />
+                </Field>
               ) : (
-                <Input
-                  placeholder="Categoria (ex: Alimentação)" value={form.category}
-                  onChange={(e) => setForm({ ...form, category: e.target.value })}
-                  className={inputCls}
-                />
+                <Field
+                  label="Categoria"
+                  htmlFor="category"
+                  error={errors.category?.message}
+                >
+                  <Controller
+                    name="category"
+                    control={control}
+                    render={({ field }) => (
+                      <Select
+                        id="category"
+                        value={field.value}
+                        onChange={field.onChange}
+                        placeholder="Selecionar categoria"
+                        options={CATEGORY_OPTIONS}
+                      />
+                    )}
+                  />
+                </Field>
               )}
-              {error && <p className="text-norby-danger text-xs">{error}</p>}
+
+              {serverError && (
+                <p className="text-norby-danger text-xs">{serverError}</p>
+              )}
+
               <Button
-                onClick={handleSave} disabled={saving}
+                type="submit"
+                disabled={isSubmitting}
                 className="w-full bg-norby-teal hover:bg-norby-teal-soft text-norby-night font-medium"
               >
-                {saving ? "Salvando…" : "Criar meta"}
+                {isSubmitting ? "Salvando…" : "Criar meta"}
               </Button>
-            </div>
+            </form>
           </DialogContent>
         </Dialog>
       </div>
@@ -182,6 +269,7 @@ export default function Goals() {
                 <div className="flex gap-1">
                   {g.type === "SAVINGS" && (
                     <button
+                      type="button"
                       onClick={() => handleContribute(g)}
                       className="p-2 rounded-lg text-norby-ivory/40 hover:text-norby-teal hover:bg-white/5"
                       title="Adicionar aporte"
@@ -190,6 +278,7 @@ export default function Goals() {
                     </button>
                   )}
                   <button
+                    type="button"
                     onClick={() => handleDelete(g.id)}
                     className="p-2 rounded-lg text-norby-ivory/40 hover:text-norby-danger hover:bg-white/5"
                   >

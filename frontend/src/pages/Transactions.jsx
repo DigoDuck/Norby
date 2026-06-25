@@ -1,10 +1,20 @@
 import { useEffect, useState } from "react";
+import { useForm, Controller, useWatch } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, Search, Trash2, Pencil } from "lucide-react";
+
 import { transactionsApi } from "@/api/transactions";
 import { walletsApi } from "@/api/wallets";
 import { recurringApi } from "@/api/recurring";
+import { CATEGORIES } from "@/lib/categories";
+import { transactionSchema } from "@/lib/schemas";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Field } from "@/components/ui/field";
+import { Segmented } from "@/components/ui/segmented";
+import { Select } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -12,40 +22,48 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
 
-const CATEGORIES = [
-  "Alimentação",
-  "Educação",
-  "Moradia",
-  "Transporte",
-  "Saúde",
-  "Lazer",
-  "Outros",
+const TYPE_OPTIONS = [
+  { value: "EXPENSE", label: "Despesa", activeClass: "bg-norby-danger text-norby-ivory" },
+  { value: "INCOME", label: "Receita", activeClass: "bg-norby-income text-norby-night" },
 ];
 
-const emptyForm = () => ({
-  wallet_id: "",
-  type: "EXPENSE",
-  amount: "",
-  category: CATEGORIES[0],
-  description: "",
-  date: new Date().toISOString().split("T")[0],
-});
+const CATEGORY_OPTIONS = CATEGORIES.map((c) => ({ value: c, label: c }));
 
-const fieldCls =
-  "w-full p-2 rounded-lg bg-white/5 border border-white/10 text-norby-ivory text-sm";
+const inputCls =
+  "w-full h-10 px-3 rounded-lg bg-white/5 border border-white/10 text-norby-ivory text-sm placeholder:text-norby-ivory/40 focus:outline-none focus:ring-2 focus:ring-norby-teal/40 transition";
+
+const today = () => new Date().toISOString().split("T")[0];
 
 export default function Transactions() {
   const [transactions, setTransactions] = useState([]);
   const [wallets, setWallets] = useState([]);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
-  const [error, setError] = useState(null);
-  const [saving, setSaving] = useState(false);
+  const [serverError, setServerError] = useState(null);
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState("");
-  const [form, setForm] = useState(emptyForm);
+
+  const {
+    register,
+    handleSubmit,
+    control,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm({
+    resolver: zodResolver(transactionSchema),
+    defaultValues: {
+      wallet_id: "",
+      type: "EXPENSE",
+      amount: "",
+      category: CATEGORIES[0],
+      description: "",
+      date: today(),
+    },
+  });
+
+  // Watch type for Segmented (not strictly needed in render, but kept for consistency)
+  useWatch({ control, name: "type" });
 
   async function load(params = {}) {
     await recurringApi.run().catch(() => {});
@@ -54,8 +72,10 @@ export default function Transactions() {
   }
 
   useEffect(() => {
-    walletsApi.list().then((r) => setWallets(r.data));
-    load();
+    walletsApi.list().then((r) => {
+      setWallets(r.data);
+    });
+    load(); // eslint-disable-line react-hooks/set-state-in-effect
   }, []);
 
   useEffect(() => {
@@ -66,18 +86,35 @@ export default function Transactions() {
     return () => clearTimeout(timer);
   }, [filterType]);
 
+  // Auto-select the sole wallet only when NOT editing
+  useEffect(() => {
+    if (wallets.length === 1 && !editing) {
+      reset((prev) => ({ ...prev, wallet_id: wallets[0].id }));
+    }
+  }, [wallets]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const reload = () => load(filterType ? { type: filterType } : {});
+
+  const walletOptions = wallets.map((w) => ({ value: w.id, label: w.name }));
 
   function openNew() {
     setEditing(null);
-    setForm(emptyForm());
-    setError(null);
+    setServerError(null);
+    reset({
+      wallet_id: wallets.length === 1 ? wallets[0].id : "",
+      type: "EXPENSE",
+      amount: "",
+      category: CATEGORIES[0],
+      description: "",
+      date: today(),
+    });
     setOpen(true);
   }
 
   function openEdit(t) {
     setEditing(t);
-    setForm({
+    setServerError(null);
+    reset({
       wallet_id: t.wallet_id,
       type: t.type,
       amount: String(t.amount),
@@ -85,19 +122,28 @@ export default function Transactions() {
       description: t.description || "",
       date: new Date(t.date).toISOString().split("T")[0],
     });
-    setError(null);
     setOpen(true);
   }
 
-  async function handleSave() {
-    if (!form.wallet_id) return setError("Selecione uma carteira.");
-    if (!form.amount || parseFloat(form.amount) <= 0)
-      return setError("Informe um valor maior que zero.");
+  function handleOpenChange(v) {
+    setOpen(v);
+    if (!v) {
+      setEditing(null);
+      setServerError(null);
+    }
+  }
 
-    setSaving(true);
-    setError(null);
+  async function onSubmit(data) {
+    setServerError(null);
+    const payload = {
+      wallet_id: data.wallet_id,
+      type: data.type,
+      amount: data.amount,
+      category: data.category,
+      description: data.description || "",
+      date: data.date,
+    };
     try {
-      const payload = { ...form, amount: parseFloat(form.amount) };
       if (editing) {
         await transactionsApi.update(editing.id, payload);
       } else {
@@ -105,14 +151,11 @@ export default function Transactions() {
       }
       setOpen(false);
       setEditing(null);
-      setForm(emptyForm());
       reload();
     } catch (err) {
-      setError(
+      setServerError(
         err.response?.data?.detail || "Não foi possível salvar a transação.",
       );
-    } finally {
-      setSaving(false);
     }
   }
 
@@ -148,16 +191,7 @@ export default function Transactions() {
             Histórico completo de transações
           </p>
         </div>
-        <Dialog
-          open={open}
-          onOpenChange={(v) => {
-            setOpen(v);
-            if (!v) {
-              setEditing(null);
-              setError(null);
-            }
-          }}
-        >
+        <Dialog open={open} onOpenChange={handleOpenChange}>
           <DialogTrigger
             render={
               <Button
@@ -174,83 +208,126 @@ export default function Transactions() {
                 {editing ? "Editar Transação" : "Nova Transação"}
               </DialogTitle>
             </DialogHeader>
-            <div className="space-y-3 mt-2">
-              <div className="grid grid-cols-2 gap-3">
-                {["INCOME", "EXPENSE"].map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => setForm({ ...form, type: t })}
-                    className={`py-2 rounded-lg text-sm font-medium transition-all ${
-                      form.type === t
-                        ? t === "INCOME"
-                          ? "bg-norby-income text-norby-night"
-                          : "bg-norby-danger text-norby-ivory"
-                        : "bg-white/5 text-norby-ivory/70"
-                    }`}
-                  >
-                    {t === "INCOME" ? "Receita" : "Despesa"}
-                  </button>
-                ))}
-              </div>
-              <select
-                value={form.wallet_id}
-                onChange={(e) => setForm({ ...form, wallet_id: e.target.value })}
-                className={fieldCls}
+
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-3 mt-2">
+              {/* Tipo */}
+              <Field label="Tipo" error={errors.type?.message}>
+                <Controller
+                  name="type"
+                  control={control}
+                  render={({ field }) => (
+                    <Segmented
+                      value={field.value}
+                      onChange={field.onChange}
+                      options={TYPE_OPTIONS}
+                    />
+                  )}
+                />
+              </Field>
+
+              {/* Carteira */}
+              <Field
+                label="Carteira"
+                htmlFor="wallet_id"
+                error={errors.wallet_id?.message}
               >
-                <option value="" className="bg-norby-surface">
-                  Selecionar carteira
-                </option>
-                {wallets.map((w) => (
-                  <option key={w.id} value={w.id} className="bg-norby-surface">
-                    {w.name}
-                  </option>
-                ))}
-              </select>
-              <Input
-                type="number"
-                placeholder="Valor"
-                value={form.amount}
-                onChange={(e) => setForm({ ...form, amount: e.target.value })}
-                className="bg-white/5 border-white/10 text-norby-ivory placeholder:text-norby-ivory/40 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-              />
-              <select
-                value={form.category}
-                onChange={(e) => setForm({ ...form, category: e.target.value })}
-                className={fieldCls}
+                <Controller
+                  name="wallet_id"
+                  control={control}
+                  render={({ field }) => (
+                    <Select
+                      id="wallet_id"
+                      value={field.value}
+                      onChange={field.onChange}
+                      placeholder="Selecionar carteira"
+                      options={walletOptions}
+                    />
+                  )}
+                />
+              </Field>
+
+              {/* Categoria */}
+              <Field
+                label="Categoria"
+                htmlFor="category"
+                error={errors.category?.message}
               >
-                {CATEGORIES.map((c) => (
-                  <option key={c} value={c} className="bg-norby-surface">
-                    {c}
-                  </option>
-                ))}
-              </select>
-              <Input
-                placeholder="Descrição (opcional)"
-                value={form.description}
-                onChange={(e) =>
-                  setForm({ ...form, description: e.target.value })
-                }
-                className="bg-white/5 border-white/10 text-norby-ivory placeholder:text-norby-ivory/40"
-              />
-              <Input
-                type="date"
-                value={form.date}
-                onChange={(e) => setForm({ ...form, date: e.target.value })}
-                className="bg-white/5 border-white/10 text-norby-ivory"
-              />
-              {error && <p className="text-norby-danger text-xs">{error}</p>}
+                <Controller
+                  name="category"
+                  control={control}
+                  render={({ field }) => (
+                    <Select
+                      id="category"
+                      value={field.value}
+                      onChange={field.onChange}
+                      placeholder="Selecionar categoria"
+                      options={CATEGORY_OPTIONS}
+                    />
+                  )}
+                />
+              </Field>
+
+              {/* Valor */}
+              <Field
+                label="Valor (R$)"
+                htmlFor="amount"
+                error={errors.amount?.message}
+              >
+                <Input
+                  id="amount"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0,00"
+                  className={`${inputCls} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+                  {...register("amount")}
+                />
+              </Field>
+
+              {/* Descrição */}
+              <Field
+                label="Descrição (opcional)"
+                htmlFor="description"
+                error={errors.description?.message}
+              >
+                <Input
+                  id="description"
+                  placeholder="Ex: mercado, cinema..."
+                  className={inputCls}
+                  {...register("description")}
+                />
+              </Field>
+
+              {/* Data */}
+              <Field
+                label="Data"
+                htmlFor="date"
+                error={errors.date?.message}
+              >
+                <Input
+                  id="date"
+                  type="date"
+                  className={inputCls}
+                  {...register("date")}
+                />
+              </Field>
+
+              {serverError && (
+                <p className="text-norby-danger text-xs">{serverError}</p>
+              )}
+
               <Button
-                onClick={handleSave}
-                disabled={saving}
+                type="submit"
+                disabled={isSubmitting}
                 className="w-full bg-norby-teal hover:bg-norby-teal-soft text-norby-night font-medium"
               >
-                {saving
+                {isSubmitting
                   ? "Salvando..."
                   : editing
                     ? "Salvar alterações"
                     : "Registrar Transação"}
               </Button>
-            </div>
+            </form>
           </DialogContent>
         </Dialog>
       </div>
@@ -269,6 +346,7 @@ export default function Transactions() {
         {["", "INCOME", "EXPENSE"].map((t) => (
           <button
             key={t}
+            type="button"
             onClick={() => setFilterType(t)}
             className={`px-4 py-2 rounded-lg text-sm transition-all ${
               filterType === t
@@ -333,12 +411,14 @@ export default function Transactions() {
                 <td className="px-4 py-3">
                   <div className="flex gap-2">
                     <button
+                      type="button"
                       onClick={() => openEdit(t)}
                       className="text-norby-ivory/50 hover:text-norby-ivory transition-colors"
                     >
                       <Pencil size={16} />
                     </button>
                     <button
+                      type="button"
                       onClick={() => handleDelete(t.id)}
                       className="text-norby-ivory/50 hover:text-norby-danger transition-colors"
                     >
