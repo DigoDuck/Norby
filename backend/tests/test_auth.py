@@ -14,6 +14,24 @@ async def test_register_returns_token_and_user(client):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("senha", ["123", "curta1", "semnumero", "12345678"])
+async def test_register_weak_password_422(client, senha):
+    # Senha precisa ter >=8 chars, ao menos uma letra e um número.
+    res = await client.post(
+        "/auth/register", json={"name": "Weak", "email": "weak@test.com", "password": senha}
+    )
+    assert res.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_register_strong_password_ok(client):
+    res = await client.post(
+        "/auth/register", json={"name": "Strong", "email": "strong@test.com", "password": "senha1234"}
+    )
+    assert res.status_code == 201
+
+
+@pytest.mark.asyncio
 async def test_register_duplicate_email_400(client):
     await client.post("/auth/register", json=REG)
     res = await client.post("/auth/register", json=REG)

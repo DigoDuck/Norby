@@ -4,8 +4,13 @@ from sqlalchemy import select
 from app.dependencies import get_db, get_current_user
 from app.limiter import limiter
 from app.models.sql_models import User
-from app.schemas.user import UserRegister, UserLogin, UserUpdate, Token, UserResponse
-from app.services.auth_service import hash_password, verify_password, create_access_token
+from app.schemas.user import (
+    UserRegister, UserLogin, UserUpdate, Token, TokenPair, RefreshRequest, UserResponse,
+)
+from app.services.auth_service import (
+    hash_password, verify_password, create_access_token,
+    create_refresh_token, rotate_refresh_token, revoke_refresh_token,
+)
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -25,21 +30,37 @@ async def register(request: Request, payload: UserRegister, db: AsyncSession = D
     db.add(user)
     await db.commit()
     await db.refresh(user)
-    
-    token = create_access_token(str(user.id))
-    return Token(access_token=token, user=UserResponse.model_validate(user))
+
+    access = create_access_token(str(user.id))
+    refresh = await create_refresh_token(str(user.id), db)
+    return Token(access_token=access, refresh_token=refresh, user=UserResponse.model_validate(user))
 
 @router.post("/login", response_model=Token)
 @limiter.limit("10/minute")
 async def login(request: Request, payload: UserLogin, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.email == payload.email))
     user = result.scalar_one_or_none()
-    
+
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Credenciais inválidas")
-    
-    token = create_access_token(str(user.id))
-    return Token(access_token=token, user=UserResponse.model_validate(user))
+
+    access = create_access_token(str(user.id))
+    refresh = await create_refresh_token(str(user.id), db)
+    return Token(access_token=access, refresh_token=refresh, user=UserResponse.model_validate(user))
+
+@router.post("/refresh", response_model=TokenPair)
+@limiter.limit("20/minute")
+async def refresh_token(request: Request, payload: RefreshRequest, db: AsyncSession = Depends(get_db)):
+    result = await rotate_refresh_token(payload.refresh_token, db)
+    if result is None:
+        raise HTTPException(status_code=401, detail="Refresh token inválido ou expirado")
+    access, new_refresh, _user = result
+    return TokenPair(access_token=access, refresh_token=new_refresh)
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+async def logout(payload: RefreshRequest, db: AsyncSession = Depends(get_db)):
+    # Revoga o refresh recebido. Idempotente: token inexistente também retorna 204.
+    await revoke_refresh_token(payload.refresh_token, db)
 
 @router.get("/me", response_model=UserResponse)
 async def me(current_user: User = Depends(get_current_user)):

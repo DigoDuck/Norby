@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 export default function Settings() {
-  const { user, logout, updateUser } = useAuthStore();
+  const { user, updateUser } = useAuthStore();
   const navigate = useNavigate();
   const [form, setForm] = useState({
     name: user?.name || "",
@@ -16,8 +16,8 @@ export default function Settings() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState(null);
 
-  function handleLogout() {
-    logout();
+  async function handleLogout() {
+    await authApi.logout();
     navigate("/");
   }
 
