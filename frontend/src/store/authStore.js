@@ -5,11 +5,16 @@ export const useAuthStore = create(
   persist(
     (set) => ({
       token: null,
+      refreshToken: null,
       user: null,
       isAuthenticated: false,
 
-      login: (token, user) => set({ token, user, isAuthenticated: true }),
-      logout: () => set({ token: null, user: null, isAuthenticated: false }),
+      login: (token, refreshToken, user) =>
+        set({ token, refreshToken, user, isAuthenticated: true }),
+      // Atualiza só o par de tokens (usado na rotação do refresh), mantém o user.
+      setTokens: (token, refreshToken) => set({ token, refreshToken }),
+      logout: () =>
+        set({ token: null, refreshToken: null, user: null, isAuthenticated: false }),
       updateUser: (userData) =>
         set((state) => ({
           // Atualiza apenas os campos fornecidos, mantendo os outros intactos

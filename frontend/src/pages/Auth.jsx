@@ -57,7 +57,7 @@ export default function Auth() {
               password: data.password,
             });
 
-      login(res.data.access_token, res.data.user);
+      login(res.data.access_token, res.data.refresh_token, res.data.user);
       navigate("/dashboard");
     } catch (err) {
       if (!err.response) {

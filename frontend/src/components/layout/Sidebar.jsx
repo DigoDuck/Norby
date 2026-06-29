@@ -1,5 +1,6 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore";
+import { authApi } from "../../api/auth";
 import {
   LayoutDashboard,
   Wallet,
@@ -23,11 +24,11 @@ const navItems = [
 ];
 
 export default function Sidebar() {
-  const { user, logout } = useAuthStore();
+  const { user } = useAuthStore();
   const navigate = useNavigate();
 
-  function handleLogout() {
-    logout();
+  async function handleLogout() {
+    await authApi.logout();
     navigate("/");
   }
 
