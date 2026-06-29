@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -19,7 +19,16 @@ const loginSchema = z.object({
 const registerSchema = loginSchema
   .extend({
     name: z.string().min(3, "Nome obrigatório"),
+    // Alinha com a regra do backend: 8+ chars, ao menos uma letra e um número.
+    password: z
+      .string()
+      .min(8, "Mínimo de 8 caracteres")
+      .regex(/[A-Za-z]/, "Inclua ao menos uma letra")
+      .regex(/\d/, "Inclua ao menos um número"),
     confirmPassword: z.string(),
+    acceptedTerms: z.boolean().refine((v) => v === true, {
+      message: "Você precisa aceitar os Termos e a Política de Privacidade",
+    }),
   })
   .refine((d) => d.password === d.confirmPassword, {
     message: "Senhas não coincidem",
@@ -157,6 +166,32 @@ export default function Auth() {
                   <p className="text-norby-danger text-xs mt-1">
                     {errors.confirmPassword.message}
                   </p>
+                )}
+              </div>
+            )}
+
+            {mode === "register" && (
+              <div>
+                <label className="flex items-start gap-2 text-xs text-norby-ivory/60">
+                  <input
+                    type="checkbox"
+                    {...register("acceptedTerms")}
+                    className="mt-0.5 accent-norby-teal"
+                  />
+                  <span>
+                    Li e aceito os{" "}
+                    <Link to="/termos" target="_blank" className="text-norby-teal hover:underline">
+                      Termos de Uso
+                    </Link>{" "}
+                    e a{" "}
+                    <Link to="/privacidade" target="_blank" className="text-norby-teal hover:underline">
+                      Política de Privacidade
+                    </Link>
+                    .
+                  </span>
+                </label>
+                {errors.acceptedTerms && (
+                  <p className="text-norby-danger text-xs mt-1">{errors.acceptedTerms.message}</p>
                 )}
               </div>
             )}

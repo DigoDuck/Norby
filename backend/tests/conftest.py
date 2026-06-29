@@ -65,6 +65,31 @@ async def client():
 
 
 @pytest_asyncio.fixture
+async def mongo():
+    # Motor liga o cliente ao event loop no primeiro await. Como o cliente de
+    # produção é criado no import, ele fica preso ao loop do 1º teste e quebra nos
+    # seguintes ("Event loop is closed"). Aqui criamos um cliente fresco no loop
+    # do teste atual e religamos as referências que o account_service usa.
+    from motor.motor_asyncio import AsyncIOMotorClient
+    from app import database
+    import app.services.account_service as acc
+
+    client = AsyncIOMotorClient(database.settings.mongodb_url)
+    db = client["norby_db"]
+    ai = db["ai_insights"]
+    ch = db["chat_history"]
+
+    previous = (acc.ai_insights_collection, acc.chat_history_collection)
+    acc.ai_insights_collection = ai
+    acc.chat_history_collection = ch
+    try:
+        yield {"ai_insights": ai, "chat_history": ch}
+    finally:
+        acc.ai_insights_collection, acc.chat_history_collection = previous
+        client.close()
+
+
+@pytest_asyncio.fixture
 async def make_auth_client():
     app.dependency_overrides[get_db] = _override_get_db()
     created = []

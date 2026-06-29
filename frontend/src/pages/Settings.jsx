@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { User, Lock, LogOut, Save } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { User, Lock, LogOut, Save, Download, Trash2, ShieldCheck } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { authApi } from "@/api/auth";
+import { accountApi } from "@/api/account";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -16,9 +17,47 @@ export default function Settings() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState(null);
 
+  const [exporting, setExporting] = useState(false);
+  const [confirmText, setConfirmText] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [dangerError, setDangerError] = useState(null);
+
   async function handleLogout() {
     await authApi.logout();
     navigate("/");
+  }
+
+  async function handleExport() {
+    setDangerError(null);
+    setExporting(true);
+    try {
+      const res = await accountApi.exportData();
+      // Dispara o download do JSON no navegador.
+      const url = URL.createObjectURL(res.data);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "norby-meus-dados.json";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setDangerError("Não foi possível exportar seus dados. Tente novamente.");
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  async function handleDeleteAccount() {
+    setDangerError(null);
+    setDeleting(true);
+    try {
+      await accountApi.deleteAccount();
+      // Conta apagada no servidor (PG + Mongo); limpa o estado local e sai.
+      useAuthStore.getState().logout();
+      navigate("/");
+    } catch {
+      setDangerError("Não foi possível excluir a conta. Tente novamente.");
+      setDeleting(false);
+    }
   }
 
   async function handleSave() {
@@ -93,6 +132,64 @@ export default function Settings() {
           Sua senha é armazenada com hash bcrypt. Para alterar, entre em contato
           com o suporte.
         </p>
+      </div>
+
+      {/* Privacidade e dados (LGPD) */}
+      <div className="glass-card p-6 space-y-4">
+        <div className="flex items-center gap-3">
+          <ShieldCheck size={18} className="text-norby-teal" />
+          <h2 className="font-semibold text-norby-ivory">Privacidade e dados</h2>
+        </div>
+        <p className="text-sm text-norby-ivory/60">
+          Você pode baixar uma cópia de todos os seus dados a qualquer momento.
+          Veja como tratamos suas informações na{" "}
+          <Link to="/privacidade" className="text-norby-teal hover:underline">
+            Política de Privacidade
+          </Link>{" "}
+          e nos{" "}
+          <Link to="/termos" className="text-norby-teal hover:underline">
+            Termos de Uso
+          </Link>
+          .
+        </p>
+        <Button
+          onClick={handleExport}
+          disabled={exporting}
+          variant="outline"
+          className="border-norby-teal/40 text-norby-teal hover:bg-norby-teal hover:text-norby-night"
+        >
+          <Download size={15} className="mr-1.5" />
+          {exporting ? "Exportando..." : "Exportar meus dados"}
+        </Button>
+      </div>
+
+      {/* Zona de perigo: exclusão definitiva (LGPD) */}
+      <div className="glass-card p-6 space-y-4 border border-norby-danger/30">
+        <div className="flex items-center gap-3">
+          <Trash2 size={18} className="text-norby-danger" />
+          <h2 className="font-semibold text-norby-ivory">Excluir minha conta</h2>
+        </div>
+        <p className="text-sm text-norby-ivory/60">
+          Esta ação é <strong>permanente</strong>. Todos os seus dados serão
+          apagados de verdade dos nossos bancos (incluindo histórico da IA) e não
+          poderão ser recuperados. Para confirmar, digite{" "}
+          <strong className="text-norby-ivory">EXCLUIR</strong> abaixo.
+        </p>
+        <Input
+          placeholder="Digite EXCLUIR para confirmar"
+          value={confirmText}
+          onChange={(e) => setConfirmText(e.target.value)}
+          className={inputCls}
+        />
+        {dangerError && <p className="text-norby-danger text-xs">{dangerError}</p>}
+        <Button
+          onClick={handleDeleteAccount}
+          disabled={confirmText !== "EXCLUIR" || deleting}
+          className="bg-norby-danger hover:bg-norby-danger/80 text-norby-ivory disabled:opacity-40"
+        >
+          <Trash2 size={15} className="mr-1.5" />
+          {deleting ? "Excluindo..." : "Excluir minha conta permanentemente"}
+        </Button>
       </div>
 
       {/* Logout */}

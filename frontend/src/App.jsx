@@ -11,6 +11,8 @@ import AIAnalyst from "./pages/AIAnalyst";
 import Settings from "./pages/Settings";
 import Recurring from "./pages/Recurring";
 import Goals from "./pages/Goals";
+import Privacidade from "./pages/Privacidade";
+import Termos from "./pages/Termos";
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated } = useAuthStore();
@@ -51,6 +53,8 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Auth />} />
+        <Route path="/privacidade" element={<Privacidade />} />
+        <Route path="/termos" element={<Termos />} />
         <Route
           element={
             <ProtectedRoute>
