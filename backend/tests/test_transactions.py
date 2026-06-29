@@ -14,7 +14,7 @@ def tx_payload(wallet_id, **over):
         "amount": "30.00",
         "category": "Food",
         "description": "Lunch",
-        "date": "2026-06-10T12:00:00+00:00",
+        "date": "2026-06-10",
     }
     base.update(over)
     return base
@@ -28,6 +28,16 @@ async def test_create_expense_decreases_balance(make_auth_client):
     assert res.status_code == 201
     wallets = (await ac.get("/wallets/")).json()
     assert float(wallets[0]["balance"]) == 70.0
+
+
+@pytest.mark.asyncio
+async def test_date_is_returned_as_calendar_date_without_shift(make_auth_client):
+    # A data é um dia de calendário: o que entra deve voltar igual, sem fuso.
+    ac = await make_auth_client("Alice")
+    w = await make_wallet(ac, balance=100)
+    res = await ac.post("/transactions/", json=tx_payload(w["id"], date="2026-06-30"))
+    assert res.status_code == 201, res.text
+    assert res.json()["date"] == "2026-06-30"
 
 
 @pytest.mark.asyncio

@@ -1,11 +1,11 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, date, timezone
 from decimal import Decimal
 from enum import Enum as PyEnum
 from typing import Optional, List
 
 from sqlalchemy import (
-    String, DateTime, Numeric, ForeignKey,
+    String, DateTime, Date, Numeric, ForeignKey,
     Enum, Integer, Boolean
 )
 from sqlalchemy.dialects.postgresql import UUID
@@ -78,9 +78,10 @@ class Transaction(Base):
     amount: Mapped[Decimal] = mapped_column(Numeric(15, 2), nullable=False)
     category: Mapped[str] = mapped_column(String(100), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    # Dia de calendário, sem hora/fuso — a data de uma transação não é um instante.
+    date: Mapped[date] = mapped_column(Date, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
-    
+
     user: Mapped["User"] = relationship("User", back_populates="transactions")
     wallet: Mapped["Wallet"] = relationship("Wallet", back_populates="transactions")
 
