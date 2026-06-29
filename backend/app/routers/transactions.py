@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from uuid import UUID
-from datetime import datetime
+from datetime import date
 from typing import Optional
 from app.dependencies import get_db, get_current_user
 from app.models.sql_models import User, Transaction, TransactionType, Wallet
@@ -29,8 +29,8 @@ async def list_transactions(
         filters.append(Transaction.type == type)
     if month and year:
         # Intervalo [início do mês, início do mês seguinte) — correto inclusive p/ dezembro
-        start = datetime(year, month, 1)
-        end = datetime(year + 1, 1, 1) if month == 12 else datetime(year, month + 1, 1)
+        start = date(year, month, 1)
+        end = date(year + 1, 1, 1) if month == 12 else date(year, month + 1, 1)
         filters.append(Transaction.date >= start)
         filters.append(Transaction.date < end)
     result = await db.execute(

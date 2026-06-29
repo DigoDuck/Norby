@@ -65,7 +65,7 @@ async def materialize_due_recurring(db: AsyncSession, user: User) -> int:
                 amount=tpl.amount,
                 category=tpl.category,
                 description=tpl.description,
-                date=tpl.next_run_date,
+                date=tpl.next_run_date.date(),
             ))
             if wallet is not None:
                 if tpl.type == TransactionType.INCOME:
