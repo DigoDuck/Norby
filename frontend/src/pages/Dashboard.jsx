@@ -28,6 +28,7 @@ import { walletsApi } from "@/api/wallets";
 import { aiApi } from "@/api/ai";
 import { recurringApi } from "@/api/recurring";
 import { Button } from "@/components/ui/button";
+import { formatDateBR } from "@/lib/utils";
 
 // Paleta categórica de hues distintos (resolve o "2 cores parecidas" do donut)
 const CATEGORY_COLORS = [
@@ -478,7 +479,7 @@ export default function Dashboard() {
                           {t.category}
                         </p>
                         <p className="text-xs text-norby-ivory/40">
-                          {new Date(t.date).toLocaleDateString("pt-BR")}
+                          {formatDateBR(t.date)}
                         </p>
                       </div>
                     </div>

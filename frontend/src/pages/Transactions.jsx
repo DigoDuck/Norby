@@ -8,6 +8,7 @@ import { walletsApi } from "@/api/wallets";
 import { recurringApi } from "@/api/recurring";
 import { CATEGORIES } from "@/lib/categories";
 import { transactionSchema } from "@/lib/schemas";
+import { formatDateBR, toDateInput, todayInput } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,7 +34,6 @@ const CATEGORY_OPTIONS = CATEGORIES.map((c) => ({ value: c, label: c }));
 const inputCls =
   "w-full h-10 px-3 rounded-lg bg-white/5 border border-white/10 text-norby-ivory text-sm placeholder:text-norby-ivory/40 focus:outline-none focus:ring-2 focus:ring-norby-teal/40 transition";
 
-const today = () => new Date().toISOString().split("T")[0];
 
 export default function Transactions() {
   const [transactions, setTransactions] = useState([]);
@@ -58,7 +58,7 @@ export default function Transactions() {
       amount: "",
       category: CATEGORIES[0],
       description: "",
-      date: today(),
+      date: todayInput(),
     },
   });
 
@@ -106,7 +106,7 @@ export default function Transactions() {
       amount: "",
       category: CATEGORIES[0],
       description: "",
-      date: today(),
+      date: todayInput(),
     });
     setOpen(true);
   }
@@ -120,7 +120,7 @@ export default function Transactions() {
       amount: String(t.amount),
       category: t.category,
       description: t.description || "",
-      date: new Date(t.date).toISOString().split("T")[0],
+      date: toDateInput(t.date),
     });
     setOpen(true);
   }
@@ -406,7 +406,7 @@ export default function Transactions() {
                   {fmt(t.amount)}
                 </td>
                 <td className="px-4 py-3 text-sm text-norby-ivory/60">
-                  {new Date(t.date).toLocaleDateString("pt-BR")}
+                  {formatDateBR(t.date)}
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex gap-2">

@@ -7,6 +7,7 @@ import { recurringApi } from "@/api/recurring";
 import { walletsApi } from "@/api/wallets";
 import { CATEGORIES } from "@/lib/categories";
 import { recurringSchema } from "@/lib/schemas";
+import { formatDateBR } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -354,7 +355,7 @@ export default function Recurring() {
               </p>
               <p className="text-xs text-norby-ivory/40">
                 {cadence(it)} · próx.{" "}
-                {new Date(it.next_run_date).toLocaleDateString("pt-BR")}
+                {formatDateBR(it.next_run_date)}
                 {!it.active && " · pausada"}
               </p>
             </div>
