@@ -1,16 +1,20 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.dependencies import get_db, get_current_user
 from app.limiter import limiter
 from app.models.sql_models import User
 from app.schemas.user import (
-    UserRegister, UserLogin, UserUpdate, Token, TokenPair, RefreshRequest, UserResponse,
+    UserRegister, UserLogin, UserUpdate, Token, TokenPair, RefreshRequest,
+    DeleteAccountRequest, UserResponse,
 )
 from app.services.auth_service import (
     hash_password, verify_password, create_access_token,
     create_refresh_token, rotate_refresh_token, revoke_refresh_token,
 )
+from app.services.account_service import delete_account, export_data
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -87,3 +91,26 @@ async def update_me(
     await db.commit()
     await db.refresh(current_user)
     return current_user
+
+@router.get("/me/export")
+async def export_my_data(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    # LGPD: portabilidade. Baixa um JSON com todos os dados do usuário (PG + Mongo).
+    data = await export_data(current_user, db)
+    headers = {"Content-Disposition": 'attachment; filename="norby-meus-dados.json"'}
+    return JSONResponse(content=jsonable_encoder(data), headers=headers)
+
+@router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit("3/minute")
+async def delete_my_account(
+    request: Request,
+    payload: DeleteAccountRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    # LGPD: exclusão definitiva. Exige confirmação explícita no corpo.
+    if not payload.confirm:
+        raise HTTPException(status_code=400, detail="Confirmação obrigatória para excluir a conta")
+    await delete_account(current_user, db)
