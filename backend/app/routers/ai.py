@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.dependencies import get_db, get_current_user
 from app.models.sql_models import User
 from app.services.ai_service import get_or_generate_insight, chat_with_ai
+from app.schemas.ai import InsightResponse, ChatResponse, ChatSessionSummary
 from app.database import chat_history_collection
 import logging
 
@@ -18,7 +19,7 @@ class ChatMessage(BaseModel):
     message: str
     session_id: str | None = None
     
-@router.get("/insight")
+@router.get("/insight", response_model=InsightResponse)
 async def get_dashboard_insight(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -38,7 +39,11 @@ async def get_dashboard_insight(
             "error": "IA temporariamente indisponível"
         }
         
-@router.post("/chat")
+@router.post(
+    "/chat",
+    response_model=ChatResponse,
+    responses={503: {"description": "Norby AI temporariamente indisponível"}},
+)
 async def chat(
     payload: ChatMessage,
     current_user: User = Depends(get_current_user),
@@ -87,7 +92,7 @@ async def chat(
 
     return {"response": ai_response, "session_id": session_id}
 
-@router.get("/chat/sessions")
+@router.get("/chat/sessions", response_model=list[ChatSessionSummary])
 async def list_sessions(current_user: User = Depends(get_current_user)): # Lista sessões de chat do usuário
     cursor = chat_history_collection.find(
         {"user_id": str(current_user.id)},
