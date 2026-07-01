@@ -54,6 +54,8 @@ async def list_transactions(
     type: Optional[TransactionType] = Query(None),
     month: Optional[int] = Query(None, ge=1, le=12),
     year: Optional[int] = Query(None),
+    limit: int = Query(200, ge=1, le=500),
+    offset: int = Query(0, ge=0),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -71,8 +73,9 @@ async def list_transactions(
     result = await db.execute(
         select(Transaction)
         .where(*filters)
-        .order_by(Transaction.date.desc())
-        .limit(200)
+        .order_by(Transaction.date.desc(), Transaction.created_at.desc())
+        .limit(limit)
+        .offset(offset)
     )
     return result.scalars().all()
 
