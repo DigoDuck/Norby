@@ -4,8 +4,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.sql_models import (
-    User, Wallet, RecurringTransaction, RecurrenceFrequency, Transaction, TransactionType
+    User, Wallet, RecurringTransaction, RecurrenceFrequency, Transaction
 )
+from app.services.transaction_service import apply_delta
 
 
 def add_one_month(d: datetime) -> datetime:
@@ -68,10 +69,7 @@ async def materialize_due_recurring(db: AsyncSession, user: User) -> int:
                 date=tpl.next_run_date.date(),
             ))
             if wallet is not None:
-                if tpl.type == TransactionType.INCOME:
-                    wallet.balance += tpl.amount
-                else:
-                    wallet.balance -= tpl.amount
+                apply_delta(wallet, tpl.type, tpl.amount)
             tpl.next_run_date = advance(tpl.next_run_date, tpl.frequency)
             generated += 1
 
