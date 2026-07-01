@@ -6,11 +6,16 @@ from app.config import get_settings
 settings = get_settings()
 
 # PostgreSQL
+# Provedores gerenciados (Neon) exigem SSL; ligamos via connect_args porque o
+# param `sslmode` foi removido da URL (o asyncpg não o entende). Local: sem SSL.
+connect_args = {"ssl": True} if settings.database_ssl_required else {}
+
 engine = create_async_engine(
     settings.async_database_url,  # normaliza para o driver asyncpg (ver config.py)
     echo=False,  # True em desenvolvimento pra ver SQL no terminal para debugar
     pool_size=10,
     max_overflow=20,
+    connect_args=connect_args,
 )
 
 AsyncSessionLocal = async_sessionmaker(
