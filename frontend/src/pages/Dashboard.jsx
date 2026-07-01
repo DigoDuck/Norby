@@ -28,7 +28,7 @@ import { walletsApi } from "@/api/wallets";
 import { aiApi } from "@/api/ai";
 import { recurringApi } from "@/api/recurring";
 import { Button } from "@/components/ui/button";
-import { formatDateBR } from "@/lib/utils";
+import { formatDateBR, parseDateOnly } from "@/lib/utils";
 
 // Paleta categórica de hues distintos (resolve o "2 cores parecidas" do donut)
 const CATEGORY_COLORS = [
@@ -109,7 +109,7 @@ export default function Dashboard() {
   const prevM = prevDate.getMonth();
 
   const inMonth = (dateStr, y, m) => {
-    const d = new Date(dateStr);
+    const d = parseDateOnly(dateStr);
     return d.getFullYear() === y && d.getMonth() === m;
   };
   const sumBy = (list, type) =>
@@ -135,7 +135,7 @@ export default function Dashboard() {
   const cashFlowData = (() => {
     const map = {};
     transactions.forEach((t) => {
-      const d = new Date(t.date);
+      const d = parseDateOnly(t.date);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
       if (!map[key]) {
         map[key] = {
