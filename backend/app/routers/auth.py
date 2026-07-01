@@ -1,3 +1,5 @@
+import asyncio
+
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
@@ -26,10 +28,13 @@ async def register(request: Request, payload: UserRegister, db: AsyncSession = D
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Email já cadastrado")
 
+    # bcrypt é CPU-bound e síncrono (~100-300ms). Rodar direto na rota async
+    # travaria o event loop; offload para thread, como já é feito com o Gemini.
+    password_hash = await asyncio.to_thread(hash_password, payload.password)
     user = User(
         name=payload.name,
         email=payload.email,
-        password_hash=hash_password(payload.password)
+        password_hash=password_hash,
     )
     db.add(user)
     await db.commit()
@@ -45,7 +50,11 @@ async def login(request: Request, payload: UserLogin, db: AsyncSession = Depends
     result = await db.execute(select(User).where(User.email == payload.email))
     user = result.scalar_one_or_none()
 
-    if not user or not verify_password(payload.password, user.password_hash):
+    # verify_password (bcrypt) também é bloqueante → offload para thread.
+    password_ok = user and await asyncio.to_thread(
+        verify_password, payload.password, user.password_hash
+    )
+    if not password_ok:
         raise HTTPException(status_code=401, detail="Credenciais inválidas")
 
     access = create_access_token(str(user.id))
