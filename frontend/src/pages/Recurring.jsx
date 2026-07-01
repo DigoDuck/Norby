@@ -7,7 +7,7 @@ import { recurringApi } from "@/api/recurring";
 import { walletsApi } from "@/api/wallets";
 import { CATEGORIES } from "@/lib/categories";
 import { recurringSchema } from "@/lib/schemas";
-import { formatDateBR } from "@/lib/utils";
+import { formatDateBR, formatBRL, inputCls } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,9 +45,6 @@ const TYPE_OPTIONS = [
 ];
 
 const CATEGORY_OPTIONS = CATEGORIES.map((c) => ({ value: c, label: c }));
-
-const inputCls =
-  "w-full h-10 px-3 rounded-lg bg-white/5 border border-white/10 text-norby-ivory text-sm placeholder:text-norby-ivory/40 focus:outline-none focus:ring-2 focus:ring-norby-teal/40 transition";
 
 export default function Recurring() {
   const [items, setItems] = useState([]);
@@ -147,8 +144,6 @@ export default function Recurring() {
     load();
   }
 
-  const fmt = (v) =>
-    `R$ ${parseFloat(v).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
   const cadence = (it) =>
     it.frequency === "MONTHLY"
       ? `Mensal · dia ${it.day_of_month}`
@@ -350,7 +345,7 @@ export default function Recurring() {
                       : "text-norby-ivory/50"
                   }
                 >
-                  · {it.type === "INCOME" ? "+" : "−"} {fmt(it.amount)}
+                  · {it.type === "INCOME" ? "+" : "−"} {formatBRL(it.amount)}
                 </span>
               </p>
               <p className="text-xs text-norby-ivory/40">

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from uuid import UUID
 import datetime  # via módulo: o campo `date` colide com o tipo `date` se importado direto
 from decimal import Decimal
@@ -30,5 +30,4 @@ class TransactionResponse(BaseModel):
     date: datetime.date
     created_at: datetime.datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

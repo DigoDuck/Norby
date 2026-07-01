@@ -49,3 +49,14 @@ export function todayInput() {
   const day = String(d.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
+
+/** Formata um valor (número ou string decimal) como moeda pt-BR: "R$ 1.234,56". */
+export const formatBRL = (v) =>
+  `R$ ${Number(v).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+
+/**
+ * Classe base dos inputs "cheios" dos formulários (input nativo, não o <Input>
+ * do shadcn, que tem estilo próprio). Compartilhada por Goals/Recurring/Transactions.
+ */
+export const inputCls =
+  "w-full h-10 px-3 rounded-lg bg-white/5 border border-white/10 text-norby-ivory text-sm placeholder:text-norby-ivory/40 focus:outline-none focus:ring-2 focus:ring-norby-teal/40 transition";

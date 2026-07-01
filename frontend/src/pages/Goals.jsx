@@ -6,6 +6,7 @@ import { Plus, Trash2, Target, PiggyBank } from "lucide-react";
 import { goalsApi } from "@/api/goals";
 import { CATEGORIES } from "@/lib/categories";
 import { goalSchema } from "@/lib/schemas";
+import { formatBRL, inputCls } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,12 +23,6 @@ const TYPE_OPTIONS = [
 ];
 
 const CATEGORY_OPTIONS = CATEGORIES.map((c) => ({ value: c, label: c }));
-
-const inputCls =
-  "w-full h-10 px-3 rounded-lg bg-white/5 border border-white/10 text-norby-ivory text-sm placeholder:text-norby-ivory/40 focus:outline-none focus:ring-2 focus:ring-norby-teal/40 transition";
-
-const fmt = (v) =>
-  `R$ ${parseFloat(v).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
 
 export default function Goals() {
   const [goals, setGoals] = useState([]);
@@ -292,7 +287,7 @@ export default function Goals() {
               </div>
               <div className="flex items-center justify-between text-xs">
                 <span className="text-norby-ivory/60 tnum">
-                  {fmt(g.current_amount)} / {fmt(g.target_amount)}
+                  {formatBRL(g.current_amount)} / {formatBRL(g.target_amount)}
                 </span>
                 <span className={over ? "text-norby-danger" : "text-norby-ivory/40"}>
                   {g.progress_pct}%
