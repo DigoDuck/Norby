@@ -22,19 +22,15 @@ alembic_config = context.config
 if alembic_config.config_file_name is not None:
     fileConfig(alembic_config.config_file_name)
 
-# Usa a DATABASE_URL diretamente com asyncpg — sem converter para psycopg2
-database_url = os.getenv("DATABASE_URL", "")
+# Reutiliza a MESMA normalização do app (config.py): driver asyncpg + remoção
+# dos params estilo libpq (sslmode/channel_binding) que o asyncpg rejeita, e o
+# SSL via connect_args quando o provedor exige (Neon). Evita a divergência que
+# fazia o alembic quebrar com `unexpected keyword argument 'sslmode'`.
+from app.config import get_settings  # noqa: E402
 
-if not database_url:
-    raise RuntimeError("DATABASE_URL não encontrada no .env")
-
-# Garante que o driver é asyncpg
-if "asyncpg" not in database_url:
-    database_url = database_url.replace(
-        "postgresql://", "postgresql+asyncpg://"
-    ).replace(
-        "postgresql+psycopg2://", "postgresql+asyncpg://"
-    )
+_settings = get_settings()
+database_url = _settings.async_database_url
+connect_args = {"ssl": True} if _settings.database_ssl_required else {}
 
 alembic_config.set_main_option("sqlalchemy.url", database_url)
 target_metadata = Base.metadata
@@ -67,6 +63,7 @@ async def run_migrations_online() -> None:
     engine = create_async_engine(
         database_url,
         poolclass=pool.NullPool,
+        connect_args=connect_args,
     )
     async with engine.connect() as connection:
         await connection.run_sync(do_run_migrations)
