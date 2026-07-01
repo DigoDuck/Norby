@@ -80,6 +80,32 @@ npm run test     # Vitest
 - **Mensagens de commit em inglês** (comentários de código e docs do vault podem ser PT).
 - **NUNCA** adicione "Co-authored-by: Claude" ou qualquer trailer de coautoria em mensagens de commit. Comandos `git commit` devem conter apenas a mensagem solicitada, sem assinatura ou atribuição ao Claude.
 
+## Deploy (produção)
+
+App no ar, deploy a partir da branch `main`:
+- **Backend:** Render (Docker, free) — `https://norby-backend.onrender.com`. Dorme
+  após ~15min ocioso (cold start ~50s). Env vars no painel do Render.
+- **Postgres:** Neon (serverless, free). **Mongo:** Atlas M0 (free).
+- **Frontend:** Vercel — `https://norby-finance.vercel.app`. `VITE_API_URL`
+  aponta pro Render (**embutida no build** → mudou, tem que rebuildar).
+
+Start em produção: `backend/start.sh` roda `alembic upgrade head` + uvicorn na
+`$PORT` do provedor (o `CMD` do `backend/Dockerfile`; o `docker-compose.yml` de
+dev sobrescreve com `--reload`).
+
+**Armadilhas já resolvidas (não reintroduzir):**
+- `asyncpg` rejeita params libpq (`sslmode`, `channel_binding`) que o Neon manda
+  na URL. `app/config.py` (`async_database_url` + `database_ssl_required`) e
+  `alembic/env.py` removem esses params e ligam SSL via `connect_args`.
+- `CORS_ORIGINS` deve ter a URL da Vercel **sem barra final** (o `Origin` do
+  navegador nunca tem barra), separada por vírgula do `localhost`.
+
+**`docker-compose.prod.yml` + `Caddyfile`:** rota **alternativa self-hosted (VPS)**,
+**não usada** pelo deploy atual no Render. Sobem backend + Postgres + Mongo num
+único servidor, com Caddy fazendo HTTPS automático (Let's Encrypt). Mantidos como
+caminho documentado para uma futura migração pra VPS — se um dia sair do Render,
+começar por eles.
+
 ## Escopo congelado — v1 (2026-06-23)
 
 Entregue na v1: core financeiro, metas (SAVINGS/BUDGET), transações recorrentes
@@ -90,5 +116,5 @@ intervalo livre), data-fim e scheduler no servidor; histórico de aportes de met
 orçamento não-mensal; metas compartilhadas; notificações/push; multi-moeda; Open
 Finance; anexos/recibos; export CSV/PDF; CRUD de categorias.
 
-**Adiado p/ próximas semanas (não é "nunca"):** deploy (Vercel + VPS/Docker);
-auditoria de segurança profunda; i18n. UI permanece em português.
+**Adiado p/ próximas semanas (não é "nunca"):** auditoria de segurança profunda;
+i18n. UI permanece em português. (Deploy: **feito** — ver seção "Deploy".)
