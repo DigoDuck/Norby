@@ -20,6 +20,21 @@ export function formatDateBR(value) {
   return `${day}/${month}/${year}`;
 }
 
+/**
+ * Converte uma data de calendário (ISO da API) num Date em horário LOCAL.
+ *
+ * Para agrupar/filtrar transações por mês precisamos de um Date, mas
+ * `new Date("2026-07-01")` é interpretado como meia-noite UTC — em UTC-3
+ * (Brasil) `.getMonth()` devolve o mês anterior. Aqui lemos ano/mês/dia da
+ * string e construímos o Date já em horário local, sem qualquer conversão de
+ * fuso (mesmo cuidado de `formatDateBR`). Retorna null para entrada vazia.
+ */
+export function parseDateOnly(value) {
+  if (!value) return null;
+  const [year, month, day] = String(value).slice(0, 10).split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
 /** Parte de data (YYYY-MM-DD) de um ISO da API, para inputs type="date". */
 export function toDateInput(value) {
   if (!value) return "";

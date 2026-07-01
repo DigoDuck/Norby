@@ -1,19 +1,26 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal
 
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.sql_models import Transaction, TransactionType, Goal, GoalType
+from app.schemas.goal import GoalResponse
 
 
-def current_month_range(now: datetime | None = None):
+def current_month_range(now: date | datetime | None = None) -> tuple[date, date]:
+    """Intervalo [início do mês, início do mês seguinte) da referência, como `date`.
+
+    Retorna `date` (não `datetime` tz-aware) de propósito: `Transaction.date` é uma
+    coluna DATE, e comparar date-com-date evita o cast implícito para timestamptz no
+    timezone da sessão do Postgres. Aceita datetime, date ou None (usa agora, UTC).
+    """
     now = now or datetime.now(timezone.utc)
-    start = datetime(now.year, now.month, 1, tzinfo=timezone.utc)
+    start = date(now.year, now.month, 1)
     if now.month == 12:
-        end = datetime(now.year + 1, 1, 1, tzinfo=timezone.utc)
+        end = date(now.year + 1, 1, 1)
     else:
-        end = datetime(now.year, now.month + 1, 1, tzinfo=timezone.utc)
+        end = date(now.year, now.month + 1, 1)
     return start, end
 
 
@@ -31,7 +38,7 @@ async def month_spent(db: AsyncSession, user_id, category: str) -> Decimal:
     return Decimal(str(total))
 
 
-async def build_goal_response(db: AsyncSession, goal: Goal) -> dict:
+async def build_goal_response(db: AsyncSession, goal: Goal) -> GoalResponse:
     if goal.type == GoalType.SAVINGS:
         current = goal.current_amount
     else:
@@ -39,15 +46,15 @@ async def build_goal_response(db: AsyncSession, goal: Goal) -> dict:
 
     target = goal.target_amount
     progress = float(current / target * 100) if target and target > 0 else 0.0
-    return {
-        "id": goal.id,
-        "name": goal.name,
-        "type": goal.type,
-        "target_amount": target,
-        "current_amount": current,
-        "category": goal.category,
-        "deadline": goal.deadline,
-        "created_at": goal.created_at,
-        "progress_pct": round(progress, 1),
-        "remaining": target - current,
-    }
+    return GoalResponse(
+        id=goal.id,
+        name=goal.name,
+        type=goal.type,
+        target_amount=target,
+        current_amount=current,
+        category=goal.category,
+        deadline=goal.deadline,
+        created_at=goal.created_at,
+        progress_pct=round(progress, 1),
+        remaining=target - current,
+    )

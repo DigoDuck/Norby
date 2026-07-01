@@ -2,8 +2,9 @@ import google.generativeai as genai
 from datetime import datetime, timezone
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.database import AsyncSessionLocal, ai_insights_collection
+from app.database import ai_insights_collection
 from app.models.sql_models import Transaction, TransactionType
+from app.services.goal_service import current_month_range
 from app.config import get_settings
 import asyncio
 import json
@@ -16,47 +17,49 @@ settings = get_settings()
 genai.configure(api_key=settings.gemini_api_key)
 model = genai.GenerativeModel("models/gemini-2.5-flash")
 
-async def _get_user_financial_summary(user_id: str) -> dict:
-    async with AsyncSessionLocal() as db:
-        now = datetime.now(timezone.utc)
+async def _get_user_financial_summary(db: AsyncSession, user_id: str) -> dict:
+    now = datetime.now(timezone.utc)
+    # Range [início do mês, mês seguinte) como date — mesmo helper de goals,
+    # indexável e sem cast de timezone (antes usava func.extract mês/ano).
+    start, end = current_month_range(now)
 
-        # Total de receitas no mês
-        income_result = await db.execute(
-            select(func.sum(Transaction.amount)).where(
-                Transaction.user_id == user_id,
-                Transaction.type == TransactionType.INCOME,
-                func.extract("month", Transaction.date) == now.month,
-                func.extract("year", Transaction.date) == now.year,
-            )
+    # Total de receitas no mês
+    income_result = await db.execute(
+        select(func.sum(Transaction.amount)).where(
+            Transaction.user_id == user_id,
+            Transaction.type == TransactionType.INCOME,
+            Transaction.date >= start,
+            Transaction.date < end,
         )
-        total_income = float(income_result.scalar() or 0)
-        
-        # Total de gastos no mês
-        expense_result = await db.execute(
-            select(func.sum(Transaction.amount)).where(
-                Transaction.user_id == user_id,
-                Transaction.type == TransactionType.EXPENSE,
-                func.extract("month", Transaction.date) == now.month,
-                func.extract("year", Transaction.date) == now.year,
-            )
+    )
+    total_income = float(income_result.scalar() or 0)
+
+    # Total de gastos no mês
+    expense_result = await db.execute(
+        select(func.sum(Transaction.amount)).where(
+            Transaction.user_id == user_id,
+            Transaction.type == TransactionType.EXPENSE,
+            Transaction.date >= start,
+            Transaction.date < end,
         )
-        total_expenses = float(expense_result.scalar() or 0)
-        
-        # Top 5 categorias de despesas
-        category_result = await db.execute(
-            select(Transaction.category, func.sum(Transaction.amount).label("total"))
-            .where(
-                Transaction.user_id == user_id,
-                Transaction.type == TransactionType.EXPENSE,
-                func.extract("month", Transaction.date) == now.month,
-                func.extract("year", Transaction.date) == now.year,
-            )
-            .group_by(Transaction.category)
-            .order_by(func.sum(Transaction.amount).desc())
-            .limit(5)
+    )
+    total_expenses = float(expense_result.scalar() or 0)
+
+    # Top 5 categorias de despesas
+    category_result = await db.execute(
+        select(Transaction.category, func.sum(Transaction.amount).label("total"))
+        .where(
+            Transaction.user_id == user_id,
+            Transaction.type == TransactionType.EXPENSE,
+            Transaction.date >= start,
+            Transaction.date < end,
         )
-        categories = [{"category": r.category, "total": float(r.total)} for r in category_result]
-        
+        .group_by(Transaction.category)
+        .order_by(func.sum(Transaction.amount).desc())
+        .limit(5)
+    )
+    categories = [{"category": r.category, "total": float(r.total)} for r in category_result]
+
     return {
         "month": now.strftime("%B %Y"),
         "total_income": total_income,
@@ -65,7 +68,7 @@ async def _get_user_financial_summary(user_id: str) -> dict:
         "top_categories": categories,
     }
     
-async def get_or_generate_insight(user_id: str, month: int, year: int) -> dict:
+async def get_or_generate_insight(db: AsyncSession, user_id: str, month: int, year: int) -> dict:
     reference = f"{year}-{month:02d}"
 
     # Verifica cache
@@ -75,9 +78,9 @@ async def get_or_generate_insight(user_id: str, month: int, year: int) -> dict:
     if cached:
         cached.pop("_id", None)
         return cached
-    
-    # Busca dados fincaneiros
-    summary = await _get_user_financial_summary(user_id)
+
+    # Busca dados financeiros
+    summary = await _get_user_financial_summary(db, user_id)
 
     # Chama o Gemini
     prompt = f"""
@@ -129,9 +132,9 @@ async def get_or_generate_insight(user_id: str, month: int, year: int) -> dict:
     insight.pop("_id", None)
     return insight
 
-async def chat_with_ai(user_id: str, message: str, history: list) -> str:
-    """ Chat contextualizado com dados fincaneiros do usuário """
-    summary = await _get_user_financial_summary(user_id)
+async def chat_with_ai(db: AsyncSession, user_id: str, message: str, history: list) -> str:
+    """ Chat contextualizado com dados financeiros do usuário """
+    summary = await _get_user_financial_summary(db, user_id)
 
     system_context = f"""
     Você é o Norby, um assistente financeiro inteligente e amigável. Responda sempre em português (pt-BR).
@@ -144,11 +147,15 @@ async def chat_with_ai(user_id: str, message: str, history: list) -> str:
     Seja direto, útil e use os dados para personalizar suas respostas.
     """
     
-    # Monta histórico no formato do Gemini
+    # Monta histórico no formato do Gemini. Usa .get() porque um doc antigo ou
+    # malformado no Mongo (sem role/content) não deve derrubar o chat inteiro.
     chat_history = []
     for msg in history[-10:]: # Últimas 10 mensagens para não estourar contexto
-        role = "user" if msg["role"] == "user" else "model"
-        chat_history.append({"role": role, "parts": [msg["content"]]})
+        content = msg.get("content")
+        if not content:
+            continue
+        role = "user" if msg.get("role") == "user" else "model"
+        chat_history.append({"role": role, "parts": [content]})
         
     chat = model.start_chat(history=chat_history)
     # Chamada bloqueante do SDK -> offload p/ thread

@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from datetime import datetime, timezone
 from uuid import uuid4
-from app.dependencies import get_current_user
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.dependencies import get_db, get_current_user
 from app.models.sql_models import User
 from app.services.ai_service import get_or_generate_insight, chat_with_ai
 from app.database import chat_history_collection
@@ -18,10 +19,13 @@ class ChatMessage(BaseModel):
     session_id: str | None = None
     
 @router.get("/insight")
-async def get_dashboard_insight(current_user: User = Depends(get_current_user)):
+async def get_dashboard_insight(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     try:
         now = datetime.now(timezone.utc)
-        insight = await get_or_generate_insight(str(current_user.id), now.month, now.year)
+        insight = await get_or_generate_insight(db, str(current_user.id), now.month, now.year)
         return insight
     except Exception:
         # Widget opcional do dashboard: degrada com elegância em vez de derrubar a tela.
@@ -35,7 +39,11 @@ async def get_dashboard_insight(current_user: User = Depends(get_current_user)):
         }
         
 @router.post("/chat")
-async def chat(payload: ChatMessage, current_user: User = Depends(get_current_user)): # Chat com o Gemini que lê os dados financeiros do usuário
+async def chat(
+    payload: ChatMessage,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+): # Chat com o Gemini que lê os dados financeiros do usuário
     session_id = payload.session_id or str(uuid4())
     user_id = str(current_user.id)
 
@@ -53,7 +61,7 @@ async def chat(payload: ChatMessage, current_user: User = Depends(get_current_us
 
     # Chama o Gemini (se falhar, devolve 503 claro em vez de 500 sem headers de CORS)
     try:
-        ai_response = await chat_with_ai(user_id, payload.message, history)
+        ai_response = await chat_with_ai(db, user_id, payload.message, history)
     except Exception:
         logger.exception("Falha no chat com a IA (user=%s)", user_id)
         raise HTTPException(

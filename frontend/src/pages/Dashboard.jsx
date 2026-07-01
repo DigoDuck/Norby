@@ -27,8 +27,24 @@ import { transactionsApi } from "@/api/transactions";
 import { walletsApi } from "@/api/wallets";
 import { aiApi } from "@/api/ai";
 import { recurringApi } from "@/api/recurring";
+import { dashboardApi } from "@/api/dashboard";
 import { Button } from "@/components/ui/button";
 import { formatDateBR } from "@/lib/utils";
+
+// Rótulo curto pt-BR de uma chave ano-mês ("2026-07" → "jul"), em horário local.
+const monthLabel = (ym) => {
+  const [y, m] = ym.split("-").map(Number);
+  return new Date(y, m - 1, 1).toLocaleString("pt-BR", { month: "short" });
+};
+
+const EMPTY_SUMMARY = {
+  month_income: 0,
+  month_expenses: 0,
+  prev_month_income: 0,
+  prev_month_expenses: 0,
+  cash_flow: [],
+  top_categories: [],
+};
 
 // Paleta categórica de hues distintos (resolve o "2 cores parecidas" do donut)
 const CATEGORY_COLORS = [
@@ -79,6 +95,7 @@ function ChartTooltip({ active, payload, label }) {
 export default function Dashboard() {
   const [wallets, setWallets] = useState([]);
   const [transactions, setTransactions] = useState([]);
+  const [summary, setSummary] = useState(null);
   const [insight, setInsight] = useState(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
@@ -86,88 +103,50 @@ export default function Dashboard() {
   useEffect(() => {
     async function loadData() {
       await recurringApi.run().catch(() => {}); // materializa recorrências vencidas
-      // allSettled: falha da IA (insight) não derruba wallets/transactions
-      const [wRes, tRes, iRes] = await Promise.allSettled([
+      // allSettled: falha da IA (insight) não derruba os demais painéis
+      const [wRes, tRes, sRes, iRes] = await Promise.allSettled([
         walletsApi.list(),
         transactionsApi.list(),
+        dashboardApi.summary(),
         aiApi.getInsight(),
       ]);
       if (wRes.status === "fulfilled") setWallets(wRes.value.data);
       if (tRes.status === "fulfilled") setTransactions(tRes.value.data);
+      if (sRes.status === "fulfilled") setSummary(sRes.value.data);
       if (iRes.status === "fulfilled") setInsight(iRes.value.data);
       setLoading(false);
     }
     loadData();
   }, []);
 
-  // --- Recortes de tempo: mês atual e mês anterior ---
-  const now = new Date();
-  const curY = now.getFullYear();
-  const curM = now.getMonth();
-  const prevDate = new Date(curY, curM - 1, 1);
-  const prevY = prevDate.getFullYear();
-  const prevM = prevDate.getMonth();
-
-  const inMonth = (dateStr, y, m) => {
-    const d = new Date(dateStr);
-    return d.getFullYear() === y && d.getMonth() === m;
-  };
-  const sumBy = (list, type) =>
-    list
-      .filter((t) => t.type === type)
-      .reduce((s, t) => s + parseFloat(t.amount), 0);
   const pctChange = (curr, prev) =>
     prev > 0 ? ((curr - prev) / prev) * 100 : undefined;
 
   // Saldo atual = soma das carteiras (estado real, não recorte de mês)
   const totalBalance = wallets.reduce((s, w) => s + parseFloat(w.balance), 0);
 
-  // KPIs do MÊS atual + variação real vs mês anterior
-  const monthTx = transactions.filter((t) => inMonth(t.date, curY, curM));
-  const prevTx = transactions.filter((t) => inMonth(t.date, prevY, prevM));
-  const monthIncome = sumBy(monthTx, "INCOME");
-  const monthExpenses = sumBy(monthTx, "EXPENSE");
-  const incomeChange = pctChange(monthIncome, sumBy(prevTx, "INCOME"));
-  const expensesChange = pctChange(monthExpenses, sumBy(prevTx, "EXPENSE"));
+  // KPIs, fluxo e categorias vêm agregados do backend (sobre TODAS as transações,
+  // sem o cap de 200 da listagem). O front só formata para os gráficos.
+  const s = summary || EMPTY_SUMMARY;
+  const monthIncome = parseFloat(s.month_income);
+  const monthExpenses = parseFloat(s.month_expenses);
+  const incomeChange = pctChange(monthIncome, parseFloat(s.prev_month_income));
+  const expensesChange = pctChange(monthExpenses, parseFloat(s.prev_month_expenses));
   const monthNet = monthIncome - monthExpenses;
 
-  // Fluxo de caixa: agrupa por ANO-MÊS (não mistura anos), ordena e pega os últimos 6
-  const cashFlowData = (() => {
-    const map = {};
-    transactions.forEach((t) => {
-      const d = new Date(t.date);
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-      if (!map[key]) {
-        map[key] = {
-          key,
-          month: d.toLocaleString("pt-BR", { month: "short" }),
-          Entradas: 0,
-          Saídas: 0,
-        };
-      }
-      if (t.type === "INCOME") map[key].Entradas += parseFloat(t.amount);
-      if (t.type === "EXPENSE") map[key].Saídas += parseFloat(t.amount);
-    });
-    return Object.values(map)
-      .sort((a, b) => a.key.localeCompare(b.key))
-      .slice(-6);
-  })();
+  const cashFlowData = s.cash_flow.map((p) => ({
+    key: p.month,
+    month: monthLabel(p.month),
+    Entradas: parseFloat(p.income),
+    Saídas: parseFloat(p.expenses),
+  }));
 
-  // Categorias de despesa DO MÊS atual (já ordenado desc → maior fatia às 12h)
-  const categoryData = Object.values(
-    monthTx
-      .filter((t) => t.type === "EXPENSE")
-      .reduce((acc, t) => {
-        const key = t.category;
-        if (!acc[key]) acc[key] = { name: key, value: 0 };
-        acc[key].value += parseFloat(t.amount);
-        return acc;
-      }, {}),
-  )
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 5);
+  const categoryData = s.top_categories.map((c) => ({
+    name: c.category,
+    value: parseFloat(c.total),
+  }));
 
-  const categoryTotal = categoryData.reduce((s, c) => s + c.value, 0);
+  const categoryTotal = categoryData.reduce((sum, c) => sum + c.value, 0);
 
   if (loading) {
     return (

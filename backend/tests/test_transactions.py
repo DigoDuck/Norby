@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 
 
@@ -89,6 +91,27 @@ async def test_user_cannot_update_other_users_tx(make_auth_client):
     tx = (await alice.post("/transactions/", json=tx_payload(w["id"]))).json()
     res = await bob.put(f"/transactions/{tx['id']}", json={"amount": "1.00"})
     assert res.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_concurrent_transactions_do_not_lose_wallet_balance_updates(make_auth_client):
+    # Duas transações simultâneas na MESMA carteira: sem lock (with_for_update),
+    # ambas leem o saldo antigo e a última sobrescreve a outra (lost update).
+    # Cada request usa sua própria sessão/transação (_override_get_db), então o
+    # gather abre duas transações concorrentes de verdade no Postgres.
+    ac = await make_auth_client("Alice")
+    w = await make_wallet(ac, balance=100)
+
+    res_a, res_b = await asyncio.gather(
+        ac.post("/transactions/", json=tx_payload(w["id"], amount="30.00")),
+        ac.post("/transactions/", json=tx_payload(w["id"], amount="30.00")),
+    )
+    assert res_a.status_code == 201, res_a.text
+    assert res_b.status_code == 201, res_b.text
+
+    wallets = (await ac.get("/wallets/")).json()
+    # 100 - 30 - 30 = 40. Sem o lock, o saldo ficaria em 70 (uma das saídas some).
+    assert float(wallets[0]["balance"]) == 40.0
 
 
 @pytest.mark.asyncio
