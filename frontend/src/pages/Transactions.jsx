@@ -8,7 +8,7 @@ import { walletsApi } from "@/api/wallets";
 import { recurringApi } from "@/api/recurring";
 import { CATEGORIES } from "@/lib/categories";
 import { transactionSchema } from "@/lib/schemas";
-import { formatDateBR, toDateInput, todayInput } from "@/lib/utils";
+import { formatDateBR, formatBRL, inputCls, toDateInput, todayInput } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,9 +30,6 @@ const TYPE_OPTIONS = [
 ];
 
 const CATEGORY_OPTIONS = CATEGORIES.map((c) => ({ value: c, label: c }));
-
-const inputCls =
-  "w-full h-10 px-3 rounded-lg bg-white/5 border border-white/10 text-norby-ivory text-sm placeholder:text-norby-ivory/40 focus:outline-none focus:ring-2 focus:ring-norby-teal/40 transition";
 
 
 export default function Transactions() {
@@ -170,9 +167,6 @@ export default function Transactions() {
       );
     }
   }
-
-  const fmt = (v) =>
-    `R$ ${parseFloat(v).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
 
   const filtered = transactions.filter(
     (t) =>
@@ -403,7 +397,7 @@ export default function Transactions() {
                   }`}
                 >
                   {t.type === "INCOME" ? "+" : "-"}
-                  {fmt(t.amount)}
+                  {formatBRL(t.amount)}
                 </td>
                 <td className="px-4 py-3 text-sm text-norby-ivory/60">
                   {formatDateBR(t.date)}

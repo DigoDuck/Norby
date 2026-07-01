@@ -29,7 +29,7 @@ import { aiApi } from "@/api/ai";
 import { recurringApi } from "@/api/recurring";
 import { dashboardApi } from "@/api/dashboard";
 import { Button } from "@/components/ui/button";
-import { formatDateBR } from "@/lib/utils";
+import { formatDateBR, formatBRL } from "@/lib/utils";
 
 // Rótulo curto pt-BR de uma chave ano-mês ("2026-07" → "jul"), em horário local.
 const monthLabel = (ym) => {
@@ -61,8 +61,6 @@ const EXPENSE_COLOR = "#E0725C";
 
 const axisTick = { fill: "rgba(239,250,248,0.40)", fontSize: 11 };
 
-const fmt = (v) =>
-  `R$ ${Number(v).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
 const fmtShort = (v) =>
   Number(v) >= 1000 ? `${(v / 1000).toFixed(1)}k` : `${v}`;
 
@@ -84,7 +82,7 @@ function ChartTooltip({ active, payload, label }) {
           />
           <span className="text-norby-ivory/70">{p.name}</span>
           <span className="ml-auto font-semibold text-norby-ivory tnum">
-            {fmt(p.value)}
+            {formatBRL(p.value)}
           </span>
         </div>
       ))}
@@ -178,16 +176,16 @@ export default function Dashboard() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-4 gap-4">
-        <KpiCard title="Saldo atual" value={fmt(totalBalance)} icon={DollarSign} />
+        <KpiCard title="Saldo atual" value={formatBRL(totalBalance)} icon={DollarSign} />
         <KpiCard
           title="Receitas do mês"
-          value={fmt(monthIncome)}
+          value={formatBRL(monthIncome)}
           change={incomeChange}
           icon={TrendingUp}
         />
         <KpiCard
           title="Gastos do mês"
-          value={fmt(monthExpenses)}
+          value={formatBRL(monthExpenses)}
           change={expensesChange}
           changeInverted
           icon={CreditCard}
@@ -379,7 +377,7 @@ export default function Dashboard() {
                     Total
                   </span>
                   <span className="text-lg font-bold text-norby-ivory tnum">
-                    {fmt(categoryTotal)}
+                    {formatBRL(categoryTotal)}
                   </span>
                 </div>
               </div>
@@ -403,7 +401,7 @@ export default function Dashboard() {
                         {c.name}
                       </span>
                       <span className="text-sm font-semibold text-norby-ivory tnum">
-                        {fmt(c.value)}
+                        {formatBRL(c.value)}
                       </span>
                       <span className="text-xs text-norby-ivory/40 tnum w-9 text-right">
                         {pct.toFixed(0)}%
@@ -467,7 +465,7 @@ export default function Dashboard() {
                         isIncome ? "text-norby-income" : "text-norby-ivory"
                       }`}
                     >
-                      {isIncome ? "+" : "−"} {fmt(parseFloat(t.amount))}
+                      {isIncome ? "+" : "−"} {formatBRL(parseFloat(t.amount))}
                     </p>
                   </div>
                 );
@@ -488,7 +486,7 @@ export default function Dashboard() {
                 ) : (
                   <TrendingDown size={13} />
                 )}
-                {fmt(monthNet)}
+                {formatBRL(monthNet)}
               </p>
             </div>
             <div className="p-3 rounded-xl bg-norby-teal/10 border border-norby-teal/20">

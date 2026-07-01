@@ -1,4 +1,4 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
 from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
 
@@ -19,9 +19,7 @@ class Settings(BaseSettings):
     # CORS — origens permitidas (separadas por vírgula). Default cobre o dev local.
     cors_origins: str = "http://localhost:5173"
 
-    class Config:
-        env_file = "../.env"
-        extra = "ignore"
+    model_config = SettingsConfigDict(env_file="../.env", extra="ignore")
 
     @property
     def cors_origins_list(self) -> list[str]:
