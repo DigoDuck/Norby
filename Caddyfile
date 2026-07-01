@@ -1,0 +1,13 @@
+# Caddy — reverse proxy com HTTPS automático (Let's Encrypt).
+# {$DOMAIN} e {$ACME_EMAIL} vêm das variáveis de ambiente (docker-compose.prod.yml).
+# O Caddy emite e renova o certificado sozinho; só precisa das portas 80/443 abertas
+# e do DOMAIN apontando pro IP do VPS.
+
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	# Proxeia todo o tráfego pro backend na rede interna do compose.
+	reverse_proxy backend:8000
+}

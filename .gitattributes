@@ -1,0 +1,7 @@
+# Força LF nestes arquivos: são consumidos por containers Linux e CRLF
+# (quebra de linha do Windows) quebra shell scripts e configs no runtime.
+*.sh            text eol=lf
+Dockerfile      text eol=lf
+Caddyfile       text eol=lf
+*.yml           text eol=lf
+*.yaml          text eol=lf
