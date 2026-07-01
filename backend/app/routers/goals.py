@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from uuid import UUID
@@ -24,11 +24,17 @@ async def _get_owned_goal(goal_id: UUID, user: User, db: AsyncSession, for_updat
 
 @router.get("/", response_model=list[GoalResponse])
 async def list_goals(
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     goals = (await db.execute(
-        select(Goal).where(Goal.user_id == current_user.id).order_by(Goal.created_at.desc())
+        select(Goal)
+        .where(Goal.user_id == current_user.id)
+        .order_by(Goal.created_at.desc())
+        .limit(limit)
+        .offset(offset)
     )).scalars().all()
     return [await build_goal_response(db, g) for g in goals]
 

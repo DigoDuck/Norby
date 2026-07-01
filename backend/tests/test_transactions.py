@@ -115,6 +115,21 @@ async def test_concurrent_transactions_do_not_lose_wallet_balance_updates(make_a
 
 
 @pytest.mark.asyncio
+async def test_list_respects_limit_and_offset(make_auth_client):
+    ac = await make_auth_client("Alice")
+    w = await make_wallet(ac, balance=1000)
+    for i in range(5):
+        await ac.post("/transactions/", json=tx_payload(w["id"], amount="10.00", date=f"2026-06-0{i+1}"))
+
+    page1 = (await ac.get("/transactions/?limit=2&offset=0")).json()
+    page2 = (await ac.get("/transactions/?limit=2&offset=2")).json()
+    assert len(page1) == 2
+    assert len(page2) == 2
+    # Páginas consecutivas não se sobrepõem.
+    assert {t["id"] for t in page1}.isdisjoint({t["id"] for t in page2})
+
+
+@pytest.mark.asyncio
 async def test_list_is_scoped_to_user(make_auth_client):
     alice = await make_auth_client("Alice")
     bob = await make_auth_client("Bob")

@@ -26,6 +26,16 @@ async def test_list_is_scoped_to_user(make_auth_client):
 
 
 @pytest.mark.asyncio
+async def test_list_respects_limit(make_auth_client):
+    # A listagem de carteiras (antes ilimitada) passa a respeitar limit/offset.
+    ac = await make_auth_client("Alice")
+    for i in range(4):
+        await make_wallet(ac, name=f"W{i}")
+    assert len((await ac.get("/wallets/?limit=2")).json()) == 2
+    assert len((await ac.get("/wallets/?limit=2&offset=2")).json()) == 2
+
+
+@pytest.mark.asyncio
 async def test_update_own_wallet_name(make_auth_client):
     ac = await make_auth_client("Alice")
     w = await make_wallet(ac)
