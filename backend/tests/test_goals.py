@@ -1,6 +1,6 @@
 import pytest
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 
 from pydantic import ValidationError
@@ -31,6 +31,29 @@ async def test_savings_progress_uses_current_amount(db_session):
     assert view["current_amount"] == Decimal("250")
     assert view["progress_pct"] == 25.0
     assert view["remaining"] == Decimal("750")
+
+
+@pytest.mark.asyncio
+async def test_month_spent_includes_month_boundaries(db_session):
+    # Guard de borda: o gasto do dia 1 e do último dia do mês entram no total;
+    # o do último dia do mês anterior fica de fora. Comparando date-com-date,
+    # o limite é exato e independe do timezone da sessão do banco.
+    user, wallet = await _seed(db_session)
+    start, end = current_month_range()
+    first_day = start
+    last_day = end - timedelta(days=1)
+    prev_month_last_day = start - timedelta(days=1)
+    db_session.add_all([
+        Transaction(user_id=user.id, wallet_id=wallet.id, type=TransactionType.EXPENSE,
+                    amount=Decimal("10"), category="Food", date=first_day),
+        Transaction(user_id=user.id, wallet_id=wallet.id, type=TransactionType.EXPENSE,
+                    amount=Decimal("20"), category="Food", date=last_day),
+        Transaction(user_id=user.id, wallet_id=wallet.id, type=TransactionType.EXPENSE,
+                    amount=Decimal("99"), category="Food", date=prev_month_last_day),
+    ])
+    await db_session.commit()
+    total = await month_spent(db_session, user.id, "Food")
+    assert total == Decimal("30")  # 10 + 20; o do mês anterior fica de fora
 
 
 @pytest.mark.asyncio
@@ -162,5 +185,16 @@ def test_contribute_zero_raises():
 
 
 def test_current_month_range_december_rollover():
-    _, end = current_month_range(datetime(2025, 12, 15, tzinfo=timezone.utc))
-    assert end == datetime(2026, 1, 1, tzinfo=timezone.utc)
+    start, end = current_month_range(datetime(2025, 12, 15, tzinfo=timezone.utc))
+    assert start == date(2025, 12, 1)
+    assert end == date(2026, 1, 1)
+
+
+def test_current_month_range_returns_date_not_datetime():
+    # Comparar coluna DATE com date (não datetime tz-aware) elimina o cast
+    # implícito no timezone da sessão do Postgres — a correção de raiz da suspeita
+    # de borda de mês em metas BUDGET.
+    start, end = current_month_range(datetime(2026, 7, 15, tzinfo=timezone.utc))
+    assert type(start) is date and type(end) is date
+    assert start == date(2026, 7, 1)
+    assert end == date(2026, 8, 1)

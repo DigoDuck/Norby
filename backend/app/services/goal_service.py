@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal
 
 from sqlalchemy import select, func
@@ -7,13 +7,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.sql_models import Transaction, TransactionType, Goal, GoalType
 
 
-def current_month_range(now: datetime | None = None):
+def current_month_range(now: date | datetime | None = None) -> tuple[date, date]:
+    """Intervalo [início do mês, início do mês seguinte) da referência, como `date`.
+
+    Retorna `date` (não `datetime` tz-aware) de propósito: `Transaction.date` é uma
+    coluna DATE, e comparar date-com-date evita o cast implícito para timestamptz no
+    timezone da sessão do Postgres. Aceita datetime, date ou None (usa agora, UTC).
+    """
     now = now or datetime.now(timezone.utc)
-    start = datetime(now.year, now.month, 1, tzinfo=timezone.utc)
+    start = date(now.year, now.month, 1)
     if now.month == 12:
-        end = datetime(now.year + 1, 1, 1, tzinfo=timezone.utc)
+        end = date(now.year + 1, 1, 1)
     else:
-        end = datetime(now.year, now.month + 1, 1, tzinfo=timezone.utc)
+        end = date(now.year, now.month + 1, 1)
     return start, end
 
 
