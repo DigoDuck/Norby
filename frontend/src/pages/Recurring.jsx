@@ -8,6 +8,7 @@ import { walletsApi } from "@/api/wallets";
 import { CATEGORIES } from "@/lib/categories";
 import { recurringSchema } from "@/lib/schemas";
 import { formatDateBR, formatBRL, inputCls } from "@/lib/utils";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -138,8 +139,7 @@ export default function Recurring() {
     load();
   }
 
-  async function handleDelete(id) {
-    if (!confirm("Remover esta recorrência?")) return;
+  async function deleteRecurring(id) {
     await recurringApi.delete(id);
     load();
   }
@@ -361,12 +361,19 @@ export default function Recurring() {
             >
               {it.active ? <Pause size={14} /> : <Play size={14} />}
             </button>
-            <button
-              onClick={() => handleDelete(it.id)}
-              className="p-2 rounded-lg text-norby-ivory/40 hover:text-norby-danger hover:bg-white/5"
-            >
-              <Trash2 size={14} />
-            </button>
+            <ConfirmDialog
+              title="Remover esta recorrência?"
+              confirmLabel="Remover"
+              errorFallback="Não foi possível remover a recorrência."
+              onConfirm={() => deleteRecurring(it.id)}
+              trigger={
+                <button
+                  className="p-2 rounded-lg text-norby-ivory/40 hover:text-norby-danger hover:bg-white/5"
+                >
+                  <Trash2 size={14} />
+                </button>
+              }
+            />
           </div>
         ))}
       </div>

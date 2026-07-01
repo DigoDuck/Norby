@@ -9,6 +9,7 @@ import { recurringApi } from "@/api/recurring";
 import { CATEGORIES } from "@/lib/categories";
 import { transactionSchema } from "@/lib/schemas";
 import { formatDateBR, formatBRL, inputCls, toDateInput, todayInput } from "@/lib/utils";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -156,16 +157,9 @@ export default function Transactions() {
     }
   }
 
-  async function handleDelete(id) {
-    if (!confirm("Remover esta transação?")) return;
-    try {
-      await transactionsApi.delete(id);
-      reload();
-    } catch (err) {
-      alert(
-        err.response?.data?.detail || "Não foi possível remover a transação.",
-      );
-    }
+  async function deleteTransaction(id) {
+    await transactionsApi.delete(id);
+    reload();
   }
 
   const filtered = transactions.filter(
@@ -411,13 +405,20 @@ export default function Transactions() {
                     >
                       <Pencil size={16} />
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(t.id)}
-                      className="text-norby-ivory/50 hover:text-norby-danger transition-colors"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    <ConfirmDialog
+                      title="Remover esta transação?"
+                      confirmLabel="Remover"
+                      errorFallback="Não foi possível remover a transação."
+                      onConfirm={() => deleteTransaction(t.id)}
+                      trigger={
+                        <button
+                          type="button"
+                          className="text-norby-ivory/50 hover:text-norby-danger transition-colors"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      }
+                    />
                   </div>
                 </td>
               </tr>

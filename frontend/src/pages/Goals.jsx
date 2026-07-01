@@ -7,6 +7,8 @@ import { goalsApi } from "@/api/goals";
 import { CATEGORIES } from "@/lib/categories";
 import { goalSchema } from "@/lib/schemas";
 import { formatBRL, inputCls } from "@/lib/utils";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { AmountPromptDialog } from "@/components/shared/AmountPromptDialog";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -90,27 +92,15 @@ export default function Goals() {
     }
   }
 
-  async function handleContribute(goal) {
-    const raw = prompt(`Adicionar aporte em "${goal.name}" (use negativo para corrigir):`);
-    if (raw === null) return;
-    const amount = Number(raw);
-    if (!amount) return;
-    try {
-      await goalsApi.contribute(goal.id, amount);
-      load();
-    } catch (err) {
-      alert(err.response?.data?.detail || "Não foi possível salvar o aporte.");
-    }
+  // Os diálogos tratam validação e erro da API; aqui só a chamada + reload.
+  async function contribute(goalId, amount) {
+    await goalsApi.contribute(goalId, amount);
+    await load();
   }
 
-  async function handleDelete(id) {
-    if (!confirm("Remover esta meta?")) return;
-    try {
-      await goalsApi.delete(id);
-      load();
-    } catch (err) {
-      alert(err.response?.data?.detail || "Não foi possível remover a meta.");
-    }
+  async function deleteGoal(id) {
+    await goalsApi.delete(id);
+    await load();
   }
 
   return (
@@ -263,22 +253,37 @@ export default function Goals() {
                 </div>
                 <div className="flex gap-1">
                   {g.type === "SAVINGS" && (
-                    <button
-                      type="button"
-                      onClick={() => handleContribute(g)}
-                      className="p-2 rounded-lg text-norby-ivory/40 hover:text-norby-teal hover:bg-white/5"
-                      title="Adicionar aporte"
-                    >
-                      <Plus size={14} />
-                    </button>
+                    <AmountPromptDialog
+                      title={`Aporte em "${g.name}"`}
+                      description="Use um valor negativo para corrigir um aporte."
+                      submitLabel="Adicionar"
+                      errorFallback="Não foi possível salvar o aporte."
+                      onSubmit={(amount) => contribute(g.id, amount)}
+                      trigger={
+                        <button
+                          type="button"
+                          className="p-2 rounded-lg text-norby-ivory/40 hover:text-norby-teal hover:bg-white/5"
+                          title="Adicionar aporte"
+                        >
+                          <Plus size={14} />
+                        </button>
+                      }
+                    />
                   )}
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(g.id)}
-                    className="p-2 rounded-lg text-norby-ivory/40 hover:text-norby-danger hover:bg-white/5"
-                  >
-                    <Trash2 size={14} />
-                  </button>
+                  <ConfirmDialog
+                    title="Remover esta meta?"
+                    confirmLabel="Remover"
+                    errorFallback="Não foi possível remover a meta."
+                    onConfirm={() => deleteGoal(g.id)}
+                    trigger={
+                      <button
+                        type="button"
+                        className="p-2 rounded-lg text-norby-ivory/40 hover:text-norby-danger hover:bg-white/5"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    }
+                  />
                 </div>
               </div>
 
