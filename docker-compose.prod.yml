@@ -1,0 +1,84 @@
+# Produção (VPS Oracle Always Free).
+# Diferenças vs. docker-compose.yml (dev):
+#   - Bancos NÃO expõem portas ao host (só a rede interna do compose alcança).
+#   - Backend roda o CMD do Dockerfile (start.sh: migrations + uvicorn sem --reload)
+#     e NÃO monta o código como volume (usa a imagem buildada).
+#   - Caddy na frente faz HTTPS automático (Let's Encrypt) e proxeia pro backend.
+# Subir: docker compose -f docker-compose.prod.yml up -d --build
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: norby_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    # Sem `ports:` — o Postgres fica acessível só dentro da rede do compose.
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mongodb:
+    image: mongo:7.0
+    container_name: norby_mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: norby_db
+    # Sem `ports:` — idem Postgres.
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: norby_backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      MONGODB_URL: mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@mongodb:27017
+    # Sem `ports:` e sem `volumes:` — Caddy alcança o backend pela rede interna.
+    # Sem `command:` — usa o CMD do Dockerfile (start.sh).
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: norby_caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}          # ex.: norby.duckdns.org
+      ACME_EMAIL: ${ACME_EMAIL}  # e-mail pro Let's Encrypt (avisos de expiração)
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data      # guarda os certificados (não perder nos restarts!)
+      - caddy_config:/config
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  mongo_data:
+  caddy_data:
+  caddy_config:

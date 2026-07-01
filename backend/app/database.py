@@ -7,7 +7,7 @@ settings = get_settings()
 
 # PostgreSQL
 engine = create_async_engine(
-    settings.database_url,
+    settings.async_database_url,  # normaliza para o driver asyncpg (ver config.py)
     echo=False,  # True em desenvolvimento pra ver SQL no terminal para debugar
     pool_size=10,
     max_overflow=20,
