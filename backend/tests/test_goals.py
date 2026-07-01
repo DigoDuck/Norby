@@ -28,9 +28,9 @@ async def test_savings_progress_uses_current_amount(db_session):
     db_session.add(goal)
     await db_session.commit()
     view = await build_goal_response(db_session, goal)
-    assert view["current_amount"] == Decimal("250")
-    assert view["progress_pct"] == 25.0
-    assert view["remaining"] == Decimal("750")
+    assert view.current_amount == Decimal("250")
+    assert view.progress_pct == 25.0
+    assert view.remaining == Decimal("750")
 
 
 @pytest.mark.asyncio
@@ -74,8 +74,8 @@ async def test_budget_progress_sums_month_expenses(db_session):
     db_session.add(goal)
     await db_session.commit()
     view = await build_goal_response(db_session, goal)
-    assert view["current_amount"] == Decimal("120")
-    assert view["progress_pct"] == 40.0
+    assert view.current_amount == Decimal("120")
+    assert view.progress_pct == 40.0
 
 
 # ---------------------------------------------------------------------------
