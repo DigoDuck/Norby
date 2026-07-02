@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, Search, Trash2, Pencil } from "lucide-react";
@@ -49,6 +50,8 @@ export default function Transactions() {
   const [serverError, setServerError] = useState(null);
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState("");
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const {
     register,
@@ -91,6 +94,21 @@ export default function Transactions() {
       reset((prev) => ({ ...prev, wallet_id: wallets[0].id }));
     }
   }, [wallets, editing, reset, getValues]);
+
+  // Atalho vindo do Dashboard ("+ Receita" / "− Despesa"): abre o form já com
+  // o tipo pré-selecionado. O state da rota é limpo em seguida para o dialog
+  // não reabrir em navegação de histórico.
+  useEffect(() => {
+    const preset = location.state?.newType;
+    if (preset !== "INCOME" && preset !== "EXPENSE") return;
+    setEditing(null);
+    setServerError(null);
+    reset({ ...emptyForm(), type: preset, category: categoriesFor(preset)[0] });
+    setOpen(true); // eslint-disable-line react-hooks/set-state-in-effect
+    navigate(location.pathname, { replace: true });
+    // roda só no mount: o state chega junto com a navegação que monta a página
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const reload = () => load(filterType ? { type: filterType } : {});
 
