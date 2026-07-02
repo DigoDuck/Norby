@@ -178,6 +178,7 @@ class _FakeInsightsStale:
     # Cache com fingerprint ANTIGO → dados mudaram → texto deve ser regenerado.
     def __init__(self):
         self.updated = False
+        self.update = None
 
     async def find_one(self, *_a, **_k):
         return {
@@ -187,8 +188,9 @@ class _FakeInsightsStale:
             "data_fingerprint": "fingerprint-antigo",
         }
 
-    async def update_one(self, *_a, **_k):
+    async def update_one(self, _filter, update, **_k):
         self.updated = True
+        self.update = update
         return None
 
 
@@ -221,3 +223,5 @@ async def test_insight_regenerates_text_when_data_changes(db_session, monkeypatc
     assert result["summary_text"] == "novo|texto|fresco"  # regenerado, não o velho
     assert result["suggested_action"] == "nova ação"
     assert fake.updated is True  # cache foi sobrescrito (upsert)
+    # score nunca vive no cache: o upsert deve REMOVER qualquer score persistido.
+    assert "score" in fake.update.get("$unset", {})

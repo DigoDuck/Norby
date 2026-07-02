@@ -169,7 +169,10 @@ async def get_or_generate_insight(db: AsyncSession, user_id: str, month: int, ye
                 "suggested_action": suggested_action,
                 "data_fingerprint": fingerprint,
                 "generated_at": generated_at,
-            }
+            },
+            # Score é sempre recalculado, nunca servido do cache — não deixar um
+            # score antigo (do código legado) persistir e ser lido por engano.
+            "$unset": {"score": ""},
         },
         upsert=True,
     )

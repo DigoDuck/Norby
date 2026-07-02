@@ -37,12 +37,21 @@ async def main() -> None:
             await ai_insights_collection.delete_one({"_id": stale["_id"]})
             removed += 1
 
+    # Score nunca deve viver no cache (é sempre recalculado). Remove qualquer
+    # score legado deixado pelo código antigo, para ninguém servir um valor velho.
+    cleaned = await ai_insights_collection.update_many(
+        {"score": {"$exists": True}}, {"$unset": {"score": ""}}
+    )
+
     await ai_insights_collection.create_index(
         [("user_id", 1), ("reference_month", 1)],
         unique=True,
         name="uniq_user_month",
     )
-    print(f"duplicados removidos: {removed}; índice único 'uniq_user_month' garantido.")
+    print(
+        f"duplicados removidos: {removed}; scores legados limpos: "
+        f"{cleaned.modified_count}; índice único 'uniq_user_month' garantido."
+    )
 
 
 if __name__ == "__main__":
