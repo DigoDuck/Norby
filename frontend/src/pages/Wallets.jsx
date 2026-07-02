@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Plus, Pencil, Trash2, Wallet } from "lucide-react";
 import { walletsApi } from "@/api/wallets";
+import { formatBRL } from "@/lib/utils";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -55,16 +57,9 @@ export default function Wallets() {
     }
   }
 
-  async function handleDelete(id) {
-    if (!confirm("Remover esta carteira e todas as transações?")) return;
-    try {
-      await walletsApi.delete(id);
-      load();
-    } catch (err) {
-      alert(
-        err.response?.data?.detail || "Não foi possível remover a carteira.",
-      );
-    }
+  async function deleteWallet(id) {
+    await walletsApi.delete(id);
+    load();
   }
 
   function openEdit(wallet) {
@@ -73,9 +68,6 @@ export default function Wallets() {
     setError(null);
     setOpen(true);
   }
-
-  const fmt = (v) =>
-    `R$ ${parseFloat(v).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
 
   const inputCls =
     "bg-white/5 border-white/10 text-norby-ivory placeholder:text-norby-ivory/30";
@@ -168,18 +160,26 @@ export default function Wallets() {
                 >
                   <Pencil size={14} />
                 </button>
-                <button
-                  onClick={() => handleDelete(w.id)}
-                  className="m-1 p-2 rounded-lg text-norby-ivory/40 hover:text-norby-danger hover:bg-white/5"
-                >
-                  <Trash2 size={14} />
-                </button>
+                <ConfirmDialog
+                  title="Remover esta carteira?"
+                  description="A carteira e todas as suas transações serão removidas."
+                  confirmLabel="Remover"
+                  errorFallback="Não foi possível remover a carteira."
+                  onConfirm={() => deleteWallet(w.id)}
+                  trigger={
+                    <button
+                      className="m-1 p-2 rounded-lg text-norby-ivory/40 hover:text-norby-danger hover:bg-white/5"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  }
+                />
               </div>
             </div>
             <div>
               <p className="text-norby-ivory/70">{w.name}</p>
               <p className="text-xl font-bold text-norby-ivory mt-1 tnum">
-                {fmt(w.balance)}
+                {formatBRL(w.balance)}
               </p>
             </div>
             <p className="text-xs text-norby-ivory/40">

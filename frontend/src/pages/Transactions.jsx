@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useForm, Controller, useWatch } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, Search, Trash2, Pencil } from "lucide-react";
 
@@ -8,7 +8,8 @@ import { walletsApi } from "@/api/wallets";
 import { recurringApi } from "@/api/recurring";
 import { CATEGORIES } from "@/lib/categories";
 import { transactionSchema } from "@/lib/schemas";
-import { formatDateBR, toDateInput, todayInput } from "@/lib/utils";
+import { formatDateBR, formatBRL, inputCls, toDateInput, todayInput } from "@/lib/utils";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,8 +32,15 @@ const TYPE_OPTIONS = [
 
 const CATEGORY_OPTIONS = CATEGORIES.map((c) => ({ value: c, label: c }));
 
-const inputCls =
-  "w-full h-10 px-3 rounded-lg bg-white/5 border border-white/10 text-norby-ivory text-sm placeholder:text-norby-ivory/40 focus:outline-none focus:ring-2 focus:ring-norby-teal/40 transition";
+// Valores iniciais do formulário (date sempre fresca → função).
+const emptyForm = () => ({
+  wallet_id: "",
+  type: "EXPENSE",
+  amount: "",
+  category: CATEGORIES[0],
+  description: "",
+  date: todayInput(),
+});
 
 
 export default function Transactions() {
@@ -49,21 +57,12 @@ export default function Transactions() {
     handleSubmit,
     control,
     reset,
+    getValues,
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(transactionSchema),
-    defaultValues: {
-      wallet_id: "",
-      type: "EXPENSE",
-      amount: "",
-      category: CATEGORIES[0],
-      description: "",
-      date: todayInput(),
-    },
+    defaultValues: emptyForm(),
   });
-
-  // Watch type for Segmented (not strictly needed in render, but kept for consistency)
-  useWatch({ control, name: "type" });
 
   async function load(params = {}) {
     await recurringApi.run().catch(() => {});
@@ -86,12 +85,13 @@ export default function Transactions() {
     return () => clearTimeout(timer);
   }, [filterType]);
 
-  // Auto-select the sole wallet only when NOT editing
+  // Auto-seleciona a única carteira, sem sobrescrever uma escolha já feita nem
+  // atrapalhar a edição.
   useEffect(() => {
-    if (wallets.length === 1 && !editing) {
+    if (wallets.length === 1 && !editing && !getValues("wallet_id")) {
       reset((prev) => ({ ...prev, wallet_id: wallets[0].id }));
     }
-  }, [wallets]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [wallets, editing, reset, getValues]);
 
   const reload = () => load(filterType ? { type: filterType } : {});
 
@@ -101,12 +101,8 @@ export default function Transactions() {
     setEditing(null);
     setServerError(null);
     reset({
+      ...emptyForm(),
       wallet_id: wallets.length === 1 ? wallets[0].id : "",
-      type: "EXPENSE",
-      amount: "",
-      category: CATEGORIES[0],
-      description: "",
-      date: todayInput(),
     });
     setOpen(true);
   }
@@ -159,20 +155,10 @@ export default function Transactions() {
     }
   }
 
-  async function handleDelete(id) {
-    if (!confirm("Remover esta transação?")) return;
-    try {
-      await transactionsApi.delete(id);
-      reload();
-    } catch (err) {
-      alert(
-        err.response?.data?.detail || "Não foi possível remover a transação.",
-      );
-    }
+  async function deleteTransaction(id) {
+    await transactionsApi.delete(id);
+    reload();
   }
-
-  const fmt = (v) =>
-    `R$ ${parseFloat(v).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
 
   const filtered = transactions.filter(
     (t) =>
@@ -403,7 +389,7 @@ export default function Transactions() {
                   }`}
                 >
                   {t.type === "INCOME" ? "+" : "-"}
-                  {fmt(t.amount)}
+                  {formatBRL(t.amount)}
                 </td>
                 <td className="px-4 py-3 text-sm text-norby-ivory/60">
                   {formatDateBR(t.date)}
@@ -417,13 +403,20 @@ export default function Transactions() {
                     >
                       <Pencil size={16} />
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(t.id)}
-                      className="text-norby-ivory/50 hover:text-norby-danger transition-colors"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    <ConfirmDialog
+                      title="Remover esta transação?"
+                      confirmLabel="Remover"
+                      errorFallback="Não foi possível remover a transação."
+                      onConfirm={() => deleteTransaction(t.id)}
+                      trigger={
+                        <button
+                          type="button"
+                          className="text-norby-ivory/50 hover:text-norby-danger transition-colors"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      }
+                    />
                   </div>
                 </td>
               </tr>

@@ -7,7 +7,8 @@ import { recurringApi } from "@/api/recurring";
 import { walletsApi } from "@/api/wallets";
 import { CATEGORIES } from "@/lib/categories";
 import { recurringSchema } from "@/lib/schemas";
-import { formatDateBR } from "@/lib/utils";
+import { formatDateBR, formatBRL, inputCls } from "@/lib/utils";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,8 +47,16 @@ const TYPE_OPTIONS = [
 
 const CATEGORY_OPTIONS = CATEGORIES.map((c) => ({ value: c, label: c }));
 
-const inputCls =
-  "w-full h-10 px-3 rounded-lg bg-white/5 border border-white/10 text-norby-ivory text-sm placeholder:text-norby-ivory/40 focus:outline-none focus:ring-2 focus:ring-norby-teal/40 transition";
+// Valores iniciais do formulário de recorrência.
+const emptyForm = () => ({
+  wallet_id: "",
+  type: "EXPENSE",
+  amount: "",
+  category: CATEGORIES[0],
+  frequency: "MONTHLY",
+  day_of_month: 1,
+  weekday: undefined,
+});
 
 export default function Recurring() {
   const [items, setItems] = useState([]);
@@ -60,18 +69,11 @@ export default function Recurring() {
     handleSubmit,
     control,
     reset,
+    getValues,
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(recurringSchema),
-    defaultValues: {
-      wallet_id: "",
-      type: "EXPENSE",
-      amount: "",
-      category: CATEGORIES[0],
-      frequency: "MONTHLY",
-      day_of_month: 1,
-      weekday: undefined,
-    },
+    defaultValues: emptyForm(),
   });
 
   async function load() {
@@ -84,17 +86,16 @@ export default function Recurring() {
     load(); // eslint-disable-line react-hooks/set-state-in-effect
   }, []);
 
-  // Build wallet options
   const walletOptions = wallets.map((w) => ({ value: w.id, label: w.name }));
 
-  // Auto-select the sole wallet when wallets load
+  // Auto-seleciona a única carteira, sem sobrescrever uma escolha já feita.
   useEffect(() => {
-    if (wallets.length === 1) {
+    if (wallets.length === 1 && !getValues("wallet_id")) {
       reset((prev) => ({ ...prev, wallet_id: wallets[0].id }));
     }
-  }, [wallets]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [wallets, reset, getValues]);
 
-  // Watch frequency to conditionally show day_of_month or weekday field
+  // Observa a frequência para alternar entre os campos day_of_month e weekday.
   const frequency = useWatch({ control, name: "frequency" });
 
   function handleOpenChange(v) {
@@ -102,13 +103,8 @@ export default function Recurring() {
     if (!v) {
       setServerError(null);
       reset({
+        ...emptyForm(),
         wallet_id: wallets.length === 1 ? wallets[0].id : "",
-        type: "EXPENSE",
-        amount: "",
-        category: CATEGORIES[0],
-        frequency: "MONTHLY",
-        day_of_month: 1,
-        weekday: undefined,
       });
     }
   }
@@ -141,14 +137,11 @@ export default function Recurring() {
     load();
   }
 
-  async function handleDelete(id) {
-    if (!confirm("Remover esta recorrência?")) return;
+  async function deleteRecurring(id) {
     await recurringApi.delete(id);
     load();
   }
 
-  const fmt = (v) =>
-    `R$ ${parseFloat(v).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
   const cadence = (it) =>
     it.frequency === "MONTHLY"
       ? `Mensal · dia ${it.day_of_month}`
@@ -350,7 +343,7 @@ export default function Recurring() {
                       : "text-norby-ivory/50"
                   }
                 >
-                  · {it.type === "INCOME" ? "+" : "−"} {fmt(it.amount)}
+                  · {it.type === "INCOME" ? "+" : "−"} {formatBRL(it.amount)}
                 </span>
               </p>
               <p className="text-xs text-norby-ivory/40">
@@ -366,12 +359,19 @@ export default function Recurring() {
             >
               {it.active ? <Pause size={14} /> : <Play size={14} />}
             </button>
-            <button
-              onClick={() => handleDelete(it.id)}
-              className="p-2 rounded-lg text-norby-ivory/40 hover:text-norby-danger hover:bg-white/5"
-            >
-              <Trash2 size={14} />
-            </button>
+            <ConfirmDialog
+              title="Remover esta recorrência?"
+              confirmLabel="Remover"
+              errorFallback="Não foi possível remover a recorrência."
+              onConfirm={() => deleteRecurring(it.id)}
+              trigger={
+                <button
+                  className="p-2 rounded-lg text-norby-ivory/40 hover:text-norby-danger hover:bg-white/5"
+                >
+                  <Trash2 size={14} />
+                </button>
+              }
+            />
           </div>
         ))}
       </div>
