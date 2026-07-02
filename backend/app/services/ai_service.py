@@ -115,13 +115,20 @@ async def get_or_generate_insight(db: AsyncSession, user_id: str, month: int, ye
         data = json.loads(raw)
         summary_text = data["summary_text"]
         suggested_action = data["suggested_action"]
-    except (AttributeError, ValueError, KeyError, TypeError) as e:
+    except (AttributeError, ValueError, KeyError, TypeError):
         raw_text = getattr(response, "text", None)
         logger.exception(
             "Resposta da IA inválida ao gerar insight (user=%s). Texto cru: %r",
             user_id, raw_text,
         )
-        raise ValueError("Resposta da IA em formato inesperado") from e
+        # O texto da IA falhou, mas o score é determinístico — devolve o score real.
+        # Não cacheia (retorna sem passar por insert_one), para tentar de novo na próxima chamada.
+        return {
+            "score": score,
+            "summary_text": "",
+            "suggested_action": None,
+            "error": "Não foi possível gerar a leitura da IA",
+        }
 
     # Cacheia só o texto no MongoDB (score fica fora do cache).
     insight = {
