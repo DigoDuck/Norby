@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
-import { useForm, Controller } from "react-hook-form";
+import { useLocation, useNavigate } from "react-router-dom";
+import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, Search, Trash2, Pencil } from "lucide-react";
 
 import { transactionsApi } from "@/api/transactions";
 import { walletsApi } from "@/api/wallets";
 import { recurringApi } from "@/api/recurring";
-import { CATEGORIES } from "@/lib/categories";
+import { categoriesFor, reconcileCategory } from "@/lib/categories";
 import { transactionSchema } from "@/lib/schemas";
 import { formatDateBR, formatBRL, inputCls, toDateInput, todayInput } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
@@ -30,14 +31,12 @@ const TYPE_OPTIONS = [
   { value: "INCOME", label: "Receita", activeClass: "bg-norby-income text-norby-night" },
 ];
 
-const CATEGORY_OPTIONS = CATEGORIES.map((c) => ({ value: c, label: c }));
-
 // Valores iniciais do formulário (date sempre fresca → função).
 const emptyForm = () => ({
   wallet_id: "",
   type: "EXPENSE",
   amount: "",
-  category: CATEGORIES[0],
+  category: categoriesFor("EXPENSE")[0],
   description: "",
   date: todayInput(),
 });
@@ -51,6 +50,8 @@ export default function Transactions() {
   const [serverError, setServerError] = useState(null);
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState("");
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const {
     register,
@@ -58,6 +59,7 @@ export default function Transactions() {
     control,
     reset,
     getValues,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(transactionSchema),
@@ -74,7 +76,7 @@ export default function Transactions() {
     walletsApi.list().then((r) => {
       setWallets(r.data);
     });
-    load(); // eslint-disable-line react-hooks/set-state-in-effect
+    load();
   }, []);
 
   useEffect(() => {
@@ -93,9 +95,30 @@ export default function Transactions() {
     }
   }, [wallets, editing, reset, getValues]);
 
+  // Atalho vindo do Dashboard ("+ Receita" / "− Despesa"): abre o form já com
+  // o tipo pré-selecionado. O state da rota é limpo em seguida para o dialog
+  // não reabrir em navegação de histórico.
+  useEffect(() => {
+    const preset = location.state?.newType;
+    if (preset !== "INCOME" && preset !== "EXPENSE") return;
+    setEditing(null);
+    setServerError(null);
+    reset({ ...emptyForm(), type: preset, category: categoriesFor(preset)[0] });
+    setOpen(true);
+    navigate(location.pathname, { replace: true });
+    // roda só no mount: o state chega junto com a navegação que monta a página
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const reload = () => load(filterType ? { type: filterType } : {});
 
   const walletOptions = wallets.map((w) => ({ value: w.id, label: w.name }));
+
+  const watchedType = useWatch({ control, name: "type" });
+  const categoryOptions = categoriesFor(watchedType).map((c) => ({
+    value: c,
+    label: c,
+  }));
 
   function openNew() {
     setEditing(null);
@@ -170,7 +193,7 @@ export default function Transactions() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-norby-ivory tracking-tight">
+          <h1 className="text-3xl font-bold text-norby-ivory tracking-tight">
             Relatórios
           </h1>
           <p className="text-norby-ivory/50 text-sm mt-1">
@@ -204,7 +227,10 @@ export default function Transactions() {
                   render={({ field }) => (
                     <Segmented
                       value={field.value}
-                      onChange={field.onChange}
+                      onChange={(v) => {
+                        field.onChange(v);
+                        setValue("category", reconcileCategory(v, getValues("category")));
+                      }}
                       options={TYPE_OPTIONS}
                     />
                   )}
@@ -247,7 +273,7 @@ export default function Transactions() {
                       value={field.value}
                       onChange={field.onChange}
                       placeholder="Selecionar categoria"
-                      options={CATEGORY_OPTIONS}
+                      options={categoryOptions}
                     />
                   )}
                 />

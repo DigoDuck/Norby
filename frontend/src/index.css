@@ -14,14 +14,42 @@
   /* Card dark "Petróleo Confiável": superfície sólida o bastante p/ ler dados,
      borda sutil, leve blur deixando o glow teal vazar por trás. */
   .glass-card {
-    @apply bg-norby-surface/70 backdrop-blur-xl border border-white/[0.06] rounded-2xl;
+    @apply bg-norby-surface/70 backdrop-blur-xl border border-white/[0.06] rounded-3xl;
   }
   .glass-card-hover {
     @apply glass-card transition-colors duration-200 hover:border-white/[0.14];
+  }
+
+  /* Chip de tendência (pílula): variação % nunca fica como texto solto */
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold tnum;
+  }
+  .chip-pos { @apply chip bg-norby-income/15 text-norby-income; }
+  .chip-neg { @apply chip bg-norby-danger/15 text-norby-danger; }
+  .chip-neutral { @apply chip bg-white/[0.06] text-norby-ivory/60; }
+
+  /* Label micro em uppercase: padrão único de rótulo de dado */
+  .microlabel {
+    @apply text-[11px] font-medium text-norby-ivory/40 uppercase tracking-widest;
   }
 }
 
 @layer base {
   /* Números monetários/tabela: figuras tabulares (precisão, sem layout shift) */
   .tnum { font-variant-numeric: tabular-nums; }
+}
+
+/* Estrela-norte pulsando: substituto de spinner genérico (assinatura da marca) */
+@keyframes star-pulse {
+  0%, 100% { opacity: 0.35; transform: scale(0.92); }
+  50% { opacity: 1; transform: scale(1); }
+}
+.star-loading { animation: star-pulse 1.4s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

@@ -5,8 +5,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import ai_insights_collection
 from app.models.sql_models import Transaction, TransactionType
 from app.services.goal_service import current_month_range
+from app.services.score_service import compute_financial_score
 from app.config import get_settings
 import asyncio
+import hashlib
 import json
 import re
 import logging
@@ -71,21 +73,46 @@ async def _get_user_financial_summary(db: AsyncSession, user_id: str) -> dict:
         "top_categories": categories,
     }
     
+def _summary_fingerprint(summary: dict) -> str:
+    """Impressão digital dos dados que embasam o texto da IA.
+
+    Se qualquer número/categoria muda, o fingerprint muda e o texto é
+    regenerado — evita a 'Leitura da IA' congelada quando as transações do mês
+    mudam, sem precisar chamar o Gemini a cada carga do dashboard.
+    """
+    payload = json.dumps(
+        {
+            "income": summary.get("total_income"),
+            "expenses": summary.get("total_expenses"),
+            "categories": summary.get("top_categories"),
+        },
+        sort_keys=True,
+        default=str,
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
 async def get_or_generate_insight(db: AsyncSession, user_id: str, month: int, year: int) -> dict:
     reference = f"{year}-{month:02d}"
 
-    # Verifica cache
+    # Score é sempre recalculado (determinístico) — nunca servido do cache,
+    # para não congelar quando as transações do mês mudam.
+    summary = await _get_user_financial_summary(db, user_id)
+    score = compute_financial_score(summary)
+    fingerprint = _summary_fingerprint(summary)
+
+    # Texto (summary_text/suggested_action) é cacheado por mês, mas só
+    # reaproveitado se os dados que o embasam não mudaram (fingerprint bate).
+    # Assim a leitura nunca contradiz os números do dashboard.
     cached = await ai_insights_collection.find_one(
         {"user_id": user_id, "reference_month": reference}
     )
-    if cached:
+    if cached and cached.get("data_fingerprint") == fingerprint:
         cached.pop("_id", None)
+        cached["score"] = score
         return cached
 
-    # Busca dados financeiros
-    summary = await _get_user_financial_summary(db, user_id)
-
-    # Chama o Gemini
+    # Chama o Gemini só para o texto (o número não vem mais do LLM).
     prompt = f"""
     Você é um consultor financeiro pessoal. Analise os dados abaixo e responda em português (pt-BR).
     Dados do usuário em {summary['month']}:
@@ -93,47 +120,65 @@ async def get_or_generate_insight(db: AsyncSession, user_id: str, month: int, ye
     - Despesas totais: R$ {summary['total_expenses']:.2f}
     - Saldo: R$ {summary['balance']:.2f}
     - Maiores categorias de gasto: {summary['top_categories']}
-    
+
     responda APENAS em JSON com este formato (sem markdown):
     {{
-        "score": <número de 0 a 100 representando saúde financeira>,
         "summary_text": "<3 insights curtos separados por | sobre o comportamento financeiro>",
         "suggested_action": "<uma sugestão prática e específica>"
     }}
     """
-    
-    # Chamada bloqueante do SDK -> offload p/ thread pra não travar o event loop
-    response = await asyncio.to_thread(model.generate_content, prompt)
 
-    # A IA pode devolver texto não-JSON, vazio ou ser bloqueada por safety filter.
-    # Parsing isolado: se falhar, loga o texto cru e propaga pro router tratar.
+    # A IA pode falhar na chamada (API/rede/quota) ou devolver texto não-JSON,
+    # vazio ou bloqueado por safety filter — qualquer uma dessas falhas não
+    # pode derrubar o score determinístico já calculado.
+    response = None
     try:
+        # Chamada bloqueante do SDK -> offload p/ thread pra não travar o event loop
+        response = await asyncio.to_thread(model.generate_content, prompt)
         raw = response.text.strip()
         raw = re.sub(r"```json|```", "", raw).strip()  # Tira formatação markdown
         data = json.loads(raw)
-        score = data["score"]
         summary_text = data["summary_text"]
         suggested_action = data["suggested_action"]
-    except (AttributeError, ValueError, KeyError, TypeError) as e:
+    except Exception:
         raw_text = getattr(response, "text", None)
         logger.exception(
             "Resposta da IA inválida ao gerar insight (user=%s). Texto cru: %r",
             user_id, raw_text,
         )
-        raise ValueError("Resposta da IA em formato inesperado") from e
+        # O texto da IA falhou, mas o score é determinístico — devolve o score real.
+        # Não cacheia (retorna sem passar por insert_one), para tentar de novo na próxima chamada.
+        return {
+            "score": score,
+            "summary_text": "",
+            "suggested_action": None,
+            "error": "Não foi possível gerar a leitura da IA",
+        }
 
-    # Salva no cache do MongoDB
-    insight = {
-        "user_id": user_id,
-        "reference_month": reference,
+    # Cacheia só o texto + o fingerprint dos dados (score fica fora do cache).
+    # upsert em (user_id, reference_month) → sempre 1 doc por usuário/mês:
+    # sobrescreve o texto velho e não cria duplicados sob concorrência.
+    generated_at = datetime.now(timezone.utc).isoformat()
+    await ai_insights_collection.update_one(
+        {"user_id": user_id, "reference_month": reference},
+        {
+            "$set": {
+                "user_id": user_id,
+                "reference_month": reference,
+                "summary_text": summary_text,
+                "suggested_action": suggested_action,
+                "data_fingerprint": fingerprint,
+                "generated_at": generated_at,
+            }
+        },
+        upsert=True,
+    )
+    return {
         "score": score,
         "summary_text": summary_text,
         "suggested_action": suggested_action,
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": generated_at,
     }
-    await ai_insights_collection.insert_one(insight)
-    insight.pop("_id", None)
-    return insight
 
 async def chat_with_ai(db: AsyncSession, user_id: str, message: str, history: list) -> str:
     """ Chat contextualizado com dados financeiros do usuário """

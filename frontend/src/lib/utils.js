@@ -59,4 +59,4 @@ export const formatBRL = (v) =>
  * do shadcn, que tem estilo próprio). Compartilhada por Goals/Recurring/Transactions.
  */
 export const inputCls =
-  "w-full h-10 px-3 rounded-lg bg-white/5 border border-white/10 text-norby-ivory text-sm placeholder:text-norby-ivory/40 focus:outline-none focus:ring-2 focus:ring-norby-teal/40 transition";
+  "w-full h-10 px-3 rounded-xl bg-white/5 border border-white/10 text-norby-ivory text-sm placeholder:text-norby-ivory/40 focus:outline-none focus:ring-2 focus:ring-norby-teal/40 transition";

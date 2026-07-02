@@ -22,3 +22,13 @@ class ChatSessionSummary(BaseModel):
     session_id: str
     updated_at: datetime | None = None
     first_message: str = ""
+
+
+class ChatMessageOut(BaseModel):
+    role: str
+    content: str
+
+
+class ChatSessionDetail(BaseModel):
+    session_id: str
+    messages: list[ChatMessageOut]
