@@ -5,7 +5,7 @@ import { Plus, Trash2, Repeat, Pause, Play } from "lucide-react";
 
 import { recurringApi } from "@/api/recurring";
 import { walletsApi } from "@/api/wallets";
-import { CATEGORIES } from "@/lib/categories";
+import { categoriesFor, reconcileCategory } from "@/lib/categories";
 import { recurringSchema } from "@/lib/schemas";
 import { formatDateBR, formatBRL, inputCls } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
@@ -45,14 +45,12 @@ const TYPE_OPTIONS = [
   { value: "INCOME", label: "Receita", activeClass: "bg-norby-income text-norby-night" },
 ];
 
-const CATEGORY_OPTIONS = CATEGORIES.map((c) => ({ value: c, label: c }));
-
 // Valores iniciais do formulário de recorrência.
 const emptyForm = () => ({
   wallet_id: "",
   type: "EXPENSE",
   amount: "",
-  category: CATEGORIES[0],
+  category: categoriesFor("EXPENSE")[0],
   frequency: "MONTHLY",
   day_of_month: 1,
   weekday: undefined,
@@ -70,6 +68,7 @@ export default function Recurring() {
     control,
     reset,
     getValues,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(recurringSchema),
@@ -97,6 +96,12 @@ export default function Recurring() {
 
   // Observa a frequência para alternar entre os campos day_of_month e weekday.
   const frequency = useWatch({ control, name: "frequency" });
+
+  const watchedType = useWatch({ control, name: "type" });
+  const categoryOptions = categoriesFor(watchedType).map((c) => ({
+    value: c,
+    label: c,
+  }));
 
   function handleOpenChange(v) {
     setOpen(v);
@@ -183,7 +188,10 @@ export default function Recurring() {
                   render={({ field }) => (
                     <Segmented
                       value={field.value}
-                      onChange={field.onChange}
+                      onChange={(v) => {
+                        field.onChange(v);
+                        setValue("category", reconcileCategory(v, getValues("category")));
+                      }}
                       options={TYPE_OPTIONS}
                     />
                   )}
@@ -226,7 +234,7 @@ export default function Recurring() {
                       value={field.value}
                       onChange={field.onChange}
                       placeholder="Selecionar categoria"
-                      options={CATEGORY_OPTIONS}
+                      options={categoryOptions}
                     />
                   )}
                 />
