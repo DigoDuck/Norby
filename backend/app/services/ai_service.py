@@ -8,6 +8,7 @@ from app.services.goal_service import current_month_range
 from app.services.score_service import compute_financial_score
 from app.config import get_settings
 import asyncio
+import hashlib
 import json
 import re
 import logging
@@ -72,6 +73,25 @@ async def _get_user_financial_summary(db: AsyncSession, user_id: str) -> dict:
         "top_categories": categories,
     }
     
+def _summary_fingerprint(summary: dict) -> str:
+    """Impressão digital dos dados que embasam o texto da IA.
+
+    Se qualquer número/categoria muda, o fingerprint muda e o texto é
+    regenerado — evita a 'Leitura da IA' congelada quando as transações do mês
+    mudam, sem precisar chamar o Gemini a cada carga do dashboard.
+    """
+    payload = json.dumps(
+        {
+            "income": summary.get("total_income"),
+            "expenses": summary.get("total_expenses"),
+            "categories": summary.get("top_categories"),
+        },
+        sort_keys=True,
+        default=str,
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
 async def get_or_generate_insight(db: AsyncSession, user_id: str, month: int, year: int) -> dict:
     reference = f"{year}-{month:02d}"
 
@@ -79,12 +99,15 @@ async def get_or_generate_insight(db: AsyncSession, user_id: str, month: int, ye
     # para não congelar quando as transações do mês mudam.
     summary = await _get_user_financial_summary(db, user_id)
     score = compute_financial_score(summary)
+    fingerprint = _summary_fingerprint(summary)
 
-    # Texto (summary_text/suggested_action) pode vir do cache mensal.
+    # Texto (summary_text/suggested_action) é cacheado por mês, mas só
+    # reaproveitado se os dados que o embasam não mudaram (fingerprint bate).
+    # Assim a leitura nunca contradiz os números do dashboard.
     cached = await ai_insights_collection.find_one(
         {"user_id": user_id, "reference_month": reference}
     )
-    if cached:
+    if cached and cached.get("data_fingerprint") == fingerprint:
         cached.pop("_id", None)
         cached["score"] = score
         return cached
@@ -132,18 +155,30 @@ async def get_or_generate_insight(db: AsyncSession, user_id: str, month: int, ye
             "error": "Não foi possível gerar a leitura da IA",
         }
 
-    # Cacheia só o texto no MongoDB (score fica fora do cache).
-    insight = {
-        "user_id": user_id,
-        "reference_month": reference,
+    # Cacheia só o texto + o fingerprint dos dados (score fica fora do cache).
+    # upsert em (user_id, reference_month) → sempre 1 doc por usuário/mês:
+    # sobrescreve o texto velho e não cria duplicados sob concorrência.
+    generated_at = datetime.now(timezone.utc).isoformat()
+    await ai_insights_collection.update_one(
+        {"user_id": user_id, "reference_month": reference},
+        {
+            "$set": {
+                "user_id": user_id,
+                "reference_month": reference,
+                "summary_text": summary_text,
+                "suggested_action": suggested_action,
+                "data_fingerprint": fingerprint,
+                "generated_at": generated_at,
+            }
+        },
+        upsert=True,
+    )
+    return {
+        "score": score,
         "summary_text": summary_text,
         "suggested_action": suggested_action,
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": generated_at,
     }
-    await ai_insights_collection.insert_one(insight)
-    insight.pop("_id", None)
-    insight["score"] = score
-    return insight
 
 async def chat_with_ai(db: AsyncSession, user_id: str, message: str, history: list) -> str:
     """ Chat contextualizado com dados financeiros do usuário """

@@ -38,6 +38,9 @@ class _FakeInsights:
     async def insert_one(self, *_a, **_k):
         return None
 
+    async def update_one(self, *_a, **_k):
+        return None
+
 
 @pytest.mark.asyncio
 async def test_insight_score_is_deterministic_not_from_llm(db_session, monkeypatch):
@@ -126,15 +129,20 @@ async def test_insight_returns_score_when_llm_call_raises(db_session, monkeypatc
 
 
 class _FakeInsightsCacheHit:
+    # Cache com fingerprint que BATE com o summary atual → texto é reaproveitado.
+    def __init__(self, fingerprint):
+        self._fp = fingerprint
+
     async def find_one(self, *_a, **_k):
         return {
             "score": 5,  # score em cache está desatualizado (stale)
             "summary_text": "cached text",
             "suggested_action": "x",
+            "data_fingerprint": self._fp,
         }
 
-    async def insert_one(self, *_a, **_k):
-        return None
+    async def update_one(self, *_a, **_k):
+        raise AssertionError("não deve regenerar quando o fingerprint bate")
 
 
 @pytest.mark.asyncio
@@ -152,8 +160,64 @@ async def test_insight_recomputes_score_on_cache_hit(db_session, monkeypatch):
         return summary
 
     monkeypatch.setattr(ai, "_get_user_financial_summary", _fake_summary)
-    monkeypatch.setattr(ai, "ai_insights_collection", _FakeInsightsCacheHit())
+    monkeypatch.setattr(
+        ai, "ai_insights_collection", _FakeInsightsCacheHit(ai._summary_fingerprint(summary))
+    )
+    # Se reaproveitar o cache, o Gemini nem é chamado.
+    def _boom(_p):
+        raise AssertionError("não deve chamar o Gemini quando o fingerprint bate")
+
+    monkeypatch.setattr(ai.model, "generate_content", _boom)
 
     result = await ai.get_or_generate_insight(db_session, "user-1", 7, 2026)
     assert result["score"] == 90
     assert result["summary_text"] == "cached text"
+
+
+class _FakeInsightsStale:
+    # Cache com fingerprint ANTIGO → dados mudaram → texto deve ser regenerado.
+    def __init__(self):
+        self.updated = False
+
+    async def find_one(self, *_a, **_k):
+        return {
+            "score": 5,
+            "summary_text": "texto velho e errado",
+            "suggested_action": "ação antiga",
+            "data_fingerprint": "fingerprint-antigo",
+        }
+
+    async def update_one(self, *_a, **_k):
+        self.updated = True
+        return None
+
+
+@pytest.mark.asyncio
+async def test_insight_regenerates_text_when_data_changes(db_session, monkeypatch):
+    # Regressão do bug real: a Leitura da IA ficava congelada mesmo com os dados
+    # do mês mudando. Com o fingerprint diferente, o texto tem que ser regenerado.
+    summary = {
+        "month": "July 2026",
+        "total_income": 4050.0,
+        "total_expenses": 230.0,  # s alto -> score 100
+        "balance": 3820.0,
+        "top_categories": [{"category": "Outros", "total": 100.0}],
+    }
+
+    async def _fake_summary(_db, _uid):
+        return summary
+
+    fake = _FakeInsightsStale()
+    monkeypatch.setattr(ai, "_get_user_financial_summary", _fake_summary)
+    monkeypatch.setattr(ai, "ai_insights_collection", fake)
+
+    class _Resp:
+        text = '{"summary_text": "novo|texto|fresco", "suggested_action": "nova ação"}'
+
+    monkeypatch.setattr(ai.model, "generate_content", lambda _p: _Resp())
+
+    result = await ai.get_or_generate_insight(db_session, "user-1", 7, 2026)
+    assert result["score"] == 100
+    assert result["summary_text"] == "novo|texto|fresco"  # regenerado, não o velho
+    assert result["suggested_action"] == "nova ação"
+    assert fake.updated is True  # cache foi sobrescrito (upsert)
