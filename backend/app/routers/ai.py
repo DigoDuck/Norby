@@ -127,10 +127,10 @@ async def get_session(
     if not doc:
         raise HTTPException(status_code=404, detail="Conversa não encontrada")
 
-    # .get() defensivo: mensagens malformadas (sem content) são ignoradas.
+    # .get() defensivo: mensagens malformadas (sem content ou sem role) são ignoradas.
     messages = [
         {"role": m.get("role"), "content": m.get("content")}
         for m in doc.get("messages", [])
-        if m.get("content")
+        if m.get("content") and m.get("role")
     ]
     return {"session_id": session_id, "messages": messages}

@@ -105,17 +105,19 @@ async def get_or_generate_insight(db: AsyncSession, user_id: str, month: int, ye
     }}
     """
 
-    # Chamada bloqueante do SDK -> offload p/ thread pra não travar o event loop
-    response = await asyncio.to_thread(model.generate_content, prompt)
-
-    # A IA pode devolver texto não-JSON, vazio ou ser bloqueada por safety filter.
+    # A IA pode falhar na chamada (API/rede/quota) ou devolver texto não-JSON,
+    # vazio ou bloqueado por safety filter — qualquer uma dessas falhas não
+    # pode derrubar o score determinístico já calculado.
+    response = None
     try:
+        # Chamada bloqueante do SDK -> offload p/ thread pra não travar o event loop
+        response = await asyncio.to_thread(model.generate_content, prompt)
         raw = response.text.strip()
         raw = re.sub(r"```json|```", "", raw).strip()  # Tira formatação markdown
         data = json.loads(raw)
         summary_text = data["summary_text"]
         suggested_action = data["suggested_action"]
-    except (AttributeError, ValueError, KeyError, TypeError):
+    except Exception:
         raw_text = getattr(response, "text", None)
         logger.exception(
             "Resposta da IA inválida ao gerar insight (user=%s). Texto cru: %r",

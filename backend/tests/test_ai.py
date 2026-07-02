@@ -96,6 +96,35 @@ async def test_insight_returns_score_when_llm_text_fails(db_session, monkeypatch
     assert result.get("error")
 
 
+@pytest.mark.asyncio
+async def test_insight_returns_score_when_llm_call_raises(db_session, monkeypatch):
+    # Erro de API/rede/quota do Gemini (não só parse) também deve degradar
+    # com elegância e devolver o score determinístico já calculado.
+    summary = {
+        "month": "July 2026",
+        "total_income": 1000.0,
+        "total_expenses": 700.0,  # s=0.3 -> 90
+        "balance": 300.0,
+        "top_categories": [],
+    }
+
+    async def _fake_summary(_db, _uid):
+        return summary
+
+    monkeypatch.setattr(ai, "_get_user_financial_summary", _fake_summary)
+    monkeypatch.setattr(ai, "ai_insights_collection", _FakeInsights())
+
+    def _boom(_p):
+        raise RuntimeError("gemini down")
+
+    monkeypatch.setattr(ai.model, "generate_content", _boom)
+
+    result = await ai.get_or_generate_insight(db_session, "user-1", 7, 2026)
+    assert result["score"] == 90
+    assert result["summary_text"] == ""
+    assert result.get("error")
+
+
 class _FakeInsightsCacheHit:
     async def find_one(self, *_a, **_k):
         return {

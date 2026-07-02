@@ -30,6 +30,7 @@ async def test_get_session_returns_messages(client, monkeypatch):
             {"role": "user", "content": "oi"},
             {"role": "assistant", "content": "olá"},
             {"role": "user"},  # malformada (sem content) → ignorada
+            {"content": "sem role"},  # malformada (sem role) → ignorada
         ],
     }]
     monkeypatch.setattr(ai_router, "chat_history_collection", _FakeChatHistory(docs))
