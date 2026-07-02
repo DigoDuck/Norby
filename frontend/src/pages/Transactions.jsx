@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useForm, Controller, useWatch } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, Search, Trash2, Pencil } from "lucide-react";
 
@@ -32,6 +32,16 @@ const TYPE_OPTIONS = [
 
 const CATEGORY_OPTIONS = CATEGORIES.map((c) => ({ value: c, label: c }));
 
+// Valores iniciais do formulário (date sempre fresca → função).
+const emptyForm = () => ({
+  wallet_id: "",
+  type: "EXPENSE",
+  amount: "",
+  category: CATEGORIES[0],
+  description: "",
+  date: todayInput(),
+});
+
 
 export default function Transactions() {
   const [transactions, setTransactions] = useState([]);
@@ -47,21 +57,12 @@ export default function Transactions() {
     handleSubmit,
     control,
     reset,
+    getValues,
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(transactionSchema),
-    defaultValues: {
-      wallet_id: "",
-      type: "EXPENSE",
-      amount: "",
-      category: CATEGORIES[0],
-      description: "",
-      date: todayInput(),
-    },
+    defaultValues: emptyForm(),
   });
-
-  // Watch type for Segmented (not strictly needed in render, but kept for consistency)
-  useWatch({ control, name: "type" });
 
   async function load(params = {}) {
     await recurringApi.run().catch(() => {});
@@ -84,12 +85,13 @@ export default function Transactions() {
     return () => clearTimeout(timer);
   }, [filterType]);
 
-  // Auto-select the sole wallet only when NOT editing
+  // Auto-seleciona a única carteira, sem sobrescrever uma escolha já feita nem
+  // atrapalhar a edição.
   useEffect(() => {
-    if (wallets.length === 1 && !editing) {
+    if (wallets.length === 1 && !editing && !getValues("wallet_id")) {
       reset((prev) => ({ ...prev, wallet_id: wallets[0].id }));
     }
-  }, [wallets]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [wallets, editing, reset, getValues]);
 
   const reload = () => load(filterType ? { type: filterType } : {});
 
@@ -99,12 +101,8 @@ export default function Transactions() {
     setEditing(null);
     setServerError(null);
     reset({
+      ...emptyForm(),
       wallet_id: wallets.length === 1 ? wallets[0].id : "",
-      type: "EXPENSE",
-      amount: "",
-      category: CATEGORIES[0],
-      description: "",
-      date: todayInput(),
     });
     setOpen(true);
   }

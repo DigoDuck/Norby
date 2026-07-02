@@ -47,6 +47,17 @@ const TYPE_OPTIONS = [
 
 const CATEGORY_OPTIONS = CATEGORIES.map((c) => ({ value: c, label: c }));
 
+// Valores iniciais do formulário de recorrência.
+const emptyForm = () => ({
+  wallet_id: "",
+  type: "EXPENSE",
+  amount: "",
+  category: CATEGORIES[0],
+  frequency: "MONTHLY",
+  day_of_month: 1,
+  weekday: undefined,
+});
+
 export default function Recurring() {
   const [items, setItems] = useState([]);
   const [wallets, setWallets] = useState([]);
@@ -58,18 +69,11 @@ export default function Recurring() {
     handleSubmit,
     control,
     reset,
+    getValues,
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(recurringSchema),
-    defaultValues: {
-      wallet_id: "",
-      type: "EXPENSE",
-      amount: "",
-      category: CATEGORIES[0],
-      frequency: "MONTHLY",
-      day_of_month: 1,
-      weekday: undefined,
-    },
+    defaultValues: emptyForm(),
   });
 
   async function load() {
@@ -82,17 +86,16 @@ export default function Recurring() {
     load(); // eslint-disable-line react-hooks/set-state-in-effect
   }, []);
 
-  // Build wallet options
   const walletOptions = wallets.map((w) => ({ value: w.id, label: w.name }));
 
-  // Auto-select the sole wallet when wallets load
+  // Auto-seleciona a única carteira, sem sobrescrever uma escolha já feita.
   useEffect(() => {
-    if (wallets.length === 1) {
+    if (wallets.length === 1 && !getValues("wallet_id")) {
       reset((prev) => ({ ...prev, wallet_id: wallets[0].id }));
     }
-  }, [wallets]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [wallets, reset, getValues]);
 
-  // Watch frequency to conditionally show day_of_month or weekday field
+  // Observa a frequência para alternar entre os campos day_of_month e weekday.
   const frequency = useWatch({ control, name: "frequency" });
 
   function handleOpenChange(v) {
@@ -100,13 +103,8 @@ export default function Recurring() {
     if (!v) {
       setServerError(null);
       reset({
+        ...emptyForm(),
         wallet_id: wallets.length === 1 ? wallets[0].id : "",
-        type: "EXPENSE",
-        amount: "",
-        category: CATEGORIES[0],
-        frequency: "MONTHLY",
-        day_of_month: 1,
-        weekday: undefined,
       });
     }
   }

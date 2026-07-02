@@ -14,6 +14,8 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/ai", tags=["AI"])
 
+CHAT_SESSIONS_LIMIT = 20  # nº de sessões de chat recentes listadas
+
 
 class ChatMessage(BaseModel):
     message: str
@@ -97,7 +99,7 @@ async def list_sessions(current_user: User = Depends(get_current_user)): # Lista
     cursor = chat_history_collection.find(
         {"user_id": str(current_user.id)},
         {"session_id": 1, "updated_at": 1, "messages": {"$slice": 1}},
-    ).sort("updated_at", -1).limit(20)
+    ).sort("updated_at", -1).limit(CHAT_SESSIONS_LIMIT)
 
     sessions = []
     async for doc in cursor:

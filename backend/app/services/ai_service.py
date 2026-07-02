@@ -13,6 +13,9 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Nº de mensagens recentes enviadas como contexto ao Gemini (evita estourar o limite).
+MAX_CHAT_HISTORY_MESSAGES = 10
+
 settings = get_settings()
 genai.configure(api_key=settings.gemini_api_key)
 model = genai.GenerativeModel("models/gemini-2.5-flash")
@@ -150,7 +153,7 @@ async def chat_with_ai(db: AsyncSession, user_id: str, message: str, history: li
     # Monta histórico no formato do Gemini. Usa .get() porque um doc antigo ou
     # malformado no Mongo (sem role/content) não deve derrubar o chat inteiro.
     chat_history = []
-    for msg in history[-10:]: # Últimas 10 mensagens para não estourar contexto
+    for msg in history[-MAX_CHAT_HISTORY_MESSAGES:]:
         content = msg.get("content")
         if not content:
             continue
