@@ -24,6 +24,19 @@ export default defineConfig([
     },
     rules: {
       'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      // Permite exportar constantes (ex.: as variantes cva do shadcn) junto do componente.
+      'react-refresh/only-export-components': ['error', { allowConstantExport: true }],
     },
+  },
+  {
+    // Arquivos de configuração rodam no Node (têm __dirname, process, etc.).
+    files: ['*.config.js'],
+    languageOptions: { globals: globals.node },
+  },
+  {
+    // Primitivos gerados pelo shadcn: exportar as variantes cva junto do
+    // componente é intencional; a regra de fast-refresh não se aplica aqui.
+    files: ['src/components/ui/**'],
+    rules: { 'react-refresh/only-export-components': 'off' },
   },
 ])

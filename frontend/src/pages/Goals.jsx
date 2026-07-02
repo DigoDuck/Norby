@@ -26,6 +26,14 @@ const TYPE_OPTIONS = [
 
 const CATEGORY_OPTIONS = CATEGORIES.map((c) => ({ value: c, label: c }));
 
+const EMPTY_FORM = {
+  name: "",
+  type: "SAVINGS",
+  target_amount: "",
+  current_amount: "",
+  category: "",
+};
+
 export default function Goals() {
   const [goals, setGoals] = useState([]);
   const [open, setOpen] = useState(false);
@@ -39,16 +47,10 @@ export default function Goals() {
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(goalSchema),
-    defaultValues: {
-      name: "",
-      type: "SAVINGS",
-      target_amount: "",
-      current_amount: "",
-      category: "",
-    },
+    defaultValues: EMPTY_FORM,
   });
 
-  // Watch type to toggle conditional fields and label
+  // Observa o type para alternar campos condicionais e o rótulo.
   const type = useWatch({ control, name: "type" });
 
   async function load() {
@@ -63,13 +65,7 @@ export default function Goals() {
     setOpen(v);
     if (!v) {
       setServerError(null);
-      reset({
-        name: "",
-        type: "SAVINGS",
-        target_amount: "",
-        current_amount: "",
-        category: "",
-      });
+      reset(EMPTY_FORM);
     }
   }
 

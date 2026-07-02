@@ -57,6 +57,6 @@ class Settings(BaseSettings):
                 return value not in ("disable", "allow")
         return False
 
-@lru_cache()  # Lê o env só uma vez depois reutiliza pra melhorar a perfomance
+@lru_cache()  # Lê o env só uma vez depois reutiliza pra melhorar a performance
 def get_settings() -> Settings:
     return Settings()
