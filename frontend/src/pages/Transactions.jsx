@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
-import { useForm, Controller } from "react-hook-form";
+import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, Search, Trash2, Pencil } from "lucide-react";
 
 import { transactionsApi } from "@/api/transactions";
 import { walletsApi } from "@/api/wallets";
 import { recurringApi } from "@/api/recurring";
-import { CATEGORIES } from "@/lib/categories";
+import { categoriesFor, reconcileCategory } from "@/lib/categories";
 import { transactionSchema } from "@/lib/schemas";
 import { formatDateBR, formatBRL, inputCls, toDateInput, todayInput } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
@@ -30,14 +30,12 @@ const TYPE_OPTIONS = [
   { value: "INCOME", label: "Receita", activeClass: "bg-norby-income text-norby-night" },
 ];
 
-const CATEGORY_OPTIONS = CATEGORIES.map((c) => ({ value: c, label: c }));
-
 // Valores iniciais do formulário (date sempre fresca → função).
 const emptyForm = () => ({
   wallet_id: "",
   type: "EXPENSE",
   amount: "",
-  category: CATEGORIES[0],
+  category: categoriesFor("EXPENSE")[0],
   description: "",
   date: todayInput(),
 });
@@ -58,6 +56,7 @@ export default function Transactions() {
     control,
     reset,
     getValues,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(transactionSchema),
@@ -96,6 +95,12 @@ export default function Transactions() {
   const reload = () => load(filterType ? { type: filterType } : {});
 
   const walletOptions = wallets.map((w) => ({ value: w.id, label: w.name }));
+
+  const watchedType = useWatch({ control, name: "type" });
+  const categoryOptions = categoriesFor(watchedType).map((c) => ({
+    value: c,
+    label: c,
+  }));
 
   function openNew() {
     setEditing(null);
@@ -204,7 +209,10 @@ export default function Transactions() {
                   render={({ field }) => (
                     <Segmented
                       value={field.value}
-                      onChange={field.onChange}
+                      onChange={(v) => {
+                        field.onChange(v);
+                        setValue("category", reconcileCategory(v, getValues("category")));
+                      }}
                       options={TYPE_OPTIONS}
                     />
                   )}
@@ -247,7 +255,7 @@ export default function Transactions() {
                       value={field.value}
                       onChange={field.onChange}
                       placeholder="Selecionar categoria"
-                      options={CATEGORY_OPTIONS}
+                      options={categoryOptions}
                     />
                   )}
                 />
