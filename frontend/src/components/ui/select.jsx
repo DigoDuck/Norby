@@ -4,7 +4,7 @@ import { ChevronDown, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const fieldBase =
-  "w-full h-10 px-3 rounded-lg bg-white/5 border border-white/10 text-norby-ivory text-sm placeholder:text-norby-ivory/40 focus:outline-none focus:ring-2 focus:ring-norby-teal/40 transition";
+  "w-full h-10 px-3 rounded-xl bg-white/5 border border-white/10 text-norby-ivory text-sm placeholder:text-norby-ivory/40 focus:outline-none focus:ring-2 focus:ring-norby-teal/40 transition";
 
 /**
  * Themed dropdown built on @base-ui/react Select.
@@ -61,7 +61,7 @@ export function Select({ id, value, placeholder, options, onChange, disabled }) 
         >
           <SelectPrimitive.Popup
             data-slot="select-popup"
-            className="bg-norby-surface border border-white/10 rounded-lg shadow-xl p-1 min-w-[var(--anchor-width)] origin-[var(--transform-origin)] outline-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 duration-100"
+            className="bg-norby-surface border border-white/10 rounded-xl shadow-xl p-1 min-w-[var(--anchor-width)] origin-[var(--transform-origin)] outline-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 duration-100"
           >
             <SelectPrimitive.List>
               {options?.map((opt) => (

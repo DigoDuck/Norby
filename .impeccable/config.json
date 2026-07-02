@@ -1,0 +1,14 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "inter",
+        "reason": "Inter e identidade fechada do brand book Norby (docs/design-workflow.md + DESIGN.md)",
+        "createdAt": "2026-07-02T03:43:18.297Z"
+      }
+    ]
+  }
+}

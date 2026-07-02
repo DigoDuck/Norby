@@ -24,7 +24,7 @@ export function Segmented({ value, onChange, options, className }) {
             type="button"
             onClick={() => onChange(opt.value)}
             className={cn(
-              "rounded-lg py-2 text-sm font-medium transition-all",
+              "rounded-xl py-2 text-sm font-medium transition-all",
               isActive
                 ? (opt.activeClass ?? "bg-norby-teal text-norby-night")
                 : "bg-white/5 text-norby-ivory/70 hover:text-norby-ivory"
