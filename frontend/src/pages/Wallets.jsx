@@ -76,7 +76,7 @@ export default function Wallets() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-norby-ivory tracking-tight">
+          <h1 className="text-3xl font-bold text-norby-ivory tracking-tight">
             Carteiras
           </h1>
           <p className="text-norby-ivory/50 text-sm mt-1">
@@ -146,7 +146,21 @@ export default function Wallets() {
         </Dialog>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-5">
+        {wallets.length === 0 && (
+          <div className="col-span-3 glass-card p-10 flex flex-col items-center text-center">
+            <div className="w-11 h-11 rounded-xl bg-norby-teal/15 flex items-center justify-center mb-3">
+              <Wallet size={20} className="text-norby-teal" />
+            </div>
+            <p className="text-sm font-medium text-norby-ivory">
+              Nenhuma carteira ainda
+            </p>
+            <p className="text-xs text-norby-ivory/50 mt-1 max-w-xs leading-relaxed">
+              Crie sua primeira carteira (conta, cartão ou dinheiro) para
+              começar a registrar transações.
+            </p>
+          </div>
+        )}
         {wallets.map((w) => (
           <div key={w.id} className="glass-card-hover p-5 flex flex-col gap-4">
             <div className="flex items-start justify-between">

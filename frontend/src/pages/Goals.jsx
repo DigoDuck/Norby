@@ -103,7 +103,7 @@ export default function Goals() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-norby-ivory tracking-tight">Metas</h1>
+          <h1 className="text-3xl font-bold text-norby-ivory tracking-tight">Metas</h1>
           <p className="text-norby-ivory/50 text-sm mt-1">
             Objetivos de poupança e orçamentos mensais
           </p>
@@ -219,9 +219,20 @@ export default function Goals() {
         </Dialog>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-5">
         {goals.length === 0 && (
-          <p className="col-span-2 text-norby-ivory/40 text-sm">Nenhuma meta ainda.</p>
+          <div className="col-span-2 glass-card p-10 flex flex-col items-center text-center">
+            <div className="w-11 h-11 rounded-xl bg-norby-teal/15 flex items-center justify-center mb-3">
+              <Target size={20} className="text-norby-teal" />
+            </div>
+            <p className="text-sm font-medium text-norby-ivory">
+              Nenhuma meta ainda
+            </p>
+            <p className="text-xs text-norby-ivory/50 mt-1 max-w-xs leading-relaxed">
+              Crie uma meta de poupança para acompanhar um objetivo, ou um
+              orçamento para limitar os gastos de uma categoria.
+            </p>
+          </div>
         )}
         {goals.map((g) => {
           const pct = Math.min(g.progress_pct, 100);
