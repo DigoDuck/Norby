@@ -464,7 +464,7 @@ export default function Dashboard() {
             <div className="pl-3">
               <p className="microlabel">Score IA</p>
               <p className="text-sm font-semibold text-norby-teal-soft tnum mt-1">
-                {insight?.score ?? "—"}/100
+                {insight?.score != null ? `${insight.score}/100` : "—"}
               </p>
             </div>
           </div>

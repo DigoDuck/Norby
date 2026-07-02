@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import ai_insights_collection
 from app.models.sql_models import Transaction, TransactionType
 from app.services.goal_service import current_month_range
+from app.services.score_service import compute_financial_score
 from app.config import get_settings
 import asyncio
 import json
@@ -74,18 +75,21 @@ async def _get_user_financial_summary(db: AsyncSession, user_id: str) -> dict:
 async def get_or_generate_insight(db: AsyncSession, user_id: str, month: int, year: int) -> dict:
     reference = f"{year}-{month:02d}"
 
-    # Verifica cache
+    # Score é sempre recalculado (determinístico) — nunca servido do cache,
+    # para não congelar quando as transações do mês mudam.
+    summary = await _get_user_financial_summary(db, user_id)
+    score = compute_financial_score(summary)
+
+    # Texto (summary_text/suggested_action) pode vir do cache mensal.
     cached = await ai_insights_collection.find_one(
         {"user_id": user_id, "reference_month": reference}
     )
     if cached:
         cached.pop("_id", None)
+        cached["score"] = score
         return cached
 
-    # Busca dados financeiros
-    summary = await _get_user_financial_summary(db, user_id)
-
-    # Chama o Gemini
+    # Chama o Gemini só para o texto (o número não vem mais do LLM).
     prompt = f"""
     Você é um consultor financeiro pessoal. Analise os dados abaixo e responda em português (pt-BR).
     Dados do usuário em {summary['month']}:
@@ -93,25 +97,22 @@ async def get_or_generate_insight(db: AsyncSession, user_id: str, month: int, ye
     - Despesas totais: R$ {summary['total_expenses']:.2f}
     - Saldo: R$ {summary['balance']:.2f}
     - Maiores categorias de gasto: {summary['top_categories']}
-    
+
     responda APENAS em JSON com este formato (sem markdown):
     {{
-        "score": <número de 0 a 100 representando saúde financeira>,
         "summary_text": "<3 insights curtos separados por | sobre o comportamento financeiro>",
         "suggested_action": "<uma sugestão prática e específica>"
     }}
     """
-    
+
     # Chamada bloqueante do SDK -> offload p/ thread pra não travar o event loop
     response = await asyncio.to_thread(model.generate_content, prompt)
 
     # A IA pode devolver texto não-JSON, vazio ou ser bloqueada por safety filter.
-    # Parsing isolado: se falhar, loga o texto cru e propaga pro router tratar.
     try:
         raw = response.text.strip()
         raw = re.sub(r"```json|```", "", raw).strip()  # Tira formatação markdown
         data = json.loads(raw)
-        score = data["score"]
         summary_text = data["summary_text"]
         suggested_action = data["suggested_action"]
     except (AttributeError, ValueError, KeyError, TypeError) as e:
@@ -122,17 +123,17 @@ async def get_or_generate_insight(db: AsyncSession, user_id: str, month: int, ye
         )
         raise ValueError("Resposta da IA em formato inesperado") from e
 
-    # Salva no cache do MongoDB
+    # Cacheia só o texto no MongoDB (score fica fora do cache).
     insight = {
         "user_id": user_id,
         "reference_month": reference,
-        "score": score,
         "summary_text": summary_text,
         "suggested_action": suggested_action,
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
     await ai_insights_collection.insert_one(insight)
     insight.pop("_id", None)
+    insight["score"] = score
     return insight
 
 async def chat_with_ai(db: AsyncSession, user_id: str, message: str, history: list) -> str:
