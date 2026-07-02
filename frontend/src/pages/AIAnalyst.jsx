@@ -40,6 +40,7 @@ export default function AIAnalyst() {
     try {
       const res = await aiApi.chat({ message: input, session_id: sessionId });
       setSessionId(res.data.session_id);
+      aiApi.getSessions().then((r) => setSessions(r.data)).catch(() => {});
       setMessages((prev) => [
         ...prev,
         { role: "assistant", content: res.data.response },
@@ -51,6 +52,22 @@ export default function AIAnalyst() {
           role: "assistant",
           content: "Erro ao conectar com a IA. Tente novamente.",
         },
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function openSession(id) {
+    if (id === sessionId || loading) return;
+    setLoading(true);
+    try {
+      const res = await aiApi.getSession(id);
+      setMessages(res.data.messages);
+      setSessionId(id);
+    } catch {
+      setMessages([
+        { role: "assistant", content: "Não foi possível carregar esta conversa." },
       ]);
     } finally {
       setLoading(false);
@@ -77,7 +94,7 @@ export default function AIAnalyst() {
           {sessions.map((s) => (
             <button
               key={s.session_id}
-              onClick={() => setSessionId(s.session_id)}
+              onClick={() => openSession(s.session_id)}
               className={`text-left p-2.5 rounded-xl text-xs transition-colors truncate ${
                 sessionId === s.session_id
                   ? "bg-white/10 text-norby-ivory"
