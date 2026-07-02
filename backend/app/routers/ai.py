@@ -6,7 +6,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.dependencies import get_db, get_current_user
 from app.models.sql_models import User
 from app.services.ai_service import get_or_generate_insight, chat_with_ai
-from app.schemas.ai import InsightResponse, ChatResponse, ChatSessionSummary
+from app.schemas.ai import (
+    InsightResponse,
+    ChatResponse,
+    ChatSessionSummary,
+    ChatSessionDetail,
+)
 from app.database import chat_history_collection
 import logging
 
@@ -109,4 +114,23 @@ async def list_sessions(current_user: User = Depends(get_current_user)): # Lista
             "first_message": doc["messages"][0]["content"] if doc.get("messages") else "",
         })
     return sessions
-        
+
+
+@router.get("/chat/sessions/{session_id}", response_model=ChatSessionDetail)
+async def get_session(
+    session_id: str,
+    current_user: User = Depends(get_current_user),
+):  # Mensagens de uma sessão do próprio usuário
+    doc = await chat_history_collection.find_one(
+        {"user_id": str(current_user.id), "session_id": session_id}
+    )
+    if not doc:
+        raise HTTPException(status_code=404, detail="Conversa não encontrada")
+
+    # .get() defensivo: mensagens malformadas (sem content) são ignoradas.
+    messages = [
+        {"role": m.get("role"), "content": m.get("content")}
+        for m in doc.get("messages", [])
+        if m.get("content")
+    ]
+    return {"session_id": session_id, "messages": messages}
