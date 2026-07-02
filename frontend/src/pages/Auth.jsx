@@ -102,12 +102,12 @@ export default function Auth() {
         {/* Card */}
         <div className="glass-card p-8">
           {/* Tabs */}
-          <div className="flex gap-1 p-1 rounded-xl bg-white/5 mb-6">
+          <div className="flex gap-1 p-1 rounded-full bg-white/5 mb-6">
             {["login", "register"].map((m) => (
               <button
                 key={m}
                 onClick={() => setMode(m)}
-                className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
+                className={`flex-1 py-2 rounded-full text-sm font-medium transition-all ${
                   mode === m
                     ? "bg-norby-teal text-norby-night"
                     : "text-norby-ivory/50 hover:text-norby-ivory"
@@ -197,7 +197,7 @@ export default function Auth() {
             )}
 
             {error && (
-              <div className="p-3 rounded-lg bg-norby-danger/10 border border-norby-danger/20 text-norby-danger text-sm">
+              <div className="p-3 rounded-xl bg-norby-danger/10 border border-norby-danger/20 text-norby-danger text-sm">
                 {error}
               </div>
             )}

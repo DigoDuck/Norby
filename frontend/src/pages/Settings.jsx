@@ -78,7 +78,7 @@ export default function Settings() {
   return (
     <div className="max-w-2xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-norby-ivory tracking-tight">
+        <h1 className="text-3xl font-bold text-norby-ivory tracking-tight">
           Configurações
         </h1>
         <p className="text-norby-ivory/50 text-sm mt-1">Gerencie seu perfil</p>

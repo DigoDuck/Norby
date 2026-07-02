@@ -76,7 +76,7 @@ export default function Transactions() {
     walletsApi.list().then((r) => {
       setWallets(r.data);
     });
-    load(); // eslint-disable-line react-hooks/set-state-in-effect
+    load();
   }, []);
 
   useEffect(() => {
@@ -104,7 +104,7 @@ export default function Transactions() {
     setEditing(null);
     setServerError(null);
     reset({ ...emptyForm(), type: preset, category: categoriesFor(preset)[0] });
-    setOpen(true); // eslint-disable-line react-hooks/set-state-in-effect
+    setOpen(true);
     navigate(location.pathname, { replace: true });
     // roda só no mount: o state chega junto com a navegação que monta a página
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -193,7 +193,7 @@ export default function Transactions() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-norby-ivory tracking-tight">
+          <h1 className="text-3xl font-bold text-norby-ivory tracking-tight">
             Relatórios
           </h1>
           <p className="text-norby-ivory/50 text-sm mt-1">

@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from "react";
-import { BrainCircuit, Send, Plus } from "lucide-react";
+import { Send, Plus } from "lucide-react";
 import { aiApi } from "@/api/ai";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import NorbyMark from "@/components/shared/Logo";
+import AiOrb from "@/components/shared/AiOrb";
 
 export default function AIAnalyst() {
   const [messages, setMessages] = useState([]);
@@ -108,15 +109,25 @@ export default function AIAnalyst() {
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {messages.length === 0 && !loading && (
+            <div className="h-full flex flex-col items-center justify-center gap-3 text-center">
+              <AiOrb size={56} />
+              <p className="text-sm font-medium text-norby-ivory mt-1">
+                No que posso ajudar?
+              </p>
+              <p className="text-xs text-norby-ivory/50 max-w-xs leading-relaxed">
+                Pergunte sobre seus gastos, suas metas ou peça dicas de
+                economia — a Norby responde com base nos seus dados.
+              </p>
+            </div>
+          )}
           {messages.map((msg, i) => (
             <div
               key={i}
               className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
             >
               {msg.role === "assistant" && (
-                <div className="w-7 h-7 rounded-lg bg-norby-teal/15 flex items-center justify-center shrink-0 mr-2 mt-0.5">
-                  <BrainCircuit size={18} className="text-norby-teal" />
-                </div>
+                <AiOrb size={28} pulse={false} className="mr-2 mt-0.5" />
               )}
               <div
                 className={`max-w-[70%] px-4 py-3 rounded-2xl text-sm leading-relaxed ${
@@ -131,15 +142,13 @@ export default function AIAnalyst() {
           ))}
           {loading && (
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-norby-teal/15 flex items-center justify-center">
-                <BrainCircuit size={13} className="text-norby-teal" />
-              </div>
+              <AiOrb size={28} />
               <div className="glass-card px-4 py-3 flex gap-1.5">
                 {[0, 1, 2].map((i) => (
                   <span
                     key={i}
-                    className="w-1.5 h-1.5 rounded-full bg-norby-ivory/30 animate-bounce"
-                    style={{ animationDelay: `${i * 0.15}s` }}
+                    className="w-1.5 h-1.5 rounded-full bg-norby-ivory/40 animate-pulse"
+                    style={{ animationDelay: `${i * 0.2}s` }}
                   />
                 ))}
               </div>

@@ -30,7 +30,8 @@ const prefItems = [
 
 // Item de navegação: ativo = estrela-norte teal + texto ivory sobre fundo
 // sutil (o teal chapado fica reservado ao CTA primário — ver DESIGN.md).
-function NavItem({ to, icon: Icon, label }) {
+function NavItem({ to, icon, label }) {
+  const Icon = icon;
   return (
     <NavLink
       to={to}
