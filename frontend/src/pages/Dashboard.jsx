@@ -1,21 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  TrendingUp,
-  TrendingDown,
   Plus,
   Minus,
   ArrowRight,
   ArrowUpRight,
   ArrowDownRight,
-  Flame,
-  Target,
+  AlertTriangle,
+  Check,
+  Sparkles,
 } from "lucide-react";
 import {
   AreaChart,
   Area,
   XAxis,
-  YAxis,
   Tooltip,
   ResponsiveContainer,
   PieChart,
@@ -34,7 +32,7 @@ import { Select } from "@/components/ui/select";
 import NorthStar from "@/components/shared/NorthStar";
 import AiOrb from "@/components/shared/AiOrb";
 import { useAuthStore } from "@/store/authStore";
-import { formatDateBR, formatBRL } from "@/lib/utils";
+import { formatDateBR, formatBRL, parseDateOnly } from "@/lib/utils";
 
 // Rótulo curto pt-BR de uma chave ano-mês ("2026-07" → "jul"), em horário local.
 const monthLabel = (ym) => {
@@ -66,8 +64,47 @@ const EXPENSE_COLOR = "#E0725C";
 
 const axisTick = { fill: "rgba(239,250,248,0.40)", fontSize: 11 };
 
-const fmtShort = (v) =>
-  Number(v) >= 1000 ? `${(v / 1000).toFixed(1)}k` : `${v}`;
+// Emoji por categoria (rascunho aprovado): chip visual das movimentações.
+const CATEGORY_EMOJI = {
+  "Alimentação": "🍔",
+  "Moradia": "🏠",
+  "Transporte": "🚇",
+  "Saúde": "💊",
+  "Educação": "📚",
+  "Lazer": "🎬",
+  "Compras": "🛍️",
+  "Contas & Serviços": "🧾",
+  "Salário": "💼",
+  "Freelance/Extra": "💰",
+  "Investimentos": "📈",
+  "Reembolso": "↩️",
+  "Presente": "🎁",
+};
+const emojiFor = (t) =>
+  CATEGORY_EMOJI[t.category] ?? (t.type === "INCOME" ? "🪙" : "💸");
+
+// "Hoje" / "Ontem" / "N dias atrás" / dd/mm/aaaa — para as movimentações.
+function relativeDay(value) {
+  const d = parseDateOnly(value);
+  if (!d) return "";
+  const today = new Date();
+  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const diff = Math.round((startOfToday - d) / 86_400_000);
+  if (diff <= 0) return "Hoje";
+  if (diff === 1) return "Ontem";
+  if (diff < 7) return `${diff} dias atrás`;
+  return formatDateBR(value);
+}
+
+// Ícone contextual dos insights da IA (heurística simples em pt-BR).
+function insightStyle(text) {
+  const t = text.toLowerCase();
+  if (/(caminho certo|parab|bom |ótimo|no azul|guarda|econom|caíram|caiu|reduz)/.test(t))
+    return { Icon: Check, chip: "bg-norby-income/15 text-norby-income", bg: "bg-norby-income/[0.07]" };
+  if (/(crítico|urgente|déficit|acima|estour|exced|negativ|cuidado|risco|falta|imped|ausência|não )/.test(t))
+    return { Icon: AlertTriangle, chip: "bg-norby-danger/15 text-norby-danger", bg: "bg-norby-danger/[0.07]" };
+  return { Icon: Sparkles, chip: "bg-norby-teal/15 text-norby-teal", bg: "bg-white/[0.03]" };
+}
 
 // Janela do heatmap "Ritmo financeiro" (dias, terminando hoje)
 const STREAK_DAYS = 42;
@@ -115,7 +152,7 @@ function ChartTooltip({ active, payload, label }) {
   );
 }
 
-// Valor monetário grande com centavos rebaixados ("R$ 8.240" + ",50")
+// Valor monetário grande com centavos em teal-soft ("R$ 8.240" + ",50")
 function MoneyHero({ value }) {
   const formatted = formatBRL(value);
   const idx = formatted.lastIndexOf(",");
@@ -124,7 +161,7 @@ function MoneyHero({ value }) {
       <span className="text-4xl font-semibold text-norby-ivory">
         {formatted.slice(0, idx)}
       </span>
-      <span className="text-2xl font-semibold text-norby-ivory/50">
+      <span className="text-2xl font-semibold text-norby-teal-soft">
         {formatted.slice(idx)}
       </span>
     </span>
@@ -209,9 +246,27 @@ export default function Dashboard() {
     value: parseFloat(c.total),
   }));
   const categoryTotal = categoryData.reduce((sum, c) => sum + c.value, 0);
+  const categoryMax = Math.max(1, ...categoryData.map((c) => c.value));
   const topCategoryPct = categoryTotal
     ? Math.round((categoryData[0]?.value / categoryTotal) * 100)
     : 0;
+
+  // Ponto de fim de linha do fluxo de caixa (detalhe do rascunho aprovado)
+  const endDot = (color) =>
+    function EndDot({ cx, cy, index }) {
+      if (index !== cashFlowData.length - 1) return <g key={index} />;
+      return (
+        <circle
+          key={index}
+          cx={cx}
+          cy={cy}
+          r={4.5}
+          fill="#0E1B19"
+          stroke={color}
+          strokeWidth={2.5}
+        />
+      );
+    };
 
   // ── Ritmo financeiro: 42 dias, "no azul" = receitas ≥ despesas no dia ──
   const { streakCells, streakCount, hasStreakActivity } = useMemo(() => {
@@ -267,6 +322,13 @@ export default function Dashboard() {
   const todayLabel = new Date()
     .toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "long" })
     .replace(".", "");
+  // "julho de 2026" → "Julho de 2026" (capitalize do CSS pegaria o "De" também)
+  const rawMonthYear = new Date().toLocaleDateString("pt-BR", {
+    month: "long",
+    year: "numeric",
+  });
+  const monthYearLabel =
+    rawMonthYear.charAt(0).toUpperCase() + rawMonthYear.slice(1);
 
   if (loading) {
     return (
@@ -288,9 +350,9 @@ export default function Dashboard() {
     navigate("/transactions", { state: { newType: type } });
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {/* ── Linha 1: hero + saldo total ─────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-5">
+      <div className="grid grid-cols-[1.15fr_1fr] gap-4">
         {/* Hero: saudação + convite à IA */}
         <div
           className="relative overflow-hidden rounded-3xl p-7 flex flex-col animate-fade-up"
@@ -300,25 +362,25 @@ export default function Dashboard() {
           }}
         >
           {/* Círculos decorativos, como no rascunho aprovado */}
-          <div className="absolute -right-16 -top-24 w-72 h-72 rounded-full bg-white/[0.08] pointer-events-none" />
-          <div className="absolute right-20 bottom-[-70px] w-44 h-44 rounded-full bg-norby-night/[0.08] pointer-events-none" />
+          <div className="absolute -right-10 -top-10 w-56 h-56 rounded-full bg-white/[0.08] pointer-events-none" />
+          <div className="absolute right-5 -bottom-16 w-40 h-40 rounded-full bg-norby-night/[0.16] pointer-events-none" />
 
-          <span className="relative inline-flex items-center gap-1.5 w-fit rounded-full bg-norby-night/20 px-3 py-1 text-[11px] font-semibold text-norby-night uppercase tracking-widest">
+          <span className="relative inline-flex items-center gap-1.5 w-fit rounded-full bg-white/25 px-3 py-1 text-[11px] font-semibold text-norby-night/80 uppercase tracking-widest">
             <span className="w-1.5 h-1.5 rounded-full bg-norby-night/70" />
             {todayLabel}
           </span>
 
-          <h1 className="relative text-3xl font-bold text-norby-night mt-4 tracking-tight">
+          <h1 className="relative text-3xl font-bold text-norby-night mt-3.5 tracking-tight">
             Olá, {firstName} 👋
           </h1>
-          <p className="relative text-sm text-norby-night/70 mt-1.5 max-w-xs leading-relaxed">
+          <p className="relative text-sm text-norby-night/70 mt-1.5 max-w-sm leading-relaxed">
             Pergunte qualquer coisa sobre suas finanças — a Norby está pronta.
           </p>
 
-          <div className="relative mt-auto pt-6">
+          <div className="relative mt-auto pt-5">
             <Button
               onClick={() => navigate("/ai")}
-              className="bg-norby-night text-norby-ivory hover:bg-norby-night/85"
+              className="bg-norby-night text-norby-teal-soft hover:bg-norby-night/85"
             >
               Falar com a Norby <ArrowRight size={15} />
             </Button>
@@ -326,8 +388,15 @@ export default function Dashboard() {
         </div>
 
         {/* Saldo total */}
-        <div className="glass-card p-6 flex flex-col gap-4 animate-fade-up">
-          <div className="flex items-center justify-between gap-3">
+        <div className="relative overflow-hidden glass-card border-norby-teal/20 p-6 flex flex-col gap-4 animate-fade-up">
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background:
+                "radial-gradient(circle at 90% 12%, rgba(45,181,163,0.14), transparent 55%)",
+            }}
+          />
+          <div className="relative flex items-center justify-between gap-3">
             <span className="microlabel">Saldo total</span>
             {wallets.length > 1 && (
               <div className="w-48 shrink-0">
@@ -341,7 +410,7 @@ export default function Dashboard() {
             )}
           </div>
 
-          <div>
+          <div className="relative">
             <div className="flex items-baseline gap-2">
               <MoneyHero value={shownBalance} />
               <span className="text-xs font-medium text-norby-ivory/40">BRL</span>
@@ -363,7 +432,7 @@ export default function Dashboard() {
             )}
           </div>
 
-          <div className="flex gap-2">
+          <div className="relative flex gap-2">
             <Button
               onClick={() => newTransaction("INCOME")}
               className="flex-1 bg-norby-teal text-norby-night hover:bg-norby-teal-soft font-medium shadow-lg shadow-norby-teal/20"
@@ -373,13 +442,13 @@ export default function Dashboard() {
             <Button
               onClick={() => newTransaction("EXPENSE")}
               variant="outline"
-              className="flex-1 border-white/10 bg-white/[0.03] text-norby-ivory hover:bg-white/[0.08]"
+              className="flex-1 border-norby-teal/25 bg-norby-teal/[0.08] text-norby-teal hover:bg-norby-teal/[0.15]"
             >
               <Minus size={15} /> Despesa
             </Button>
           </div>
 
-          <div className="grid grid-cols-3 divide-x divide-white/[0.06] border-t border-white/[0.06] pt-4 mt-auto">
+          <div className="relative grid grid-cols-3 divide-x divide-white/[0.06] border-t border-dashed border-white/10 pt-4 mt-auto">
             <div className="pr-3">
               <p className="microlabel">Receitas</p>
               <p className="text-sm font-semibold text-norby-income tnum mt-1">
@@ -403,25 +472,25 @@ export default function Dashboard() {
       </div>
 
       {/* ── Linha 2: categorias + ritmo + meta ──────────────────────── */}
-      <div className="grid grid-cols-3 gap-5">
+      <div className="grid grid-cols-[1.1fr_1fr_1fr] gap-4">
         {/* Onde vai seu dinheiro */}
         <div className="glass-card p-6">
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <h2 className="font-semibold text-norby-ivory">
-                Onde vai seu dinheiro
-              </h2>
-              <p className="text-xs text-norby-ivory/50 mt-0.5 capitalize">
+          <div>
+            <h2 className="font-semibold text-norby-ivory">
+              Onde vai seu dinheiro
+            </h2>
+            <p className="text-xs text-norby-ivory/50 mt-0.5">
+              <span className="capitalize">
                 {new Date().toLocaleDateString("pt-BR", { month: "long" })}
-                {categoryTotal > 0 && (
-                  <span className="tnum"> · {formatBRL(categoryTotal)}</span>
-                )}
-              </p>
-            </div>
+              </span>
+              {categoryTotal > 0 && (
+                <span className="tnum"> · {formatBRL(categoryTotal)} no total</span>
+              )}
+            </p>
           </div>
 
           {categoryData.length === 0 ? (
-            <div className="flex items-center justify-center h-[170px] text-norby-ivory/40 text-xs text-center px-4">
+            <div className="flex items-center justify-center h-[150px] text-norby-ivory/40 text-xs text-center px-4">
               Registre despesas para ver a distribuição por categoria
             </div>
           ) : (
@@ -435,10 +504,10 @@ export default function Dashboard() {
                       nameKey="name"
                       cx="50%"
                       cy="50%"
-                      innerRadius={44}
+                      innerRadius={46}
                       outerRadius={62}
                       paddingAngle={categoryData.length > 1 ? 3 : 0}
-                      cornerRadius={4}
+                      cornerRadius={6}
                       startAngle={90}
                       endAngle={-270}
                       stroke="none"
@@ -454,35 +523,33 @@ export default function Dashboard() {
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                  <span className="text-[10px] text-norby-ivory/40 uppercase tracking-wider">
+                  <span className="text-[10px] text-norby-ivory/45 uppercase tracking-widest">
                     Maior
                   </span>
-                  <span className="text-lg font-bold text-norby-ivory tnum">
+                  <span className="text-[15px] font-semibold text-norby-teal-soft tnum mt-0.5">
                     {topCategoryPct}%
                   </span>
                 </div>
               </div>
 
-              {/* Legenda: cor + categoria + % (valor no tooltip do donut) */}
+              {/* Legenda: quadradinho de cor + categoria + % (valor no tooltip) */}
               <div className="flex-1 flex flex-col gap-2 min-w-0">
                 {categoryData.map((c, i) => {
                   const pct = categoryTotal
                     ? Math.round((c.value / categoryTotal) * 100)
                     : 0;
                   return (
-                    <div key={c.name} className="flex items-center gap-2.5">
+                    <div key={c.name} className="flex items-center gap-2 text-xs">
                       <span
-                        className="w-2 h-2 rounded-full shrink-0"
+                        className="w-2 h-2 rounded-[3px] shrink-0"
                         style={{
                           background: CATEGORY_COLORS[i % CATEGORY_COLORS.length],
                         }}
                       />
-                      <span className="text-xs text-norby-ivory/80 flex-1 truncate">
+                      <span className="text-norby-ivory/75 flex-1 truncate">
                         {c.name}
                       </span>
-                      <span className="text-xs font-semibold text-norby-ivory tnum">
-                        {pct}%
-                      </span>
+                      <span className="text-norby-ivory/55 tnum">{pct}%</span>
                     </div>
                   );
                 })}
@@ -504,22 +571,26 @@ export default function Dashboard() {
             </div>
             {hasStreakActivity && streakCount > 0 && (
               <span className="chip bg-norby-teal/15 text-norby-teal">
-                <Flame size={12} /> {streakCount}
+                🔥 {streakCount}
               </span>
             )}
           </div>
 
           <div
-            className="grid gap-1.5 mt-5"
+            className="grid gap-1 mt-4"
             style={{ gridTemplateColumns: "repeat(14, minmax(0, 1fr))" }}
           >
-            {streakCells.map((cell) => (
+            {streakCells.map((cell, i) => (
               <div
                 key={cell.key}
                 title={`${formatDateBR(cell.key)} · ${
                   cell.active ? formatBRL(cell.net) : "sem lançamentos"
                 }`}
-                className={`aspect-square rounded-[4px] ${cellClass(cell)}`}
+                className={`aspect-square rounded-[3px] ${cellClass(cell)} ${
+                  i === streakCells.length - 1
+                    ? "ring-1 ring-norby-teal ring-offset-1 ring-offset-norby-surface"
+                    : ""
+                }`}
               />
             ))}
           </div>
@@ -540,12 +611,19 @@ export default function Dashboard() {
         </div>
 
         {/* Meta em destaque */}
-        <div className="glass-card p-6 flex flex-col">
+        <div className="relative overflow-hidden glass-card border-norby-income/25 p-6 flex flex-col">
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background:
+                "radial-gradient(circle at 15% 90%, rgba(95,191,126,0.13), transparent 55%)",
+            }}
+          />
           {featuredGoal ? (
             <>
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-norby-income/15 text-norby-income flex items-center justify-center shrink-0">
-                  <Target size={17} />
+              <div className="relative flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-norby-income/15 flex items-center justify-center shrink-0 text-base">
+                  🎯
                 </div>
                 <div className="min-w-0">
                   <h2 className="font-semibold text-norby-ivory truncate">
@@ -555,7 +633,7 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <div className="mt-5">
+              <div className="relative mt-4">
                 <p className="tnum tracking-tight">
                   <span className="text-2xl font-semibold text-norby-ivory">
                     {formatBRL(featuredGoal.current_amount)}
@@ -572,8 +650,11 @@ export default function Dashboard() {
                   className="h-2 rounded-full bg-white/[0.06] mt-3 overflow-hidden"
                 >
                   <div
-                    className="h-full rounded-full bg-norby-income transition-all duration-500"
-                    style={{ width: `${goalPct}%` }}
+                    className="h-full rounded-full transition-all duration-500"
+                    style={{
+                      width: `${goalPct}%`,
+                      background: "linear-gradient(90deg, #5FBF7E, #7BD88F)",
+                    }}
                   />
                 </div>
                 <p className="text-xs text-norby-ivory/50 mt-2 tnum">
@@ -584,27 +665,27 @@ export default function Dashboard() {
               <Button
                 onClick={() => navigate("/goals")}
                 variant="outline"
-                className="mt-auto w-full border-norby-income/25 bg-transparent text-norby-income hover:bg-norby-income/10"
+                className="relative mt-auto w-full border-norby-income/25 bg-norby-income/[0.08] text-norby-income hover:bg-norby-income/[0.15]"
               >
                 Ver todas as metas <ArrowRight size={14} />
               </Button>
             </>
           ) : (
             <>
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-norby-income/15 text-norby-income flex items-center justify-center shrink-0">
-                  <Target size={17} />
+              <div className="relative flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-norby-income/15 flex items-center justify-center shrink-0 text-base">
+                  🎯
                 </div>
                 <h2 className="font-semibold text-norby-ivory">Metas</h2>
               </div>
-              <p className="text-xs text-norby-ivory/50 leading-relaxed mt-4 flex-1">
+              <p className="relative text-xs text-norby-ivory/50 leading-relaxed mt-4 flex-1">
                 Crie uma meta de reserva para acompanhar o progresso dela aqui
                 no painel.
               </p>
               <Button
                 onClick={() => navigate("/goals")}
                 variant="outline"
-                className="mt-4 w-full border-norby-income/25 bg-transparent text-norby-income hover:bg-norby-income/10"
+                className="relative mt-4 w-full border-norby-income/25 bg-norby-income/[0.08] text-norby-income hover:bg-norby-income/[0.15]"
               >
                 Criar uma meta <ArrowRight size={14} />
               </Button>
@@ -614,13 +695,13 @@ export default function Dashboard() {
       </div>
 
       {/* ── Linha 3: fluxo de caixa + leitura da IA ─────────────────── */}
-      <div className="grid grid-cols-3 gap-5">
-        <div className="glass-card p-6 col-span-2">
+      <div className="grid grid-cols-[2fr_1fr] gap-4">
+        <div className="glass-card p-6">
           <div className="flex items-start justify-between mb-4">
             <div>
-              <h2 className="font-semibold text-norby-ivory">Fluxo de Caixa</h2>
+              <h2 className="font-semibold text-norby-ivory">Fluxo de caixa</h2>
               <p className="text-xs text-norby-ivory/50 mt-0.5">
-                Entradas e saídas dos últimos meses
+                Entradas vs. saídas · últimos meses
               </p>
             </div>
             <div className="flex items-center gap-4 text-xs">
@@ -641,27 +722,26 @@ export default function Dashboard() {
             </div>
           </div>
           {cashFlowData.length === 0 ? (
-            <div className="flex items-center justify-center h-[220px] text-norby-ivory/40 text-sm">
+            <div className="flex items-center justify-center h-[230px] text-norby-ivory/40 text-sm">
               Nenhuma transação registrada ainda
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height={220}>
+            <ResponsiveContainer width="100%" height={230}>
               <AreaChart
                 data={cashFlowData}
-                margin={{ top: 8, right: 8, left: -16, bottom: 0 }}
+                margin={{ top: 12, right: 12, left: 12, bottom: 0 }}
               >
                 <defs>
                   <linearGradient id="gIncome" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={INCOME_COLOR} stopOpacity={0.3} />
+                    <stop offset="0%" stopColor={INCOME_COLOR} stopOpacity={0.28} />
                     <stop offset="100%" stopColor={INCOME_COLOR} stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="gExpense" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={EXPENSE_COLOR} stopOpacity={0.28} />
+                    <stop offset="0%" stopColor={EXPENSE_COLOR} stopOpacity={0.22} />
                     <stop offset="100%" stopColor={EXPENSE_COLOR} stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid
-                  strokeDasharray="3 3"
                   stroke="rgba(255,255,255,0.05)"
                   vertical={false}
                 />
@@ -670,14 +750,8 @@ export default function Dashboard() {
                   axisLine={false}
                   tickLine={false}
                   tick={axisTick}
+                  dy={8}
                   className="capitalize"
-                />
-                <YAxis
-                  axisLine={false}
-                  tickLine={false}
-                  tick={axisTick}
-                  tickFormatter={fmtShort}
-                  width={48}
                 />
                 <Tooltip
                   content={<ChartTooltip />}
@@ -687,18 +761,18 @@ export default function Dashboard() {
                   type="monotone"
                   dataKey="Entradas"
                   stroke={INCOME_COLOR}
-                  strokeWidth={2.5}
+                  strokeWidth={2.6}
                   fill="url(#gIncome)"
-                  dot={false}
+                  dot={endDot(INCOME_COLOR)}
                   activeDot={{ r: 4, strokeWidth: 0 }}
                 />
                 <Area
                   type="monotone"
                   dataKey="Saídas"
                   stroke={EXPENSE_COLOR}
-                  strokeWidth={2.5}
+                  strokeWidth={2.6}
                   fill="url(#gExpense)"
-                  dot={false}
+                  dot={endDot(EXPENSE_COLOR)}
                   activeDot={{ r: 4, strokeWidth: 0 }}
                 />
               </AreaChart>
@@ -707,13 +781,13 @@ export default function Dashboard() {
         </div>
 
         {/* Leitura da IA */}
-        <div className="glass-card p-6 flex flex-col gap-3">
+        <div className="glass-card border-norby-teal/20 p-6 flex flex-col gap-3">
           <div className="flex items-center gap-3">
             <AiOrb size={34} />
             <div>
               <h2 className="font-semibold text-norby-ivory">Leitura da IA</h2>
-              <p className="text-xs text-norby-ivory/50">
-                Resumo do seu comportamento financeiro
+              <p className="text-[11px] text-norby-teal-soft tracking-wide">
+                resumo do seu comportamento
               </p>
             </div>
           </div>
@@ -723,14 +797,34 @@ export default function Dashboard() {
             </div>
           ) : (
             <div className="flex flex-col gap-2 flex-1">
-              {insightItems.map((item, i) => (
-                <div
-                  key={i}
-                  className="p-3 rounded-xl bg-white/[0.03] text-xs text-norby-ivory/80 leading-relaxed"
-                >
-                  {item.trim()}
-                </div>
-              ))}
+              {insightItems.map((item, i) => {
+                const text = item.trim();
+                // 1º insight = destaque; demais ganham chip de ícone contextual
+                if (i === 0) {
+                  return (
+                    <div
+                      key={i}
+                      className="p-3.5 rounded-xl bg-norby-night/60 border border-white/[0.06] text-[13px] text-norby-ivory/85 leading-relaxed"
+                    >
+                      {text}
+                    </div>
+                  );
+                }
+                const { Icon, chip, bg } = insightStyle(text);
+                return (
+                  <div
+                    key={i}
+                    className={`flex items-start gap-2.5 p-3 rounded-xl ${bg} text-xs text-norby-ivory/75 leading-relaxed`}
+                  >
+                    <span
+                      className={`shrink-0 w-5 h-5 rounded-md flex items-center justify-center mt-0.5 ${chip}`}
+                    >
+                      <Icon size={12} />
+                    </span>
+                    {text}
+                  </div>
+                );
+              })}
             </div>
           )}
 
@@ -744,36 +838,92 @@ export default function Dashboard() {
               </p>
             </div>
           )}
+
+          <Button
+            onClick={() => navigate("/ai")}
+            variant="outline"
+            className="w-full border-norby-teal/40 bg-transparent text-norby-teal hover:bg-norby-teal/10"
+          >
+            Conversar com a Norby <ArrowRight size={14} />
+          </Button>
         </div>
       </div>
 
-      {/* ── Linha 4: movimentações recentes + resumo do mês ─────────── */}
-      <div className="glass-card p-6">
-        <div className="flex items-center justify-between mb-3">
-          <div>
+      {/* ── Linha 4: gastos por categoria + movimentações recentes ──── */}
+      <div className="grid grid-cols-[1fr_1.15fr] gap-4">
+        {/* Gastos por categoria (barras) */}
+        <div className="glass-card p-6">
+          <div className="flex items-center justify-between mb-5">
             <h2 className="font-semibold text-norby-ivory">
-              Movimentações Recentes
+              Gastos por categoria
             </h2>
-            <p className="text-xs text-norby-ivory/50">
-              Últimos lançamentos registrados
-            </p>
+            <span className="text-xs text-norby-ivory/45">
+              {monthYearLabel}
+            </span>
           </div>
-          <Button
-            onClick={() => navigate("/transactions")}
-            variant="ghost"
-            size="sm"
-            className="text-norby-ivory/60 hover:text-norby-ivory hover:bg-white/5"
-          >
-            Ver todas <ArrowRight size={13} />
-          </Button>
+
+          {categoryData.length === 0 ? (
+            <div className="flex items-center justify-center h-[150px] text-norby-ivory/40 text-xs text-center px-4">
+              Registre despesas para ver o ranking de categorias
+            </div>
+          ) : (
+            <div className="flex flex-col gap-4">
+              {categoryData.map((c, i) => {
+                const width = Math.max(6, (c.value / categoryMax) * 92);
+                const barOpacity = [1, 0.55, 0.45, 0.4, 0.35][i] ?? 0.3;
+                return (
+                  <div key={c.name}>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[13px] text-norby-ivory/75">
+                        {c.name}
+                      </span>
+                      <span
+                        className={`text-[13px] tnum ${
+                          i === 0
+                            ? "font-semibold text-norby-teal-soft"
+                            : "font-medium text-norby-ivory/60"
+                        }`}
+                      >
+                        {formatBRL(c.value)}
+                      </span>
+                    </div>
+                    <div className="h-2 rounded-full bg-white/[0.06] overflow-hidden">
+                      <div
+                        className="h-full rounded-full"
+                        style={{
+                          width: `${width}%`,
+                          background: `rgba(45,181,163,${barOpacity})`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
-        <div className="flex gap-6">
-          <div className="flex-1 flex flex-col min-w-0">
+        {/* Movimentações recentes */}
+        <div className="glass-card p-6 flex flex-col">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-semibold text-norby-ivory">
+              Movimentações recentes
+            </h2>
+            <Button
+              onClick={() => navigate("/transactions")}
+              variant="ghost"
+              size="sm"
+              className="text-norby-teal hover:text-norby-teal-soft hover:bg-norby-teal/10"
+            >
+              Ver todas <ArrowRight size={13} />
+            </Button>
+          </div>
+
+          <div className="flex flex-col flex-1">
             {transactions.length === 0 ? (
               <div className="flex-1 flex items-center justify-center text-norby-ivory/40 text-xs text-center py-8">
-                Nenhuma movimentação ainda — use “+ Receita” ou “− Despesa” para
-                começar
+                Nenhuma movimentação ainda — use “+ Receita” ou “− Despesa”
+                para começar
               </div>
             ) : (
               transactions.slice(0, 5).map((t) => {
@@ -784,31 +934,24 @@ export default function Dashboard() {
                     className="flex items-center justify-between py-2.5 border-b border-white/5 last:border-0"
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <div
-                        className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                          isIncome
-                            ? "bg-norby-income/15 text-norby-income"
-                            : "bg-norby-danger/15 text-norby-danger"
-                        }`}
-                      >
-                        {isIncome ? (
-                          <ArrowUpRight size={16} />
-                        ) : (
-                          <ArrowDownRight size={16} />
-                        )}
+                      <div className="w-9 h-9 rounded-[10px] bg-norby-surface2 flex items-center justify-center shrink-0 text-base">
+                        {emojiFor(t)}
                       </div>
                       <div className="min-w-0">
-                        <p className="text-sm font-medium text-norby-ivory truncate">
+                        <p className="text-[13px] font-medium text-norby-ivory truncate">
                           {t.category}
                         </p>
-                        <p className="text-xs text-norby-ivory/40">
-                          {formatDateBR(t.date)}
+                        <p className="text-xs text-norby-ivory/40 truncate">
+                          {relativeDay(t.date)}
+                          {t.description && ` · ${t.description}`}
                         </p>
                       </div>
                     </div>
                     <p
-                      className={`text-sm font-semibold tnum shrink-0 ${
-                        isIncome ? "text-norby-income" : "text-norby-ivory"
+                      className={`text-[13px] tnum shrink-0 ${
+                        isIncome
+                          ? "font-semibold text-norby-income"
+                          : "font-medium text-norby-ivory/60"
                       }`}
                     >
                       {isIncome ? "+" : "−"} {formatBRL(parseFloat(t.amount))}
@@ -817,30 +960,6 @@ export default function Dashboard() {
                 );
               })
             )}
-          </div>
-
-          <div className="w-60 shrink-0 flex flex-col gap-2">
-            <div className="p-4 rounded-2xl bg-white/[0.03]">
-              <p className="text-xs text-norby-ivory/40">Saldo do mês</p>
-              <p
-                className={`text-sm font-bold mt-1 tnum flex items-center gap-1 ${
-                  monthNet >= 0 ? "text-norby-income" : "text-norby-danger"
-                }`}
-              >
-                {monthNet >= 0 ? (
-                  <TrendingUp size={13} />
-                ) : (
-                  <TrendingDown size={13} />
-                )}
-                {formatBRL(monthNet)}
-              </p>
-            </div>
-            <div className="p-4 rounded-2xl bg-norby-teal/10 border border-norby-teal/20">
-              <p className="text-xs text-norby-teal">Maior gasto</p>
-              <p className="text-sm font-bold text-norby-ivory mt-1 truncate">
-                {categoryData[0]?.name || "—"}
-              </p>
-            </div>
           </div>
         </div>
       </div>
