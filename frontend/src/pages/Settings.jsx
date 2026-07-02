@@ -7,6 +7,23 @@ import { accountApi } from "@/api/account";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
+// Header padrão de seção: ícone em chip teal + título.
+function SectionHead({ icon, children, danger }) {
+  const Icon = icon;
+  return (
+    <div className="flex items-center gap-3 mb-5">
+      <div
+        className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+          danger ? "bg-norby-danger/12 text-norby-danger" : "bg-norby-teal/12 text-norby-teal"
+        }`}
+      >
+        <Icon size={16} />
+      </div>
+      <h2 className="font-semibold text-norby-ivory">{children}</h2>
+    </div>
+  );
+}
+
 export default function Settings() {
   const { user, updateUser } = useAuthStore();
   const navigate = useNavigate();
@@ -73,103 +90,128 @@ export default function Settings() {
   }
 
   const inputCls =
-    "bg-white/5 border-white/10 text-norby-ivory placeholder:text-norby-ivory/40";
+    "bg-norby-night border-white/10 text-norby-ivory placeholder:text-norby-ivory/40";
+
+  const memberSince = user?.created_at
+    ? new Date(user.created_at).toLocaleDateString("pt-BR", {
+        month: "long",
+        year: "numeric",
+      })
+    : null;
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="max-w-2xl mx-auto space-y-5">
       <div>
         <h1 className="text-3xl font-bold text-norby-ivory tracking-tight">
           Configurações
         </h1>
-        <p className="text-norby-ivory/50 text-sm mt-1">Gerencie seu perfil</p>
+        <p className="text-norby-ivory/50 text-sm mt-1">
+          Gerencie sua conta, segurança e privacidade.
+        </p>
       </div>
 
       {/* Perfil */}
-      <div className="glass-card p-6 space-y-6">
-        <div className="flex items-center gap-3 mb-2">
-          <User size={20} className="text-norby-teal" />
-          <h2 className="font-semibold text-norby-ivory">Perfil</h2>
-        </div>
-        <div className="flex items-center gap-4 mb-4">
-          <div className="w-16 h-16 rounded-3xl bg-norby-teal flex items-center justify-center text-2xl font-bold text-norby-night">
-            {user?.name?.[0]?.toUpperCase()}
+      <div className="glass-card p-6">
+        <SectionHead icon={User}>Perfil</SectionHead>
+
+        <div className="flex items-center gap-4 mb-6">
+          <div className="w-16 h-16 rounded-full bg-norby-teal flex items-center justify-center text-2xl font-bold text-norby-night shrink-0">
+            {user?.name?.[0]?.toUpperCase() || "U"}
           </div>
           <div>
-            <p className="font-medium text-norby-ivory">{user?.name}</p>
-            <p className="text-sm text-norby-ivory/50">{user?.email}</p>
+            <p className="font-semibold text-norby-ivory">{user?.name}</p>
+            <p className="text-sm text-norby-ivory/50">
+              {memberSince ? `Membro desde ${memberSince}` : user?.email}
+            </p>
           </div>
         </div>
-        <Input
-          placeholder="Nome"
-          value={form.name}
-          onChange={(e) => setForm({ ...form, name: e.target.value })}
-          className={inputCls}
-        />
-        <Input
-          type="email"
-          placeholder="Email"
-          value={form.email}
-          onChange={(e) => setForm({ ...form, email: e.target.value })}
-          className={inputCls}
-        />
-        {error && <p className="text-norby-danger text-xs">{error}</p>}
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-medium text-norby-ivory/60 mb-2">
+              Nome completo
+            </label>
+            <Input
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              className={inputCls}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-norby-ivory/60 mb-2">
+              E-mail
+            </label>
+            <Input
+              type="email"
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              className={inputCls}
+            />
+          </div>
+        </div>
+
+        {error && <p className="text-norby-danger text-xs mt-3">{error}</p>}
+
         <Button
           onClick={handleSave}
-          className="bg-norby-teal hover:bg-norby-teal-soft text-norby-night font-medium"
+          className="mt-5 bg-norby-teal hover:bg-norby-teal-soft text-norby-night font-medium"
         >
-          <Save size={15} className="mr-1.5" />
-          {saved ? "Salvo!" : "Salvar alterações"}
+          <Save size={15} /> {saved ? "Salvo!" : "Salvar alterações"}
         </Button>
       </div>
 
       {/* Segurança */}
-      <div className="glass-card p-6 space-y-6">
-        <div className="flex items-center gap-3">
-          <Lock size={18} className="text-norby-teal" />
-          <h2 className="font-semibold text-norby-ivory">Segurança</h2>
+      <div className="glass-card p-6">
+        <SectionHead icon={Lock}>Segurança</SectionHead>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium text-norby-ivory">Senha</p>
+            <p className="text-xs text-norby-ivory/45 mt-1 max-w-md leading-relaxed">
+              Sua senha é armazenada com hash bcrypt. Para alterá-la, entre em
+              contato com o suporte.
+            </p>
+          </div>
         </div>
-        <p className="text-sm text-norby-ivory/60">
-          Sua senha é armazenada com hash bcrypt. Para alterar, entre em contato
-          com o suporte.
-        </p>
       </div>
 
       {/* Privacidade e dados (LGPD) */}
-      <div className="glass-card p-6 space-y-4">
-        <div className="flex items-center gap-3">
-          <ShieldCheck size={18} className="text-norby-teal" />
-          <h2 className="font-semibold text-norby-ivory">Privacidade e dados</h2>
+      <div className="glass-card p-6">
+        <SectionHead icon={ShieldCheck}>Privacidade e dados</SectionHead>
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex-1">
+            <p className="text-sm font-medium text-norby-ivory">
+              Exportar meus dados
+            </p>
+            <p className="text-xs text-norby-ivory/45 mt-1 max-w-md leading-relaxed">
+              Baixe uma cópia de tudo a qualquer momento. Veja como tratamos
+              suas informações na{" "}
+              <Link to="/privacidade" className="text-norby-teal hover:underline">
+                Política de Privacidade
+              </Link>{" "}
+              e nos{" "}
+              <Link to="/termos" className="text-norby-teal hover:underline">
+                Termos de Uso
+              </Link>
+              .
+            </p>
+          </div>
+          <Button
+            onClick={handleExport}
+            disabled={exporting}
+            variant="outline"
+            className="shrink-0 border-norby-teal/40 bg-transparent text-norby-teal hover:bg-norby-teal/10"
+          >
+            <Download size={15} /> {exporting ? "Exportando…" : "Exportar"}
+          </Button>
         </div>
-        <p className="text-sm text-norby-ivory/60">
-          Você pode baixar uma cópia de todos os seus dados a qualquer momento.
-          Veja como tratamos suas informações na{" "}
-          <Link to="/privacidade" className="text-norby-teal hover:underline">
-            Política de Privacidade
-          </Link>{" "}
-          e nos{" "}
-          <Link to="/termos" className="text-norby-teal hover:underline">
-            Termos de Uso
-          </Link>
-          .
-        </p>
-        <Button
-          onClick={handleExport}
-          disabled={exporting}
-          variant="outline"
-          className="border-norby-teal/40 text-norby-teal hover:bg-norby-teal hover:text-norby-night"
-        >
-          <Download size={15} className="mr-1.5" />
-          {exporting ? "Exportando..." : "Exportar meus dados"}
-        </Button>
       </div>
 
       {/* Zona de perigo: exclusão definitiva (LGPD) */}
-      <div className="glass-card p-6 space-y-4 border border-norby-danger/30">
-        <div className="flex items-center gap-3">
-          <Trash2 size={18} className="text-norby-danger" />
-          <h2 className="font-semibold text-norby-ivory">Excluir minha conta</h2>
-        </div>
-        <p className="text-sm text-norby-ivory/60">
+      <div className="glass-card border-norby-danger/30 p-6">
+        <SectionHead icon={Trash2} danger>
+          Excluir minha conta
+        </SectionHead>
+        <p className="text-sm text-norby-ivory/60 leading-relaxed">
           Esta ação é <strong>permanente</strong>. Todos os seus dados serão
           apagados de verdade dos nossos bancos (incluindo histórico da IA) e não
           poderão ser recuperados. Para confirmar, digite{" "}
@@ -179,33 +221,35 @@ export default function Settings() {
           placeholder="Digite EXCLUIR para confirmar"
           value={confirmText}
           onChange={(e) => setConfirmText(e.target.value)}
-          className={inputCls}
+          className={`${inputCls} mt-4`}
         />
-        {dangerError && <p className="text-norby-danger text-xs">{dangerError}</p>}
+        {dangerError && <p className="text-norby-danger text-xs mt-2">{dangerError}</p>}
         <Button
           onClick={handleDeleteAccount}
           disabled={confirmText !== "EXCLUIR" || deleting}
-          className="bg-norby-danger hover:bg-norby-danger/80 text-norby-ivory disabled:opacity-40"
+          className="mt-4 bg-norby-danger hover:bg-norby-danger/80 text-norby-ivory disabled:opacity-40"
         >
-          <Trash2 size={15} className="mr-1.5" />
-          {deleting ? "Excluindo..." : "Excluir minha conta permanentemente"}
+          <Trash2 size={15} />
+          {deleting ? "Excluindo…" : "Excluir minha conta permanentemente"}
         </Button>
       </div>
 
-      {/* Logout */}
-      <div className="glass-card p-6">
-        <div className="flex items-center justify-between">
-          <h2 className="font-semibold text-norby-ivory">Sair da Conta</h2>
-          <p className="text-sm text-norby-ivory/50 mt-1">
-            Você será redirecionado para o login
+      {/* Encerrar sessão */}
+      <div className="glass-card border-norby-danger/25 p-5 flex items-center justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold text-norby-ivory">
+            Encerrar sessão
+          </p>
+          <p className="text-xs text-norby-ivory/45 mt-1">
+            Você precisará entrar novamente neste dispositivo.
           </p>
         </div>
         <Button
           onClick={handleLogout}
           variant="outline"
-          className="border-norby-danger/40 text-norby-danger hover:bg-norby-danger hover:text-norby-ivory mt-4"
+          className="shrink-0 border-norby-danger/40 bg-norby-danger/10 text-norby-danger hover:bg-norby-danger hover:text-norby-ivory"
         >
-          <LogOut size={15} className="mr-1.5" /> Sair
+          <LogOut size={15} /> Sair
         </Button>
       </div>
     </div>
