@@ -83,17 +83,23 @@ npm run test     # Vitest
 ## Deploy (produção)
 
 App no ar, deploy a partir da branch `main`:
-- **Backend:** Render (Docker, free) — `https://norby-backend.onrender.com`. Dorme
-  após ~15min ocioso (cold start ~50s). Env vars no painel do Render.
-- **Postgres:** Neon (serverless, free). **Mongo:** Atlas M0 (free).
+- **Backend:** Railway (Docker, Hobby) — `https://norby-production.up.railway.app`.
+  Não dorme (sem cold start). **Root Directory = `backend`** (faz achar o
+  `backend/Dockerfile`); **Healthcheck Path = `/health`**. Env vars no painel do
+  Railway. (Migrado do Render em 2026-07-16 — só config, zero código.)
+- **Postgres:** Neon (serverless, free). **Mongo:** Atlas M0 (free). Ficam fora do
+  Railway — **não** anexar banco do próprio Railway (zeraria os dados).
 - **Frontend:** Vercel — `https://norby-finance.vercel.app`. `VITE_API_URL`
-  aponta pro Render (**embutida no build** → mudou, tem que rebuildar).
+  aponta pro Railway (**embutida no build** → mudou, tem que rebuildar).
 
 Start em produção: `backend/start.sh` roda `alembic upgrade head` + uvicorn na
 `$PORT` do provedor (o `CMD` do `backend/Dockerfile`; o `docker-compose.yml` de
 dev sobrescreve com `--reload`).
 
 **Armadilhas já resolvidas (não reintroduzir):**
+- `VITE_API_URL` na Vercel **tem que ser `https://`**. Com `http://`, o Railway
+  responde 301 → https e o redirect rebaixa **POST→GET** → todo POST (login,
+  `/recurring/run`) vira 405, mesmo com `/health` e o backend ok.
 - `asyncpg` rejeita params libpq (`sslmode`, `channel_binding`) que o Neon manda
   na URL. `app/config.py` (`async_database_url` + `database_ssl_required`) e
   `alembic/env.py` removem esses params e ligam SSL via `connect_args`.
@@ -101,9 +107,9 @@ dev sobrescreve com `--reload`).
   navegador nunca tem barra), separada por vírgula do `localhost`.
 
 **`docker-compose.prod.yml` + `Caddyfile`:** rota **alternativa self-hosted (VPS)**,
-**não usada** pelo deploy atual no Render. Sobem backend + Postgres + Mongo num
+**não usada** pelo deploy atual no Railway. Sobem backend + Postgres + Mongo num
 único servidor, com Caddy fazendo HTTPS automático (Let's Encrypt). Mantidos como
-caminho documentado para uma futura migração pra VPS — se um dia sair do Render,
+caminho documentado para uma futura migração pra VPS — se um dia sair do Railway,
 começar por eles.
 
 ## Escopo congelado — v1 (2026-06-23)
