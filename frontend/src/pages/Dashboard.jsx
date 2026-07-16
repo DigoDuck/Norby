@@ -33,6 +33,7 @@ import NorthStar from "@/components/shared/NorthStar";
 import AiOrb from "@/components/shared/AiOrb";
 import { useAuthStore } from "@/store/authStore";
 import { formatDateBR, formatBRL, parseDateOnly } from "@/lib/utils";
+import { computeRitmo, headroom } from "@/lib/ritmo";
 
 // Rótulo curto pt-BR de uma chave ano-mês ("2026-07" → "jul"), em horário local.
 const monthLabel = (ym) => {
@@ -108,10 +109,6 @@ function insightStyle(text) {
 
 // Janela do heatmap "Ritmo financeiro" (dias, terminando hoje)
 const STREAK_DAYS = 42;
-
-const pad2 = (n) => String(n).padStart(2, "0");
-const dayKey = (d) =>
-  `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 
 // Meses (1-12/ano) que a janela de N dias terminando hoje atravessa.
 function monthsForWindow(days) {
@@ -268,46 +265,22 @@ export default function Dashboard() {
       );
     };
 
-  // ── Ritmo financeiro: 42 dias, "no azul" = receitas ≥ despesas no dia ──
-  const { streakCells, streakCount, hasStreakActivity } = useMemo(() => {
-    const byDay = new Map();
-    for (const t of streakTx) {
-      const key = String(t.date).slice(0, 10);
-      const amt = parseFloat(t.amount);
-      byDay.set(key, (byDay.get(key) || 0) + (t.type === "INCOME" ? amt : -amt));
-    }
-    const today = new Date();
-    const cells = [];
-    for (let i = STREAK_DAYS - 1; i >= 0; i--) {
-      const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
-      const key = dayKey(d);
-      const net = byDay.get(key) ?? 0;
-      cells.push({ key, net, active: byDay.has(key), blue: net >= 0 });
-    }
-    let count = 0;
-    for (let i = cells.length - 1; i >= 0 && cells[i].blue; i--) count++;
-    return {
-      streakCells: cells,
-      streakCount: count,
-      hasStreakActivity: byDay.size > 0,
-    };
-  }, [streakTx]);
-
-  const maxPositiveNet = Math.max(
-    1,
-    ...streakCells.filter((c) => c.net > 0).map((c) => c.net),
+  // ── Ritmo financeiro: 42 dias, "no ritmo" = gasto do dia abaixo da cota ──
+  // Regra e testes em lib/ritmo.js.
+  const ritmo = useMemo(
+    () => computeRitmo(streakTx, STREAK_DAYS, new Date()),
+    [streakTx],
   );
 
-  // Intensidade do heatmap: teal escala com o resultado do dia; vermelho = dia
-  // negativo; neutro = dia sem lançamento (conta como azul para a sequência).
+  // Intensidade do heatmap: teal escala com a folga do dia contra a cota;
+  // vermelho = estourou a cota; neutro = dia sem lançamento.
   function cellClass(cell) {
     if (!cell.active) return "bg-white/[0.06]";
-    if (!cell.blue) return "bg-norby-danger/60";
-    const ratio = cell.net / maxPositiveNet;
-    if (ratio > 0.66) return "bg-norby-teal";
-    if (ratio > 0.33) return "bg-norby-teal/70";
-    if (cell.net > 0) return "bg-norby-teal/40";
-    return "bg-norby-teal/20"; // dia ativo com resultado zero
+    if (!cell.onPace) return "bg-norby-danger/60";
+    const folga = headroom(cell, ritmo.dailyPace);
+    if (folga > 0.66) return "bg-norby-teal";
+    if (folga > 0.33) return "bg-norby-teal/70";
+    return "bg-norby-teal/40";
   }
 
   // ── Meta em destaque: a SAVINGS mais próxima de concluir ──
@@ -558,20 +531,23 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Ritmo financeiro (streak de dias no azul) */}
+        {/* Ritmo financeiro: dias dentro da cota diária + streak como bônus */}
         <div className="glass-card p-6 flex flex-col">
           <div className="flex items-start justify-between gap-2">
             <div>
               <h2 className="font-semibold text-norby-ivory">Ritmo financeiro</h2>
               <p className="text-xs text-norby-ivory/50 mt-0.5">
-                {hasStreakActivity
-                  ? `${streakCount} ${streakCount === 1 ? "dia" : "dias"} no azul seguidos`
-                  : "Registre lançamentos para acompanhar seu ritmo"}
+                {!ritmo.hasActivity
+                  ? "Registre lançamentos para acompanhar seu ritmo"
+                  : !ritmo.hasPace
+                    ? "Registre uma receita para calcular seu ritmo"
+                    : `${ritmo.onPaceCount} dos últimos ${STREAK_DAYS} dias no seu ritmo`}
               </p>
             </div>
-            {hasStreakActivity && streakCount > 0 && (
+            {/* Só a partir de 3 dias: sequência curta vira cobrança, não prêmio */}
+            {ritmo.hasPace && ritmo.streak >= 3 && (
               <span className="chip bg-norby-teal/15 text-norby-teal">
-                🔥 {streakCount}
+                🔥 {ritmo.streak}
               </span>
             )}
           </div>
@@ -580,14 +556,16 @@ export default function Dashboard() {
             className="grid gap-1 mt-4"
             style={{ gridTemplateColumns: "repeat(14, minmax(0, 1fr))" }}
           >
-            {streakCells.map((cell, i) => (
+            {ritmo.cells.map((cell, i) => (
               <div
                 key={cell.key}
                 title={`${formatDateBR(cell.key)} · ${
-                  cell.active ? formatBRL(cell.net) : "sem lançamentos"
+                  cell.active
+                    ? `${formatBRL(cell.spent)} de ${formatBRL(ritmo.dailyPace)}`
+                    : "sem lançamentos"
                 }`}
                 className={`aspect-square rounded-[3px] ${cellClass(cell)} ${
-                  i === streakCells.length - 1
+                  i === ritmo.cells.length - 1
                     ? "ring-1 ring-norby-teal ring-offset-1 ring-offset-norby-surface"
                     : ""
                 }`}
