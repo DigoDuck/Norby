@@ -6,7 +6,7 @@ from typing import Optional, List
 
 from sqlalchemy import (
     String, DateTime, Date, Numeric, ForeignKey,
-    Enum, Integer, Boolean
+    Enum, Integer, Boolean, CheckConstraint
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -71,6 +71,12 @@ class Wallet(Base):
 class Transaction(Base):
     __tablename__ = "transactions"
 
+    # Invariante do domínio no banco, não só no Pydantic: escrita fora da API
+    # (script, migration, psql) não pode corromper o saldo com valor negativo.
+    __table_args__ = (
+        CheckConstraint("amount > 0", name="ck_transactions_amount_positive"),
+    )
+
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"))
     wallet_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("wallets.id", ondelete="CASCADE"))
@@ -87,6 +93,18 @@ class Transaction(Base):
 
 class RecurringTransaction(Base):
     __tablename__ = "recurring_transactions"
+
+    __table_args__ = (
+        CheckConstraint("amount > 0", name="ck_recurring_amount_positive"),
+        CheckConstraint(
+            "day_of_month IS NULL OR (day_of_month BETWEEN 1 AND 28)",
+            name="ck_recurring_day_of_month",
+        ),
+        CheckConstraint(
+            "weekday IS NULL OR (weekday BETWEEN 0 AND 6)",
+            name="ck_recurring_weekday",
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"))
@@ -107,6 +125,10 @@ class RecurringTransaction(Base):
 
 class Goal(Base):
     __tablename__ = "goals"
+
+    __table_args__ = (
+        CheckConstraint("target_amount > 0", name="ck_goals_target_positive"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"))
