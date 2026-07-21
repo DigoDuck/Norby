@@ -76,3 +76,26 @@ async def test_me_with_valid_token(client):
     res = await client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
     assert res.status_code == 200
     assert res.json()["email"] == REG["email"]
+
+
+@pytest.mark.asyncio
+async def test_login_runs_bcrypt_even_for_unknown_email(client, monkeypatch):
+    # Sem o hash dummy, e-mail inexistente retorna sem passar por bcrypt: a
+    # diferença de tempo (~200ms) revela quais e-mails estão cadastrados.
+    import app.routers.auth as auth_router
+
+    calls = []
+    real = auth_router.verify_password
+
+    def spy(plain, hashed):
+        calls.append(hashed)
+        return real(plain, hashed)
+
+    monkeypatch.setattr(auth_router, "verify_password", spy)
+
+    res = await client.post(
+        "/auth/login", json={"email": "ninguem@test.com", "password": "secret123"}
+    )
+    assert res.status_code == 401
+    assert res.json()["detail"] == "Credenciais inválidas"
+    assert calls, "bcrypt precisa rodar também quando o e-mail não existe"

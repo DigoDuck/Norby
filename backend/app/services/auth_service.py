@@ -19,6 +19,11 @@ def hash_password(password: str) -> str:
 def verify_password(plain: str, hashed: str) -> bool:
     return pwd_context.verify(plain, hashed) # Compara a senha com hash
 
+# Hash descartável usado quando o e-mail não existe. Verificar contra ele custa
+# o mesmo que verificar contra um hash real, então o tempo de resposta do login
+# não revela se o e-mail está cadastrado. Calculado uma vez no import (~200ms).
+_DUMMY_HASH = pwd_context.hash("norby-dummy-password-nunca-usada")
+
 def create_access_token(user_id: str) -> str:
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.access_token_expire_minutes) # Define um tempo de expiração pro token
     payload = {"sub": str(user_id), "exp": expire}

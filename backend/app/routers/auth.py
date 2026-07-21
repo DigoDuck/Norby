@@ -15,6 +15,7 @@ from app.schemas.user import (
 from app.services.auth_service import (
     hash_password, verify_password, create_access_token,
     create_refresh_token, rotate_refresh_token, revoke_refresh_token,
+    _DUMMY_HASH,
 )
 from app.services.account_service import delete_account, export_data
 
@@ -50,11 +51,13 @@ async def login(request: Request, payload: UserLogin, db: AsyncSession = Depends
     result = await db.execute(select(User).where(User.email == payload.email))
     user = result.scalar_one_or_none()
 
-    # verify_password (bcrypt) também é bloqueante → offload para thread.
-    password_ok = user and await asyncio.to_thread(
-        verify_password, payload.password, user.password_hash
+    # bcrypt roda SEMPRE — contra o hash real ou contra o dummy. Sem isso, o
+    # e-mail inexistente retorna ~200ms mais rápido e vira oráculo de enumeração.
+    # verify_password é bloqueante → offload para thread.
+    password_ok = await asyncio.to_thread(
+        verify_password, payload.password, user.password_hash if user else _DUMMY_HASH
     )
-    if not password_ok:
+    if not user or not password_ok:
         raise HTTPException(status_code=401, detail="Credenciais inválidas")
 
     access = create_access_token(str(user.id))
