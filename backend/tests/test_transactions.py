@@ -159,3 +159,29 @@ async def test_concurrent_updates_keep_balance_consistent_with_transaction(make_
     final = (await ac.get("/transactions/")).json()[0]
     wallets = (await ac.get("/wallets/")).json()
     assert float(wallets[0]["balance"]) == 100.0 - float(final["amount"])
+
+
+@pytest.mark.asyncio
+async def test_rejects_amount_beyond_column_precision(make_auth_client):
+    # Numeric(15,2) não guarda isso: sem teto no schema, o insert vira 500.
+    ac = await make_auth_client("Alice")
+    w = await make_wallet(ac, balance=100)
+    res = await ac.post("/transactions/", json=tx_payload(w["id"], amount="99999999999999999.00"))
+    assert res.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_rejects_amount_with_extra_decimal_places(make_auth_client):
+    ac = await make_auth_client("Alice")
+    w = await make_wallet(ac, balance=100)
+    res = await ac.post("/transactions/", json=tx_payload(w["id"], amount="10.123"))
+    assert res.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_rejects_oversized_category(make_auth_client):
+    # String(100) na coluna: sem max_length no schema, vira 500.
+    ac = await make_auth_client("Alice")
+    w = await make_wallet(ac, balance=100)
+    res = await ac.post("/transactions/", json=tx_payload(w["id"], category="c" * 300))
+    assert res.status_code == 422

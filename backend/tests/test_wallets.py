@@ -71,3 +71,17 @@ async def test_delete_own_wallet(make_auth_client):
     res = await ac.delete(f"/wallets/{w['id']}")
     assert res.status_code == 204
     assert len((await ac.get("/wallets/")).json()) == 0
+
+
+@pytest.mark.asyncio
+async def test_rejects_oversized_wallet_name(make_auth_client):
+    ac = await make_auth_client("Alice")
+    res = await ac.post("/wallets/", json={"name": "w" * 300, "balance": "10.00"})
+    assert res.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_rejects_negative_initial_balance(make_auth_client):
+    ac = await make_auth_client("Alice")
+    res = await ac.post("/wallets/", json={"name": "Cofre", "balance": "-50.00"})
+    assert res.status_code == 422

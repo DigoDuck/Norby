@@ -3,14 +3,15 @@ from uuid import UUID
 from datetime import datetime
 from decimal import Decimal
 from app.models.sql_models import TransactionType, RecurrenceFrequency
+from app.schemas.common import LongText, Money, ShortText
 
 
 class RecurringCreate(BaseModel):
     wallet_id: UUID
     type: TransactionType
-    amount: Decimal = Field(gt=0)
-    category: str
-    description: str | None = None
+    amount: Money
+    category: ShortText
+    description: LongText | None = None
     frequency: RecurrenceFrequency
     day_of_month: int | None = Field(default=None, ge=1, le=28)
     weekday: int | None = Field(default=None, ge=0, le=6)
@@ -29,9 +30,9 @@ class RecurringCreate(BaseModel):
 
 
 class RecurringUpdate(BaseModel):
-    amount: Decimal | None = Field(default=None, gt=0)
-    category: str | None = None
-    description: str | None = None
+    amount: Money | None = None
+    category: ShortText | None = None
+    description: LongText | None = None
     active: bool | None = None
 
 
