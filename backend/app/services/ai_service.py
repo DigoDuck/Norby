@@ -10,7 +10,6 @@ from app.config import get_settings
 import asyncio
 import hashlib
 import json
-import re
 import logging
 
 logger = logging.getLogger(__name__)
@@ -20,7 +19,7 @@ MAX_CHAT_HISTORY_MESSAGES = 10
 
 settings = get_settings()
 genai.configure(api_key=settings.gemini_api_key)
-model = genai.GenerativeModel("models/gemini-2.5-flash")
+model = genai.GenerativeModel("models/gemini-3.5-flash-lite")
 
 async def _get_user_financial_summary(db: AsyncSession, user_id: str) -> dict:
     now = datetime.now(timezone.utc)
@@ -134,10 +133,14 @@ async def get_or_generate_insight(db: AsyncSession, user_id: str, month: int, ye
     response = None
     try:
         # Chamada bloqueante do SDK -> offload p/ thread pra não travar o event loop
-        response = await asyncio.to_thread(model.generate_content, prompt)
-        raw = response.text.strip()
-        raw = re.sub(r"```json|```", "", raw).strip()  # Tira formatação markdown
-        data = json.loads(raw)
+        # response_mime_type força JSON puro na saída (sem cercas de markdown),
+        # o que torna o parse confiável mesmo num modelo pequeno como o Lite.
+        response = await asyncio.to_thread(
+            model.generate_content,
+            prompt,
+            generation_config={"response_mime_type": "application/json"},
+        )
+        data = json.loads(response.text)
         summary_text = data["summary_text"]
         suggested_action = data["suggested_action"]
     except Exception:

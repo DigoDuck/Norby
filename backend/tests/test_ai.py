@@ -62,7 +62,7 @@ async def test_insight_score_is_deterministic_not_from_llm(db_session, monkeypat
     class _Resp:
         text = '{"summary_text": "a|b|c", "suggested_action": "faça X"}'
 
-    monkeypatch.setattr(ai.model, "generate_content", lambda _p: _Resp())
+    monkeypatch.setattr(ai.model, "generate_content", lambda _p, **_kw: _Resp())
 
     result = await ai.get_or_generate_insight(db_session, "user-1", 7, 2026)
     assert result["score"] == 90
@@ -91,7 +91,7 @@ async def test_insight_returns_score_when_llm_text_fails(db_session, monkeypatch
     class _BadResp:
         text = "desculpe, não consegui"
 
-    monkeypatch.setattr(ai.model, "generate_content", lambda _p: _BadResp())
+    monkeypatch.setattr(ai.model, "generate_content", lambda _p, **_kw: _BadResp())
 
     result = await ai.get_or_generate_insight(db_session, "user-1", 7, 2026)
     assert result["score"] == 90
@@ -117,7 +117,7 @@ async def test_insight_returns_score_when_llm_call_raises(db_session, monkeypatc
     monkeypatch.setattr(ai, "_get_user_financial_summary", _fake_summary)
     monkeypatch.setattr(ai, "ai_insights_collection", _FakeInsights())
 
-    def _boom(_p):
+    def _boom(_p, **_kw):
         raise RuntimeError("gemini down")
 
     monkeypatch.setattr(ai.model, "generate_content", _boom)
@@ -164,7 +164,7 @@ async def test_insight_recomputes_score_on_cache_hit(db_session, monkeypatch):
         ai, "ai_insights_collection", _FakeInsightsCacheHit(ai._summary_fingerprint(summary))
     )
     # Se reaproveitar o cache, o Gemini nem é chamado.
-    def _boom(_p):
+    def _boom(_p, **_kw):
         raise AssertionError("não deve chamar o Gemini quando o fingerprint bate")
 
     monkeypatch.setattr(ai.model, "generate_content", _boom)
@@ -216,7 +216,7 @@ async def test_insight_regenerates_text_when_data_changes(db_session, monkeypatc
     class _Resp:
         text = '{"summary_text": "novo|texto|fresco", "suggested_action": "nova ação"}'
 
-    monkeypatch.setattr(ai.model, "generate_content", lambda _p: _Resp())
+    monkeypatch.setattr(ai.model, "generate_content", lambda _p, **_kw: _Resp())
 
     result = await ai.get_or_generate_insight(db_session, "user-1", 7, 2026)
     assert result["score"] == 100
