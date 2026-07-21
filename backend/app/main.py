@@ -62,6 +62,17 @@ async def request_context(request: Request, call_next):
     finally:
         request_id_ctx.reset(token)
     response.headers["X-Request-ID"] = rid
+    # Como a API pode devolver dados financeiros privados, no-store global evita
+    # decisões frágeis rota a rota. Os demais headers independem do edge.
+    # A CSP limita-se a frame-ancestors: uma política completa aqui quebraria o
+    # Swagger UI em /docs e não acrescentaria proteção às respostas JSON.
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["Content-Security-Policy"] = "frame-ancestors 'none'"
+    response.headers["Strict-Transport-Security"] = (
+        "max-age=31536000; includeSubDomains"
+    )
     return response
 
 

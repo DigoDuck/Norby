@@ -32,3 +32,22 @@ async def test_request_id_is_echoed_when_provided(client):
     # Se o cliente mandar um X-Request-ID, ele é preservado na resposta.
     res = await client.get("/health", headers={"X-Request-ID": "abc-123"})
     assert res.headers.get("x-request-id") == "abc-123"
+
+
+@pytest.mark.asyncio
+async def test_responses_carry_security_headers(client):
+    res = await client.get("/health")
+    assert res.status_code == 200
+    assert res.headers["cache-control"] == "no-store"
+    assert res.headers["x-content-type-options"] == "nosniff"
+    assert res.headers["referrer-policy"] == "no-referrer"
+    assert res.headers["content-security-policy"] == "frame-ancestors 'none'"
+    assert "max-age=" in res.headers["strict-transport-security"]
+
+
+@pytest.mark.asyncio
+async def test_security_headers_survive_error_responses(client):
+    # Uma rota inexistente também precisa manter a política global de headers.
+    res = await client.get("/rota-que-nao-existe")
+    assert res.status_code == 404
+    assert res.headers["cache-control"] == "no-store"
