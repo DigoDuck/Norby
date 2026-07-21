@@ -225,3 +225,26 @@ async def test_insight_regenerates_text_when_data_changes(db_session, monkeypatc
     assert fake.updated is True  # cache foi sobrescrito (upsert)
     # score nunca vive no cache: o upsert deve REMOVER qualquer score persistido.
     assert "score" in fake.update.get("$unset", {})
+
+
+@pytest.mark.asyncio
+async def test_chat_rejects_oversized_message(make_auth_client):
+    # Mensagem gigante nunca chega ao Gemini: barrada na validação do Pydantic.
+    ac = await make_auth_client("Alice")
+    res = await ac.post("/ai/chat", json={"message": "x" * 5000})
+    assert res.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_chat_rejects_empty_message(make_auth_client):
+    ac = await make_auth_client("Alice")
+    res = await ac.post("/ai/chat", json={"message": ""})
+    assert res.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_chat_rejects_non_uuid_session_id(make_auth_client):
+    # session_id livre viraria chave arbitrária no Mongo, sem teto de tamanho.
+    ac = await make_auth_client("Alice")
+    res = await ac.post("/ai/chat", json={"message": "oi", "session_id": "a" * 500})
+    assert res.status_code == 422
