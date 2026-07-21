@@ -96,6 +96,11 @@ Start em produção: `backend/start.sh` roda `alembic upgrade head` + uvicorn na
 `$PORT` do provedor (o `CMD` do `backend/Dockerfile`; o `docker-compose.yml` de
 dev sobrescreve com `--reload`).
 
+**Sessão:** access token de 15 min (`ACCESS_TOKEN_EXPIRE_MINUTES`), refresh de 7
+dias com rotação e detecção de reuso. O logout revoga só o refresh — um access
+token roubado vale até 15 min. Revogação imediata exigiria denylist de `jti`
+(consulta extra em toda request); adiada por custo/benefício.
+
 **Armadilhas já resolvidas (não reintroduzir):**
 - `VITE_API_URL` na Vercel **tem que ser `https://`**. Com `http://`, o Railway
   responde 301 → https e o redirect rebaixa **POST→GET** → todo POST (login,
