@@ -49,7 +49,9 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 # (senão o navegador mascara o erro real como falha de CORS).
 @app.middleware("http")
 async def request_context(request: Request, call_next):
-    rid = request.headers.get("X-Request-ID") or uuid.uuid4().hex
+    rid = getattr(request.state, "request_id", None)
+    if rid is None:
+        rid = request.headers.get("X-Request-ID") or uuid.uuid4().hex
     token = request_id_ctx.set(rid)
     request.state.request_id = rid
     try:
@@ -61,6 +63,26 @@ async def request_context(request: Request, call_next):
         )
     finally:
         request_id_ctx.reset(token)
+    return response
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins_list, # configurável via CORS_ORIGINS no .env
+    allow_credentials=True, # Permite enviar cookies e headers de autenticação
+    allow_methods=["*"],
+    allow_headers=["*"], # Permite qualquer header
+)
+
+
+# Registrado depois do CORS para ficar na camada externa e alcançar também os
+# preflights OPTIONS que o CORSMiddleware responde sem chamar request_context.
+@app.middleware("http")
+async def response_headers(request: Request, call_next):
+    rid = request.headers.get("X-Request-ID") or uuid.uuid4().hex
+    request.state.request_id = rid
+    response = await call_next(request)
+
     response.headers["X-Request-ID"] = rid
     # Como a API pode devolver dados financeiros privados, no-store global evita
     # decisões frágeis rota a rota. Os demais headers independem do edge.
@@ -74,15 +96,6 @@ async def request_context(request: Request, call_next):
         "max-age=31536000; includeSubDomains"
     )
     return response
-
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.cors_origins_list, # configurável via CORS_ORIGINS no .env
-    allow_credentials=True, # Permite enviar cookies e headers de autenticação
-    allow_methods=["*"],
-    allow_headers=["*"], # Permite qualquer header
-)
 
 app.include_router(auth.router)
 app.include_router(wallets.router)
