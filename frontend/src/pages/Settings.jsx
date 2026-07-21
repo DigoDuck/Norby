@@ -36,6 +36,7 @@ export default function Settings() {
 
   const [exporting, setExporting] = useState(false);
   const [confirmText, setConfirmText] = useState("");
+  const [deletePassword, setDeletePassword] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [dangerError, setDangerError] = useState(null);
 
@@ -67,12 +68,16 @@ export default function Settings() {
     setDangerError(null);
     setDeleting(true);
     try {
-      await accountApi.deleteAccount();
+      await accountApi.deleteAccount(deletePassword);
       // Conta apagada no servidor (PG + Mongo); limpa o estado local e sai.
       useAuthStore.getState().logout();
       navigate("/");
-    } catch {
-      setDangerError("Não foi possível excluir a conta. Tente novamente.");
+    } catch (err) {
+      setDangerError(
+        err.response?.status === 401
+          ? "Senha incorreta."
+          : "Não foi possível excluir a conta. Tente novamente.",
+      );
       setDeleting(false);
     }
   }
@@ -215,7 +220,7 @@ export default function Settings() {
           Esta ação é <strong>permanente</strong>. Todos os seus dados serão
           apagados de verdade dos nossos bancos (incluindo histórico da IA) e não
           poderão ser recuperados. Para confirmar, digite{" "}
-          <strong className="text-norby-ivory">EXCLUIR</strong> abaixo.
+          <strong className="text-norby-ivory">EXCLUIR</strong> e a sua senha.
         </p>
         <Input
           placeholder="Digite EXCLUIR para confirmar"
@@ -223,10 +228,17 @@ export default function Settings() {
           onChange={(e) => setConfirmText(e.target.value)}
           className={`${inputCls} mt-4`}
         />
+        <Input
+          type="password"
+          placeholder="Sua senha atual"
+          value={deletePassword}
+          onChange={(e) => setDeletePassword(e.target.value)}
+          className={`${inputCls} mt-3`}
+        />
         {dangerError && <p className="text-norby-danger text-xs mt-2">{dangerError}</p>}
         <Button
           onClick={handleDeleteAccount}
-          disabled={confirmText !== "EXCLUIR" || deleting}
+          disabled={confirmText !== "EXCLUIR" || !deletePassword || deleting}
           className="mt-4 bg-norby-danger hover:bg-norby-danger/80 text-norby-ivory disabled:opacity-40"
         >
           <Trash2 size={15} />

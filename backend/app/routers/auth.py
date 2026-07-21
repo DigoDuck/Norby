@@ -122,4 +122,12 @@ async def delete_my_account(
     # LGPD: exclusão definitiva. Exige confirmação explícita no corpo.
     if not payload.confirm:
         raise HTTPException(status_code=400, detail="Confirmação obrigatória para excluir a conta")
+
+    # bcrypt é bloqueante: executa em thread, como no login.
+    password_ok = await asyncio.to_thread(
+        verify_password, payload.password, current_user.password_hash
+    )
+    if not password_ok:
+        raise HTTPException(status_code=401, detail="Senha incorreta")
+
     await delete_account(current_user, db)

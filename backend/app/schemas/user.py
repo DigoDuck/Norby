@@ -49,3 +49,6 @@ class RefreshRequest(BaseModel):
 
 class DeleteAccountRequest(BaseModel):
     confirm: bool
+    # Step-up auth: exclusão é irreversível, então não basta ter o access token
+    # — é preciso provar posse da senha atual.
+    password: str = Field(min_length=1, max_length=128)
