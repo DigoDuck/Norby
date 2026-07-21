@@ -64,6 +64,7 @@ export default function Auth() {
               name: data.name,
               email: data.email,
               password: data.password,
+              accept_privacy: data.acceptedTerms,
             });
 
       login(res.data.access_token, res.data.refresh_token, res.data.user);

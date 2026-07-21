@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.encoders import jsonable_encoder
@@ -36,6 +37,7 @@ async def register(request: Request, payload: UserRegister, db: AsyncSession = D
         name=payload.name,
         email=payload.email,
         password_hash=password_hash,
+        privacy_accepted_at=datetime.now(timezone.utc),
     )
     db.add(user)
     await db.commit()

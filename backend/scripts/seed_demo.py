@@ -108,7 +108,15 @@ def rows_for(today: date) -> list[tuple]:
 
 
 def _token(c: httpx.Client) -> str:
-    r = c.post("/auth/register", json={"name": NAME, "email": EMAIL, "password": PASSWORD})
+    r = c.post(
+        "/auth/register",
+        json={
+            "name": NAME,
+            "email": EMAIL,
+            "password": PASSWORD,
+            "accept_privacy": True,
+        },
+    )
     if r.status_code == 201:
         return r.json()["access_token"]
     r = c.post("/auth/login", json={"email": EMAIL, "password": PASSWORD})

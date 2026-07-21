@@ -2,7 +2,12 @@ import asyncio
 
 import pytest
 
-REG = {"name": "Bob", "email": "bob@test.com", "password": "secret123"}
+REG = {
+    "name": "Bob",
+    "email": "bob@test.com",
+    "password": "secret123",
+    "accept_privacy": True,
+}
 
 
 async def _register(client):
