@@ -13,6 +13,10 @@ from app.services.goal_service import current_month_range
 router = APIRouter(prefix="/transactions", tags=["Transactions"])
 
 
+# ponytail: locks são adquiridos na ordem transação → carteira antiga → carteira
+# nova. Duas transações DIFERENTES trocando as mesmas duas carteiras em sentidos
+# opostos ainda podem deadlockar (o Postgres detecta e aborta uma, virando 500).
+# Se isso aparecer em produção, ordenar os locks de carteira por UUID.
 async def _get_owned_wallet(
     wallet_id: UUID,
     user: User,
@@ -37,12 +41,23 @@ async def _get_owned_wallet(
 
 
 async def _get_owned_transaction(transaction_id: UUID, user: User, db: AsyncSession) -> Transaction:
-    transaction = (await db.execute(
-        select(Transaction).where(
+    """Transação do usuário, sempre com lock (FOR UPDATE).
+
+    Os dois únicos chamadores (update/delete) mutam saldo de carteira a partir
+    dos valores ANTIGOS desta linha. Sem o lock, duas requisições concorrentes
+    leem o mesmo valor antigo e o revertem duas vezes da carteira — o saldo
+    deixa de bater com a transação gravada. Com o lock, a segunda só lê depois
+    do commit da primeira e enxerga o valor já atualizado.
+    """
+    stmt = (
+        select(Transaction)
+        .where(
             Transaction.id == transaction_id,
             Transaction.user_id == user.id,
         )
-    )).scalar_one_or_none()
+        .with_for_update()
+    )
+    transaction = (await db.execute(stmt)).scalar_one_or_none()
     if not transaction:
         raise HTTPException(status_code=404, detail="Transação não encontrada")
     return transaction
