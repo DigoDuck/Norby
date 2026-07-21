@@ -144,10 +144,13 @@ async def get_or_generate_insight(db: AsyncSession, user_id: str, month: int, ye
         summary_text = data["summary_text"]
         suggested_action = data["suggested_action"]
     except Exception:
-        raw_text = getattr(response, "text", None)
+        # Nunca logar o texto cru: ele é a leitura financeira do usuário e pode
+        # conter valores e categorias. Tipo da exceção + tamanho bastam para
+        # diagnosticar um parse quebrado.
+        raw_len = len(getattr(response, "text", "") or "")
         logger.exception(
-            "Resposta da IA inválida ao gerar insight (user=%s). Texto cru: %r",
-            user_id, raw_text,
+            "Resposta da IA inválida ao gerar insight (user=%s, chars=%d)",
+            user_id, raw_len,
         )
         # O texto da IA falhou, mas o score é determinístico — devolve o score real.
         # Não cacheia (retorna sem passar por insert_one), para tentar de novo na próxima chamada.
