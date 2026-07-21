@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 from jose import jwt
 from passlib.context import CryptContext
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
@@ -30,11 +30,20 @@ def create_access_token(user_id: str) -> str:
 def _hash_token(raw: str) -> str:
     return hashlib.sha256(raw.encode()).hexdigest()
 
-async def create_refresh_token(user_id: str, db: AsyncSession) -> str:
-    """Gera um refresh token opaco, persiste só o hash e retorna o token cru."""
+def _new_refresh(user_id: str, db: AsyncSession) -> str:
+    """Enfileira um refresh novo na sessão (SEM commit) e devolve o token cru.
+
+    Separado do commit para a rotação conseguir revogar o antigo e inserir o
+    novo numa única transação.
+    """
     raw = secrets.token_urlsafe(48)
     expires_at = datetime.now(timezone.utc) + timedelta(days=settings.refresh_token_expire_days)
     db.add(RefreshToken(user_id=user_id, token_hash=_hash_token(raw), expires_at=expires_at))
+    return raw
+
+async def create_refresh_token(user_id: str, db: AsyncSession) -> str:
+    """Gera um refresh token opaco, persiste só o hash e retorna o token cru."""
+    raw = _new_refresh(user_id, db)
     await db.commit()
     return raw
 
@@ -49,20 +58,47 @@ async def _get_valid_refresh(raw: str, db: AsyncSession) -> RefreshToken | None:
     return record
 
 async def rotate_refresh_token(raw: str, db: AsyncSession) -> tuple[str, str, User] | None:
-    """Valida o refresh, revoga o antigo e emite um par novo (rotação). None se inválido."""
-    record = await _get_valid_refresh(raw, db)
+    """Valida, revoga o antigo e emite o par novo em uma transação só.
+
+    O FOR UPDATE serializa duas rotações do mesmo token: a segunda só lê a linha
+    depois do commit da primeira, já com revoked=True. Sem ele, as duas validam
+    o token vivo e emitem sucessores diferentes.
+    """
+    result = await db.execute(
+        select(RefreshToken)
+        .where(RefreshToken.token_hash == _hash_token(raw))
+        .with_for_update()
+    )
+    record = result.scalar_one_or_none()
     if record is None:
         return None
-    record.revoked = True  # rotação: o token usado não vale mais
-    await db.commit()
+
+    # Token já rotacionado sendo reapresentado é sinal de possível roubo.
+    # Revogar todas as sessões evita manter um sucessor comprometido ativo.
+    if record.revoked:
+        await db.execute(
+            update(RefreshToken)
+            .where(
+                RefreshToken.user_id == record.user_id,
+                RefreshToken.revoked.is_(False),
+            )
+            .values(revoked=True)
+        )
+        await db.commit()
+        return None
+
+    if record.expires_at <= datetime.now(timezone.utc):
+        return None
 
     user = await db.get(User, record.user_id)
     if user is None:
         return None
 
-    access = create_access_token(str(user.id))
-    new_refresh = await create_refresh_token(str(user.id), db)
-    return access, new_refresh, user
+    record.revoked = True
+    new_refresh = _new_refresh(str(user.id), db)
+    await db.commit()
+
+    return create_access_token(str(user.id)), new_refresh, user
 
 async def revoke_refresh_token(raw: str, db: AsyncSession) -> None:
     """Revoga um refresh específico (logout). Silencioso se o token não existir."""
