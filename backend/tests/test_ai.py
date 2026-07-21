@@ -4,6 +4,7 @@ from decimal import Decimal
 import pytest
 
 import app.services.ai_service as ai
+from app.limiter import limiter
 from app.models.sql_models import User, Wallet
 
 
@@ -248,3 +249,35 @@ async def test_chat_rejects_non_uuid_session_id(make_auth_client):
     ac = await make_auth_client("Alice")
     res = await ac.post("/ai/chat", json={"message": "oi", "session_id": "a" * 500})
     assert res.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_ai_rate_limit_is_per_user_not_per_ip(make_auth_client, monkeypatch):
+    # Atrás do proxy do Railway todos os usuários chegam com o mesmo IP. Se a
+    # chave do limiter fosse o IP, o balde estourado por um usuário derrubaria
+    # todos os outros. A chave tem que ser o usuário autenticado.
+    import app.routers.ai as ai_router
+
+    async def _fake_insight(_db, _uid, _month, _year):
+        return {"score": 50, "summary_text": "", "suggested_action": None}
+
+    monkeypatch.setattr(ai_router, "get_or_generate_insight", _fake_insight)
+
+    alice = await make_auth_client("Alice")
+    bob = await make_auth_client("Bob")
+
+    # O cadastro acima acontece com o limiter desligado (fixture autouse).
+    # Só agora ligamos, para medir apenas as chamadas ao /ai/insight.
+    limiter.reset()
+    limiter.enabled = True
+    try:
+        codes = [(await alice.get("/ai/insight")).status_code for _ in range(30)]
+        assert codes == [200] * 30, codes[-5:]
+        assert (await alice.get("/ai/insight")).status_code == 429
+
+        # Bob vem do MESMO IP de teste que a Alice. Com chave por usuário,
+        # o balde estourado dela não pode afetá-lo.
+        assert (await bob.get("/ai/insight")).status_code == 200
+    finally:
+        limiter.enabled = False
+        limiter.reset()

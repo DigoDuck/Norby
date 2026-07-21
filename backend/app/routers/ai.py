@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from uuid import UUID, uuid4
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.dependencies import get_db, get_current_user
-from app.limiter import limiter
+from app.limiter import limiter, user_key
 from app.models.sql_models import User
 from app.services.ai_service import get_or_generate_insight, chat_with_ai
 from app.schemas.ai import (
@@ -33,7 +33,7 @@ class ChatMessage(BaseModel):
 
 
 @router.get("/insight", response_model=InsightResponse)
-@limiter.limit("30/minute")
+@limiter.limit("30/minute", key_func=user_key)
 async def get_dashboard_insight(
     request: Request,
     current_user: User = Depends(get_current_user),
@@ -59,7 +59,7 @@ async def get_dashboard_insight(
     response_model=ChatResponse,
     responses={503: {"description": "Norby AI temporariamente indisponível"}},
 )
-@limiter.limit("10/minute")
+@limiter.limit("10/minute", key_func=user_key)
 async def chat(
     request: Request,
     payload: ChatMessage,
