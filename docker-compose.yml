@@ -61,7 +61,7 @@ services:
         condition: service_healthy # Só sobe se o Postgres estiver ok
       mongodb:
         condition: service_healthy
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: sh -c "uv pip install --system --no-cache -r requirements-dev.txt && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
 
 volumes:
   postgres_data:

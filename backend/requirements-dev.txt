@@ -1,0 +1,4 @@
+# Só para desenvolvimento e CI — NÃO entra na imagem de produção.
+-r requirements.txt
+pytest==8.3.3
+pytest-asyncio==0.24.0

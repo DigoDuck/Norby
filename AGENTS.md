@@ -5,7 +5,7 @@
 
 ## Stack & layout (monorepo)
 
-- **Backend:** FastAPI 0.115 + SQLAlchemy 2.0 async + Alembic · PostgreSQL 16
+- **Backend:** FastAPI 0.139 + SQLAlchemy 2.0 async + Alembic · PostgreSQL 16
   (relacional) + MongoDB 7 via Motor (blocos de texto da IA) · Auth JWT
   (python-jose) · IA Gemini 1.5 Flash · gerenciador de pacotes **uv**.
 - **Frontend:** React 19 + Vite 8 · TailwindCSS + shadcn/ui · Zustand ·
@@ -38,6 +38,8 @@ pytest                                                      # testes (pytest-asy
 alembic upgrade head                                        # aplica migrations
 alembic revision -m "descricao"                             # nova migration (preencher upgrade/downgrade)
 uv pip install -r requirements.txt                          # instala deps
+uv pip install -r requirements-dev.txt                      # deps + pytest (dev/CI)
+pip-audit                                                   # advisories das deps
 ```
 Banco de teste (uma vez, apenas em dev): criar um banco `norby_test` no Postgres local usando um usuário com permissão de criar bancos. Essa permissão é específica do ambiente de desenvolvimento — não replicar em produção.
 
@@ -66,6 +68,8 @@ npm run test     # Vitest
 - UI em **português** (pt-BR); tema teal "Petróleo Confiável" (classes `norby-*`).
 - Specs e planos vivem no Second Brain (Obsidian), **não** no repo (`docs/` está
   no `.gitignore`).
+- Dependências: `requirements.txt` é **só produção**; pytest e afins vivem em
+  `requirements-dev.txt`. Rodar `pip-audit` antes de cada release.
 
 ## NÃO faça
 
