@@ -100,7 +100,12 @@ async def make_auth_client():
         email = f"{name.lower()}_{uuid.uuid4().hex[:8]}@test.com"
         res = await ac.post(
             "/auth/register",
-            json={"name": name, "email": email, "password": "secret123"},
+            json={
+                "name": name,
+                "email": email,
+                "password": "secret123",
+                "accept_privacy": True,
+            },
         )
         assert res.status_code == 201, res.text
         ac.headers["Authorization"] = f"Bearer {res.json()['access_token']}"

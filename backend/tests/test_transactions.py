@@ -137,3 +137,51 @@ async def test_list_is_scoped_to_user(make_auth_client):
     await alice.post("/transactions/", json=tx_payload(w["id"]))
     assert len((await alice.get("/transactions/")).json()) == 1
     assert len((await bob.get("/transactions/")).json()) == 0
+
+
+@pytest.mark.asyncio
+async def test_concurrent_updates_keep_balance_consistent_with_transaction(make_auth_client):
+    # Dois PUT simultâneos na MESMA transação. Sem lock na linha da transação,
+    # ambos leem amount=30, revertem 30 duas vezes e aplicam valores diferentes:
+    # o saldo final deixa de corresponder ao amount que ficou gravado.
+    ac = await make_auth_client("Alice")
+    w = await make_wallet(ac, balance=100)
+    tx = (await ac.post("/transactions/", json=tx_payload(w["id"], amount="30.00"))).json()
+
+    res_a, res_b = await asyncio.gather(
+        ac.put(f"/transactions/{tx['id']}", json={"amount": "50.00"}),
+        ac.put(f"/transactions/{tx['id']}", json={"amount": "70.00"}),
+    )
+    assert res_a.status_code == 200, res_a.text
+    assert res_b.status_code == 200, res_b.text
+
+    # Invariante (não depende de quem commitou por último): saldo = inicial - despesa final.
+    final = (await ac.get("/transactions/")).json()[0]
+    wallets = (await ac.get("/wallets/")).json()
+    assert float(wallets[0]["balance"]) == 100.0 - float(final["amount"])
+
+
+@pytest.mark.asyncio
+async def test_rejects_amount_beyond_column_precision(make_auth_client):
+    # Numeric(15,2) não guarda isso: sem teto no schema, o insert vira 500.
+    ac = await make_auth_client("Alice")
+    w = await make_wallet(ac, balance=100)
+    res = await ac.post("/transactions/", json=tx_payload(w["id"], amount="99999999999999999.00"))
+    assert res.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_rejects_amount_with_extra_decimal_places(make_auth_client):
+    ac = await make_auth_client("Alice")
+    w = await make_wallet(ac, balance=100)
+    res = await ac.post("/transactions/", json=tx_payload(w["id"], amount="10.123"))
+    assert res.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_rejects_oversized_category(make_auth_client):
+    # String(100) na coluna: sem max_length no schema, vira 500.
+    ac = await make_auth_client("Alice")
+    w = await make_wallet(ac, balance=100)
+    res = await ac.post("/transactions/", json=tx_payload(w["id"], category="c" * 300))
+    assert res.status_code == 422

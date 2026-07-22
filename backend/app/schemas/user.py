@@ -8,6 +8,9 @@ class UserRegister(BaseModel):
     name: str = Field(min_length=2, max_length=100)
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
+    # LGPD: aceite explícito, registrado no servidor. O frontend já pedia o
+    # checkbox, mas o valor não chegava aqui e nada era persistido.
+    accept_privacy: bool
 
     @field_validator("password")
     @classmethod
@@ -15,6 +18,13 @@ class UserRegister(BaseModel):
         # Regra mínima: pelo menos uma letra e um número (o min_length já garante 8+)
         if not re.search(r"[A-Za-z]", v) or not re.search(r"\d", v):
             raise ValueError("A senha deve ter ao menos 8 caracteres, incluindo uma letra e um número")
+        return v
+
+    @field_validator("accept_privacy")
+    @classmethod
+    def deve_aceitar(cls, v: bool) -> bool:
+        if not v:
+            raise ValueError("É necessário aceitar os Termos e a Política de Privacidade")
         return v
 
 class UserLogin(BaseModel):
@@ -49,3 +59,6 @@ class RefreshRequest(BaseModel):
 
 class DeleteAccountRequest(BaseModel):
     confirm: bool
+    # Step-up auth: exclusão é irreversível, então não basta ter o access token
+    # — é preciso provar posse da senha atual.
+    password: str = Field(min_length=1, max_length=128)

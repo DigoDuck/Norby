@@ -20,7 +20,7 @@ O Norby junta os lançamentos num lugar só (recorrências incluídas), mantém 
 |---|---|
 | Backend | FastAPI 0.115 · SQLAlchemy 2.0 (async) + asyncpg · Alembic · Pydantic v2 · python-jose (JWT) · slowapi (rate limit) · uv |
 | Bancos | PostgreSQL 16 (núcleo relacional) · MongoDB 7 via Motor (insights e chat da IA) |
-| IA | Google Gemini 2.5 Flash (`google-generativeai`) |
+| IA | Google Gemini 3.5 Flash-Lite (`google-generativeai`) |
 | Frontend | React 19 · Vite 8 · TailwindCSS · componentes estilo shadcn/ui · Zustand · React Router v7 · React Hook Form + Zod · axios · Recharts |
 | Testes | pytest + pytest-asyncio (backend) · Vitest + Testing Library (frontend) |
 | Infra | Docker Compose (dev) · Railway (backend, Docker) · Neon (Postgres) · MongoDB Atlas · Vercel (frontend) |
@@ -37,7 +37,7 @@ flowchart LR
     FE -->|axios + JWT| API["FastAPI<br/>(Railway, Docker)"]
     API -->|SQLAlchemy async / asyncpg| PG[("PostgreSQL<br/>(Neon)")]
     API -->|Motor| MG[("MongoDB<br/>(Atlas)")]
-    API -->|google-generativeai| GEM["Gemini 2.5 Flash"]
+    API -->|google-generativeai| GEM["Gemini 3.5 Flash-Lite"]
 ```
 
 ## Decisões técnicas de destaque

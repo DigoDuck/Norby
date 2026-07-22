@@ -31,8 +31,29 @@ async def test_export_contains_own_data_only(make_auth_client, mongo):
 @pytest.mark.asyncio
 async def test_delete_requires_confirmation(make_auth_client):
     alice = await make_auth_client("Alice")
-    res = await alice.request("DELETE", "/auth/me", json={"confirm": False})
+    res = await alice.request(
+        "DELETE", "/auth/me", json={"confirm": False, "password": "secret123"}
+    )
     assert res.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_delete_requires_password_field(make_auth_client):
+    # Só o access token não basta: sem senha a requisição nem é aceita.
+    alice = await make_auth_client("Alice")
+    res = await alice.request("DELETE", "/auth/me", json={"confirm": True})
+    assert res.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_delete_rejects_wrong_password(make_auth_client, mongo):
+    alice = await make_auth_client("Alice")
+    res = await alice.request(
+        "DELETE", "/auth/me", json={"confirm": True, "password": "senhaerrada1"}
+    )
+    assert res.status_code == 401
+    # A conta continua viva.
+    assert (await alice.get("/auth/me")).status_code == 200
 
 
 @pytest.mark.asyncio
@@ -49,7 +70,9 @@ async def test_delete_account_wipes_postgres_and_mongo(make_auth_client, client,
         {"user_id": user_id, "reference_month": "2026-06"}
     )
 
-    res = await alice.request("DELETE", "/auth/me", json={"confirm": True})
+    res = await alice.request(
+        "DELETE", "/auth/me", json={"confirm": True, "password": "secret123"}
+    )
     assert res.status_code == 204
 
     # Mongo: nada do usuário permanece.

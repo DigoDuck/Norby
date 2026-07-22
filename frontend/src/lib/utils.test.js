@@ -1,5 +1,39 @@
 import { describe, it, expect } from "vitest";
-import { formatDateBR, toDateInput, parseDateOnly } from "./utils";
+import { apiErrorMessage, formatDateBR, toDateInput, parseDateOnly } from "./utils";
+
+describe("apiErrorMessage", () => {
+  it("passes through the string detail of a business error", () => {
+    const err = { response: { data: { detail: "Email já cadastrado" } } };
+    expect(apiErrorMessage(err, "fallback")).toBe("Email já cadastrado");
+  });
+
+  it("never returns the 422 detail list, which would crash the React render", () => {
+    // Forma real do 422 do FastAPI: lista de objetos. Renderizar isso derruba
+    // a árvore ("Objects are not valid as a React child") e some com o app.
+    const err = {
+      response: {
+        data: {
+          detail: [
+            {
+              type: "less_than_equal",
+              loc: ["body", "amount"],
+              msg: "Input should be less than or equal to 9999999999999.99",
+              input: "99999999999999999",
+              ctx: { le: "9999999999999.99" },
+            },
+          ],
+        },
+      },
+    };
+    expect(typeof apiErrorMessage(err, "fallback")).toBe("string");
+  });
+
+  it("falls back when there is no response (network failure)", () => {
+    expect(apiErrorMessage(new Error("boom"), "sem conexão")).toBe("sem conexão");
+    expect(apiErrorMessage({ response: { data: {} } }, "fallback")).toBe("fallback");
+    expect(apiErrorMessage({ response: { data: { detail: [] } } }, "fallback")).toBe("fallback");
+  });
+});
 
 describe("formatDateBR", () => {
   it("formats an ISO date-only string without timezone shift", () => {

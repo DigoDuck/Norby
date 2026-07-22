@@ -5,7 +5,7 @@
 
 ## Stack & layout (monorepo)
 
-- **Backend:** FastAPI 0.115 + SQLAlchemy 2.0 async + Alembic · PostgreSQL 16
+- **Backend:** FastAPI 0.139 + SQLAlchemy 2.0 async + Alembic · PostgreSQL 16
   (relacional) + MongoDB 7 via Motor (blocos de texto da IA) · Auth JWT
   (python-jose) · IA Gemini 1.5 Flash · gerenciador de pacotes **uv**.
 - **Frontend:** React 19 + Vite 8 · TailwindCSS + shadcn/ui · Zustand ·
@@ -37,7 +37,10 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload   # dev server :8000
 pytest                                                      # testes (pytest-asyncio)
 alembic upgrade head                                        # aplica migrations
 alembic revision -m "descricao"                             # nova migration (preencher upgrade/downgrade)
-uv pip install -r requirements.txt                          # instala deps
+uv pip compile --universal --python-version 3.12 requirements.txt -o requirements.lock
+uv pip compile --universal --python-version 3.12 requirements-dev.txt -o requirements-dev.lock
+uv pip install -r requirements-dev.lock                     # deps + ferramentas de dev/CI
+pip-audit -r requirements.lock --ignore-vuln PYSEC-2026-1325 # audit; exceção abaixo
 ```
 Banco de teste (uma vez, apenas em dev): criar um banco `norby_test` no Postgres local usando um usuário com permissão de criar bancos. Essa permissão é específica do ambiente de desenvolvimento — não replicar em produção.
 
@@ -66,6 +69,13 @@ npm run test     # Vitest
 - UI em **português** (pt-BR); tema teal "Petróleo Confiável" (classes `norby-*`).
 - Specs e planos vivem no Second Brain (Obsidian), **não** no repo (`docs/` está
   no `.gitignore`).
+- Dependências: `requirements.txt` é **só produção**; pytest e afins vivem em
+  `requirements-dev.txt`. Os arquivos `.lock` fixam também as transitivas usadas
+  pelo Docker; regenerá-los após alterar os arquivos-fonte. Rodar o comando de
+  audit acima antes de cada release.
+- Exceção do audit: `python-jose` traz `ecdsa`, afetado por
+  `PYSEC-2026-1325` sem versão corrigida. `Settings.algorithm` aceita somente
+  `HS256`, então o caminho vulnerável de assinatura ECDSA/ECDH não é alcançável.
 
 ## NÃO faça
 
@@ -95,6 +105,44 @@ App no ar, deploy a partir da branch `main`:
 Start em produção: `backend/start.sh` roda `alembic upgrade head` + uvicorn na
 `$PORT` do provedor (o `CMD` do `backend/Dockerfile`; o `docker-compose.yml` de
 dev sobrescreve com `--reload`).
+
+**Sessão:** access token de 15 min (`ACCESS_TOKEN_EXPIRE_MINUTES`), refresh de 7
+dias com rotação e detecção de reuso. O logout revoga só o refresh — um access
+token roubado vale até 15 min. Revogação imediata exigiria denylist de `jti`
+(consulta extra em toda request); adiada por custo/benefício.
+
+**Tokens no navegador — decisão consciente (2026-07-21):** access e refresh
+ficam no `localStorage` (Zustand persist). A correção canônica seria refresh em
+cookie `HttpOnly` + access só em memória, mas o frontend (`vercel.app`) e a API
+(`railway.app`) são *sites* diferentes: o cookie exigiria `SameSite=None` e
+seria bloqueado pelo Safari ITP e pelo Chrome, deslogando o usuário a cada
+recarga. Mitigações no lugar: CSP restritiva no `vercel.json`, access token de
+15 min e revogação de todas as sessões quando um refresh token é reusado.
+**Pré-requisito para migrar:** domínio próprio com API e frontend no mesmo site
+registrável (`norby.app` + `api.norby.app`) — aí o cookie vira `SameSite=Lax`.
+
+**Rate limit atrás do proxy — decisão consciente (2026-07-21):** o uvicorn só
+honra `X-Forwarded-For` quando o peer é `127.0.0.1` (default de
+`forwarded_allow_ips`), e o proxy do Railway não é loopback; `FORWARDED_ALLOW_IPS`
+não existe naquele ambiente, então `request.client.host` devolve o IP do proxy
+para todo mundo. **Não** ligar `--forwarded-allow-ips="*"`: nessa versão do
+uvicorn o `always_trust` faz o middleware usar o *primeiro* item do
+`X-Forwarded-For`, que é o que o cliente controla, e o rate limit de login
+viraria spoofável. Em vez disso, as rotas autenticadas (`/ai/*`) usam `user_key`
+em `app/limiter.py`, chaveando pelo id do usuário. Login e cadastro são anônimos
+e seguem por IP, com o balde compartilhado como dívida aceita: a proteção contra
+força bruta continua valendo, o custo é colateral.
+
+**Outras dívidas assumidas** (decisões, não pendências esquecidas):
+- `POST /auth/register` responde "Email já cadastrado" (enumeração por essa via
+  é possível, limitada a 5/min). Mensagem genérica destruiria a usabilidade; o
+  login já tem tempo constante, que era o vetor medível.
+- Exclusão de conta apaga o Mongo antes do Postgres, sem transação distribuída.
+  Falha no commit do SQL deixaria a conta viva sem os dados de IA.
+- `/docs` fica público: todos os endpoints por trás dele exigem autenticação, e
+  a documentação navegável é um ativo para o portfólio.
+- Usuários criados antes da migration `b2c3d4e5f6a7` têm `privacy_accepted_at`
+  nulo. NULL significa "aceite não registrado", nunca "aceitou".
 
 **Armadilhas já resolvidas (não reintroduzir):**
 - `VITE_API_URL` na Vercel **tem que ser `https://`**. Com `http://`, o Railway

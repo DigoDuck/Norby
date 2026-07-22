@@ -11,6 +11,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { apiErrorMessage } from "@/lib/utils";
 
 /**
  * Diálogo de confirmação reutilizável para ações destrutivas.
@@ -43,7 +44,7 @@ export function ConfirmDialog({
       await onConfirm();
       setOpen(false);
     } catch (err) {
-      setError(err?.response?.data?.detail || errorFallback);
+      setError(apiErrorMessage(err, errorFallback));
     } finally {
       setLoading(false);
     }

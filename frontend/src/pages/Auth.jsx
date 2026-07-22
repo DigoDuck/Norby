@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { authApi } from "../api/auth";
 import { useAuthStore } from "@/store/authStore";
+import { apiErrorMessage } from "@/lib/utils";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Eye, EyeOff } from "lucide-react";
@@ -64,6 +65,7 @@ export default function Auth() {
               name: data.name,
               email: data.email,
               password: data.password,
+              accept_privacy: data.acceptedTerms,
             });
 
       login(res.data.access_token, res.data.refresh_token, res.data.user);
@@ -74,7 +76,7 @@ export default function Auth() {
       } else if (err.response.status === 401) {
         setError("Email ou senha incorretos.");
       } else {
-        setError(err.response.data?.detail || "Algo deu errado. Tente novamente.");
+        setError(apiErrorMessage(err, "Algo deu errado. Tente novamente."));
       }
     } finally {
       setLoading(false);

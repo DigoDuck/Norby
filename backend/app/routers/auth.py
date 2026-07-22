@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.encoders import jsonable_encoder
@@ -15,6 +16,7 @@ from app.schemas.user import (
 from app.services.auth_service import (
     hash_password, verify_password, create_access_token,
     create_refresh_token, rotate_refresh_token, revoke_refresh_token,
+    _DUMMY_HASH,
 )
 from app.services.account_service import delete_account, export_data
 
@@ -35,6 +37,7 @@ async def register(request: Request, payload: UserRegister, db: AsyncSession = D
         name=payload.name,
         email=payload.email,
         password_hash=password_hash,
+        privacy_accepted_at=datetime.now(timezone.utc),
     )
     db.add(user)
     await db.commit()
@@ -50,11 +53,13 @@ async def login(request: Request, payload: UserLogin, db: AsyncSession = Depends
     result = await db.execute(select(User).where(User.email == payload.email))
     user = result.scalar_one_or_none()
 
-    # verify_password (bcrypt) também é bloqueante → offload para thread.
-    password_ok = user and await asyncio.to_thread(
-        verify_password, payload.password, user.password_hash
+    # bcrypt roda SEMPRE — contra o hash real ou contra o dummy. Sem isso, o
+    # e-mail inexistente retorna ~200ms mais rápido e vira oráculo de enumeração.
+    # verify_password é bloqueante → offload para thread.
+    password_ok = await asyncio.to_thread(
+        verify_password, payload.password, user.password_hash if user else _DUMMY_HASH
     )
-    if not password_ok:
+    if not user or not password_ok:
         raise HTTPException(status_code=401, detail="Credenciais inválidas")
 
     access = create_access_token(str(user.id))
@@ -122,4 +127,12 @@ async def delete_my_account(
     # LGPD: exclusão definitiva. Exige confirmação explícita no corpo.
     if not payload.confirm:
         raise HTTPException(status_code=400, detail="Confirmação obrigatória para excluir a conta")
+
+    # bcrypt é bloqueante: executa em thread, como no login.
+    password_ok = await asyncio.to_thread(
+        verify_password, payload.password, current_user.password_hash
+    )
+    if not password_ok:
+        raise HTTPException(status_code=401, detail="Senha incorreta")
+
     await delete_account(current_user, db)

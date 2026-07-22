@@ -7,7 +7,7 @@ import { recurringApi } from "@/api/recurring";
 import { walletsApi } from "@/api/wallets";
 import { categoriesFor, reconcileCategory } from "@/lib/categories";
 import { recurringSchema } from "@/lib/schemas";
-import { formatDateBR, formatBRL, inputCls } from "@/lib/utils";
+import { apiErrorMessage, formatDateBR, formatBRL, inputCls } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 
 import { Button } from "@/components/ui/button";
@@ -131,9 +131,7 @@ export default function Recurring() {
       setOpen(false);
       load();
     } catch (err) {
-      setServerError(
-        err.response?.data?.detail || "Não foi possível salvar a recorrência."
-      );
+      setServerError(apiErrorMessage(err, "Não foi possível salvar a recorrência."));
     }
   }
 

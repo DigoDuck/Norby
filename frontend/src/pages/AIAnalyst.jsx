@@ -253,7 +253,8 @@ export default function AIAnalyst() {
             </div>
             <p className="flex items-center justify-center gap-1.5 text-[11px] text-norby-ivory/35 mt-2.5">
               <Shield size={11} />
-              A Norby usa seus dados com segurança e nunca compartilha nada.
+              Seus dados financeiros são enviados ao Google Gemini para gerar as
+              respostas. Nunca vendemos nem compartilhamos com terceiros.
             </p>
           </div>
         </div>

@@ -3,14 +3,15 @@ from uuid import UUID
 from datetime import datetime
 from decimal import Decimal
 from app.models.sql_models import GoalType
+from app.schemas.common import MAX_MONEY, Money, MoneyOrZero, ShortText
 
 
 class GoalCreate(BaseModel):
-    name: str
+    name: ShortText
     type: GoalType
-    target_amount: Decimal = Field(gt=0)
-    current_amount: Decimal = Field(default=Decimal("0"), ge=0)
-    category: str | None = None
+    target_amount: Money
+    current_amount: MoneyOrZero = Decimal("0")
+    category: ShortText | None = None
     deadline: datetime | None = None
 
     @model_validator(mode="after")
@@ -26,12 +27,14 @@ class GoalCreate(BaseModel):
 
 
 class GoalUpdate(BaseModel):
-    name: str | None = None
-    target_amount: Decimal | None = Field(default=None, gt=0)
+    name: ShortText | None = None
+    target_amount: Money | None = None
 
 
 class GoalContribute(BaseModel):
-    amount: Decimal  # negativo é permitido p/ corrigir; zero não
+    # Negativo é permitido p/ corrigir um aporte; zero não. O teto usa MAX_MONEY
+    # nos dois sentidos para o aporte nunca estourar Numeric(15,2).
+    amount: Decimal = Field(ge=-MAX_MONEY, le=MAX_MONEY, decimal_places=2)
 
     @model_validator(mode="after")
     def non_zero(self):
