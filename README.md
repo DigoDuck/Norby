@@ -18,7 +18,7 @@ O Norby junta os lançamentos num lugar só (recorrências incluídas), mantém 
 
 | Camada | Tecnologias |
 |---|---|
-| Backend | FastAPI 0.115 · SQLAlchemy 2.0 (async) + asyncpg · Alembic · Pydantic v2 · python-jose (JWT) · slowapi (rate limit) · uv |
+| Backend | FastAPI 0.139 · SQLAlchemy 2.0 (async) + asyncpg · Alembic · Pydantic v2 · python-jose (JWT) · slowapi (rate limit) · uv |
 | Bancos | PostgreSQL 16 (núcleo relacional) · MongoDB 7 via Motor (insights e chat da IA) |
 | IA | Google Gemini 3.5 Flash-Lite (`google-generativeai`) |
 | Frontend | React 19 · Vite 8 · TailwindCSS · componentes estilo shadcn/ui · Zustand · React Router v7 · React Hook Form + Zod · axios · Recharts |
@@ -60,7 +60,7 @@ flowchart LR
 
   Mas ele se sustenta no problema. A carga aqui é I/O-bound no sentido mais literal: cada request de IA fica segundos parado esperando o Gemini responder, e o app ainda conversa com dois bancos. Como roda **uma** instância (ver o rate limit em memória, nas limitações), um worker síncrono preso esperando o LLM é exatamente o gargalo. Async é o que mantém a API atendendo enquanto o modelo pensa.
 
-  O preço foi real e está no código. Sem `django.contrib.auth`, o JWT com rotação de refresh, o hash de senha e o escopo por usuário são código meu. É parte de por que os 85 testes do backend existem.
+  O preço foi real e está no código. Sem `django.contrib.auth`, o JWT com rotação de refresh, o hash de senha e o escopo por usuário são código meu. É parte de por que os 123 testes do backend existem.
 
 - **Saldo persistido, com lock de linha.** O `Wallet.balance` é atualizado por deltas centralizados ([transaction_service.py](backend/app/services/transaction_service.py)) sob `SELECT ... FOR UPDATE`, cobrindo criar, editar, excluir e recorrência sem corrida.
 
@@ -68,7 +68,7 @@ flowchart LR
 
   Persistir dá leitura O(1) e cobra disciplina, porque todo caminho de escrita precisa aplicar ou reverter o delta. O lock existe por um motivo concreto: duas escritas simultâneas na mesma carteira se sobrescreviam. Há um teste que reproduz essa corrida e falha sem o lock ([test_transactions.py](backend/tests/test_transactions.py)). Sendo justo com a alternativa: `saldo_inicial + SUM` seria imune a divergência por construção e dispensaria o lock. Nesta escala, seria a escolha mais conservadora.
 
-- **Refresh token opaco, com rotação.** O access token JWT dura 15 minutos. O refresh dura 7 dias, é guardado só como hash SHA-256, é rotacionado a cada uso e revogado no logout ([auth_service.py](backend/app/services/auth_service.py)). No frontend, um interceptor do axios renova em caso de 401 usando fila única, para não disparar N refreshes concorrentes.
+- **Refresh token opaco, com rotação e detecção de reuso.** O access token JWT dura 15 minutos. O refresh dura 7 dias, é guardado só como hash SHA-256, é rotacionado a cada uso e revogado no logout ([auth_service.py](backend/app/services/auth_service.py)). Rotação e emissão do sucessor acontecem sob `SELECT ... FOR UPDATE` num único commit, e reapresentar um token já rotacionado derruba todas as sessões do usuário — é sinal de que ele foi roubado. No frontend, um interceptor do axios renova em caso de 401 usando fila única, para não disparar N refreshes concorrentes.
 
 - **Recorrências materializadas de forma preguiçosa.** Não existe scheduler no servidor. O frontend chama `POST /recurring/run` no boot ([App.jsx](frontend/src/App.jsx)) e as ocorrências vencidas viram transações de verdade ([recurring_service.py](backend/app/services/recurring_service.py)). O catch-up é um `while next_run_date <= now` que grava cada ocorrência **na data em que ela venceu**, não em "hoje": quem passa três meses fora volta com o histórico correto, só tardio.
 
@@ -81,6 +81,10 @@ flowchart LR
 - **Compatibilidade Neon/asyncpg resolvida na configuração.** O Neon manda parâmetros libpq na URL (`sslmode`, `channel_binding`) que o asyncpg rejeita. O [config.py](backend/app/config.py) normaliza a URL e liga o SSL via `connect_args`. O Alembic reusa a mesma lógica.
 
 - **Todo acesso a dado é escopado por usuário.** Nenhuma query confia em id vindo do corpo da requisição: a posse é checada, e recurso de outra pessoa responde 404. A convenção está fixada no [AGENTS.md](AGENTS.md) e é testada com dois usuários.
+
+- **Auditoria de segurança: o que foi corrigido e o que foi assumido.** O projeto passou por uma revisão de segurança e cada achado virou um commit rastreável. Os dois mais interessantes são de concorrência: a edição simultânea da mesma transação revertia o valor antigo duas vezes e deixava o saldo divergente do registro gravado ([`75e6998`](https://github.com/DigoDuck/Norby/commit/75e6998)), e a rotação de refresh token emitia dois sucessores válidos quando chamada em paralelo ([`f97fff4`](https://github.com/DigoDuck/Norby/commit/f97fff4)). Os dois têm teste que falha sem a correção. Entraram junto limites de valor e tamanho no Pydantic com CHECK constraints espelhadas no Postgres, headers de segurança e CSP, senha obrigatória para excluir a conta, login com tempo constante e o consentimento LGPD persistido com timestamp.
+
+  Duas decisões foram de **não** corrigir, com o motivo registrado no [AGENTS.md](AGENTS.md). Os tokens seguem no `localStorage`: a correção canônica é cookie `HttpOnly`, mas o frontend (`vercel.app`) e a API (`railway.app`) são sites registráveis distintos, então o cookie exigiria `SameSite=None` e seria bloqueado pelo Safari e pelo Chrome, deslogando o usuário a cada recarga. Migrar depende de domínio próprio. E o rate limit de login continua por IP: ligar `--forwarded-allow-ips="*"` faria o uvicorn confiar no *primeiro* item do `X-Forwarded-For`, que é justamente o que o cliente controla, tornando o limite spoofável — a correção óbvia seria pior que o problema. As rotas autenticadas passaram a ser chaveadas pelo id do usuário ([`1e8b8bd`](https://github.com/DigoDuck/Norby/commit/1e8b8bd)), o que resolve o caso real sem abrir esse buraco.
 
 ## Como usei IA no desenvolvimento
 
@@ -104,15 +108,15 @@ Só que não era um bug, era uma classe de bug: o mesmo erro tinha vazado para q
 
 ## Validação
 
-- **Backend: 85 testes** (pytest + pytest-asyncio). Cobrem auth (registro, login, refresh com rotação), CRUD de todos os recursos com checagem de posse entre dois usuários, materialização de recorrências, metas, score determinístico, contrato do insight da IA e observabilidade (request-id). Rodam contra um Postgres real de teste (`norby_test`), com o schema criado e destruído a cada teste. Comando: `pytest` em `backend/`.
-- **Frontend: 24 testes** (Vitest + Testing Library). Cobrem o store de auth, os schemas Zod, utilitários e componentes compartilhados. Comando: `npm run test` em `frontend/`.
+- **Backend: 123 testes** (pytest + pytest-asyncio). Cobrem auth (registro com consentimento, login com tempo constante, refresh com rotação e detecção de reuso), CRUD de todos os recursos com checagem de posse entre dois usuários, materialização de recorrências, metas, score determinístico, contrato do insight da IA, limites de validação, constraints do banco, rate limit por usuário e observabilidade (request-id). Vários deles são testes de concorrência que abrem transações simultâneas de verdade no Postgres e falham sem os locks. Rodam contra um Postgres real de teste (`norby_test`), com o schema criado e destruído a cada teste. Comando: `pytest` em `backend/`.
+- **Frontend: 44 testes** (Vitest + Testing Library). Cobrem o store de auth, os schemas Zod, utilitários, tratamento de erro da API e componentes compartilhados. Comando: `npm run test` em `frontend/`.
 - Sem CI configurado: os testes rodam localmente antes do merge.
 
 ## Conformidade (LGPD)
 
 O projeto trata dados financeiros pessoais, e isso está documentado em [LGPD.md](LGPD.md): inventário de dados com base legal, compartilhamento com operadores (Gemini, hospedagem) e os direitos do titular que estão de fato implementados no produto.
 
-São dois, e ambos funcionam de verdade. Exportação de todos os dados em JSON (`GET /auth/me/export`) e exclusão definitiva da conta (`DELETE /auth/me`), que apaga o Mongo explicitamente e o Postgres por cascade. É documentação técnica de portfólio, e não substitui revisão jurídica.
+São dois, e ambos funcionam de verdade. Exportação de todos os dados em JSON (`GET /auth/me/export`) e exclusão definitiva da conta (`DELETE /auth/me`), que exige a senha atual — só o access token não basta para uma ação irreversível — e apaga o Mongo explicitamente e o Postgres por cascade. O aceite da política fica registrado com timestamp no cadastro. É documentação técnica de portfólio, e não substitui revisão jurídica.
 
 ## Rodar localmente
 
@@ -142,9 +146,9 @@ Os recursos de IA exigem uma chave do [Google AI Studio](https://aistudio.google
 Limitações conhecidas, aceitas conscientemente na v1:
 
 - Recorrências só materializam quando o usuário abre o app (sem scheduler server-side).
-- Rate limiting em memória, por IP. Não sobrevive a múltiplas instâncias nem a restart.
+- Rate limiting em memória. As rotas autenticadas são limitadas por usuário; login e cadastro, por IP — e atrás do proxy do Railway esse IP é o mesmo para todo mundo, então o balde é compartilhado. Não sobrevive a múltiplas instâncias nem a restart.
+- Access e refresh tokens no `localStorage`, com CSP como mitigação (o porquê está em "Auditoria de segurança").
 - Sem CI e sem linter no backend (o frontend tem ESLint).
-- O consentimento LGPD é validado no cadastro, mas ainda não é persistido com timestamp e versão dos termos.
 - Fora do escopo da v1: multi-moeda, Open Finance, export CSV/PDF, CRUD de categorias, notificações e metas compartilhadas.
 
-Próximos passos: auditoria de segurança mais profunda, i18n, persistência do consentimento e CI.
+Próximos passos: CI, i18n e a migração dos tokens para cookie `HttpOnly`, que depende de um domínio próprio com API e frontend no mesmo site registrável.
