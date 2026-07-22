@@ -37,8 +37,8 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload   # dev server :8000
 pytest                                                      # testes (pytest-asyncio)
 alembic upgrade head                                        # aplica migrations
 alembic revision -m "descricao"                             # nova migration (preencher upgrade/downgrade)
-uv pip compile --python-version 3.12 requirements.txt -o requirements.lock
-uv pip compile --python-version 3.12 requirements-dev.txt -o requirements-dev.lock
+uv pip compile --universal --python-version 3.12 requirements.txt -o requirements.lock
+uv pip compile --universal --python-version 3.12 requirements-dev.txt -o requirements-dev.lock
 uv pip install -r requirements-dev.lock                     # deps + ferramentas de dev/CI
 pip-audit -r requirements.lock --ignore-vuln PYSEC-2026-1325 # audit; exceção abaixo
 ```
