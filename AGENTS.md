@@ -111,6 +111,39 @@ dias com rotação e detecção de reuso. O logout revoga só o refresh — um a
 token roubado vale até 15 min. Revogação imediata exigiria denylist de `jti`
 (consulta extra em toda request); adiada por custo/benefício.
 
+**Tokens no navegador — decisão consciente (2026-07-21):** access e refresh
+ficam no `localStorage` (Zustand persist). A correção canônica seria refresh em
+cookie `HttpOnly` + access só em memória, mas o frontend (`vercel.app`) e a API
+(`railway.app`) são *sites* diferentes: o cookie exigiria `SameSite=None` e
+seria bloqueado pelo Safari ITP e pelo Chrome, deslogando o usuário a cada
+recarga. Mitigações no lugar: CSP restritiva no `vercel.json`, access token de
+15 min e revogação de todas as sessões quando um refresh token é reusado.
+**Pré-requisito para migrar:** domínio próprio com API e frontend no mesmo site
+registrável (`norby.app` + `api.norby.app`) — aí o cookie vira `SameSite=Lax`.
+
+**Rate limit atrás do proxy — decisão consciente (2026-07-21):** o uvicorn só
+honra `X-Forwarded-For` quando o peer é `127.0.0.1` (default de
+`forwarded_allow_ips`), e o proxy do Railway não é loopback; `FORWARDED_ALLOW_IPS`
+não existe naquele ambiente, então `request.client.host` devolve o IP do proxy
+para todo mundo. **Não** ligar `--forwarded-allow-ips="*"`: nessa versão do
+uvicorn o `always_trust` faz o middleware usar o *primeiro* item do
+`X-Forwarded-For`, que é o que o cliente controla, e o rate limit de login
+viraria spoofável. Em vez disso, as rotas autenticadas (`/ai/*`) usam `user_key`
+em `app/limiter.py`, chaveando pelo id do usuário. Login e cadastro são anônimos
+e seguem por IP, com o balde compartilhado como dívida aceita: a proteção contra
+força bruta continua valendo, o custo é colateral.
+
+**Outras dívidas assumidas** (decisões, não pendências esquecidas):
+- `POST /auth/register` responde "Email já cadastrado" (enumeração por essa via
+  é possível, limitada a 5/min). Mensagem genérica destruiria a usabilidade; o
+  login já tem tempo constante, que era o vetor medível.
+- Exclusão de conta apaga o Mongo antes do Postgres, sem transação distribuída.
+  Falha no commit do SQL deixaria a conta viva sem os dados de IA.
+- `/docs` fica público: todos os endpoints por trás dele exigem autenticação, e
+  a documentação navegável é um ativo para o portfólio.
+- Usuários criados antes da migration `b2c3d4e5f6a7` têm `privacy_accepted_at`
+  nulo. NULL significa "aceite não registrado", nunca "aceitou".
+
 **Armadilhas já resolvidas (não reintroduzir):**
 - `VITE_API_URL` na Vercel **tem que ser `https://`**. Com `http://`, o Railway
   responde 301 → https e o redirect rebaixa **POST→GET** → todo POST (login,
