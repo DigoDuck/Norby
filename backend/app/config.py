@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
+from typing import Literal
 from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
 
 class Settings(BaseSettings):
@@ -9,7 +10,7 @@ class Settings(BaseSettings):
     
     # Auth
     secret_key: str
-    algorithm: str = "HS256"
+    algorithm: Literal["HS256"] = "HS256"
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 7
     

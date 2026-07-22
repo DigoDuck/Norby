@@ -37,9 +37,10 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload   # dev server :8000
 pytest                                                      # testes (pytest-asyncio)
 alembic upgrade head                                        # aplica migrations
 alembic revision -m "descricao"                             # nova migration (preencher upgrade/downgrade)
-uv pip install -r requirements.txt                          # instala deps
-uv pip install -r requirements-dev.txt                      # deps + pytest (dev/CI)
-pip-audit --ignore-vuln PYSEC-2026-1325                    # audit; exceção documentada abaixo
+uv pip compile --python-version 3.12 requirements.txt -o requirements.lock
+uv pip compile --python-version 3.12 requirements-dev.txt -o requirements-dev.lock
+uv pip install -r requirements-dev.lock                     # deps + ferramentas de dev/CI
+pip-audit -r requirements.lock --ignore-vuln PYSEC-2026-1325 # audit; exceção abaixo
 ```
 Banco de teste (uma vez, apenas em dev): criar um banco `norby_test` no Postgres local usando um usuário com permissão de criar bancos. Essa permissão é específica do ambiente de desenvolvimento — não replicar em produção.
 
@@ -69,11 +70,12 @@ npm run test     # Vitest
 - Specs e planos vivem no Second Brain (Obsidian), **não** no repo (`docs/` está
   no `.gitignore`).
 - Dependências: `requirements.txt` é **só produção**; pytest e afins vivem em
-  `requirements-dev.txt`. Rodar o comando de audit acima antes de cada release.
+  `requirements-dev.txt`. Os arquivos `.lock` fixam também as transitivas usadas
+  pelo Docker; regenerá-los após alterar os arquivos-fonte. Rodar o comando de
+  audit acima antes de cada release.
 - Exceção do audit: `python-jose` traz `ecdsa`, afetado por
-  `PYSEC-2026-1325` sem versão corrigida. O Norby suporta somente `HS256`, então
-  o caminho vulnerável de assinatura ECDSA/ECDH não é usado. Não configurar
-  `ALGORITHM=ES*` enquanto essa dependência existir.
+  `PYSEC-2026-1325` sem versão corrigida. `Settings.algorithm` aceita somente
+  `HS256`, então o caminho vulnerável de assinatura ECDSA/ECDH não é alcançável.
 
 ## NÃO faça
 

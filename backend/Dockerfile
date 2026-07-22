@@ -11,12 +11,12 @@ COPY --from=ghcr.io/astral-sh/uv:0.11.30 /uv /uvx /bin/
 
 WORKDIR /app
 
-COPY requirements.txt ./
+COPY requirements.txt requirements.lock ./
 
 # Atualiza o pip fornecido pela imagem base e instala apenas dependências de
 # produção. O target development acrescenta pytest em uma camada separada.
 RUN uv pip install --system --no-cache pip==26.1.2 \
-    && uv pip install --system --no-cache -r requirements.txt
+    && uv pip install --system --no-cache -r requirements.lock
 
 # Cria o usuário que executará ambos os targets.
 RUN useradd --create-home --uid 10001 norby
@@ -27,9 +27,9 @@ EXPOSE 8000
 FROM base AS development
 
 # Dependências de teste entram apenas na imagem usada pelo docker-compose/CI.
-COPY requirements-dev.txt ./
+COPY requirements-dev.txt requirements-dev.lock ./
 
-RUN uv pip install --system --no-cache -r requirements-dev.txt
+RUN uv pip install --system --no-cache -r requirements-dev.lock
 
 COPY . .
 
