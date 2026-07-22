@@ -11,7 +11,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { inputCls } from "@/lib/utils";
+import { apiErrorMessage, inputCls } from "@/lib/utils";
 
 /**
  * Diálogo com um input de valor validado (R$), no lugar de `prompt()`.
@@ -54,7 +54,7 @@ export function AmountPromptDialog({
       await onSubmit(amount);
       handleOpenChange(false);
     } catch (err) {
-      setError(err?.response?.data?.detail || errorFallback);
+      setError(apiErrorMessage(err, errorFallback));
     } finally {
       setLoading(false);
     }

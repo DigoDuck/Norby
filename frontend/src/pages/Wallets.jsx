@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Plus, Pencil, Trash2, Wallet } from "lucide-react";
 import { walletsApi } from "@/api/wallets";
-import { formatBRL } from "@/lib/utils";
+import { apiErrorMessage, formatBRL } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import Money from "@/components/shared/Money";
 import { Button } from "@/components/ui/button";
@@ -61,9 +61,7 @@ export default function Wallets() {
       setForm({ name: "", balance: "" });
       load();
     } catch (err) {
-      setError(
-        err.response?.data?.detail || "Não foi possível salvar a carteira.",
-      );
+      setError(apiErrorMessage(err, "Não foi possível salvar a carteira."));
     } finally {
       setSaving(false);
     }

@@ -9,7 +9,7 @@ import { walletsApi } from "@/api/wallets";
 import { recurringApi } from "@/api/recurring";
 import { categoriesFor, reconcileCategory } from "@/lib/categories";
 import { transactionSchema } from "@/lib/schemas";
-import { formatDateBR, formatBRL, inputCls, toDateInput, todayInput } from "@/lib/utils";
+import { apiErrorMessage, formatDateBR, formatBRL, inputCls, toDateInput, todayInput } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 
 import { Button } from "@/components/ui/button";
@@ -172,9 +172,7 @@ export default function Transactions() {
       setEditing(null);
       reload();
     } catch (err) {
-      setServerError(
-        err.response?.data?.detail || "Não foi possível salvar a transação.",
-      );
+      setServerError(apiErrorMessage(err, "Não foi possível salvar a transação."));
     }
   }
 

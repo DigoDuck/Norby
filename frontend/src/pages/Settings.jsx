@@ -4,6 +4,7 @@ import { User, Lock, LogOut, Save, Download, Trash2, ShieldCheck } from "lucide-
 import { useAuthStore } from "@/store/authStore";
 import { authApi } from "@/api/auth";
 import { accountApi } from "@/api/account";
+import { apiErrorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -90,7 +91,7 @@ export default function Settings() {
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (err) {
-      setError(err.response?.data?.detail || "Não foi possível salvar.");
+      setError(apiErrorMessage(err, "Não foi possível salvar."));
     }
   }
 

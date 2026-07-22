@@ -55,6 +55,24 @@ export const formatBRL = (v) =>
   `R$ ${Number(v).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
 
 /**
+ * Mensagem de erro da API, segura para renderizar.
+ *
+ * O `detail` do FastAPI é uma string nos erros de negócio (400/401/404), mas
+ * na validação (422) é uma LISTA de objetos. Jogar essa lista direto no estado
+ * do React derruba a árvore inteira ("Objects are not valid as a React child")
+ * e o app vai a tela branca. Como o backend valida limites que o formulário não
+ * pré-checa (teto de valor, tamanho de texto), esse 422 é alcançável de fato.
+ */
+export function apiErrorMessage(err, fallback) {
+  const detail = err?.response?.data?.detail;
+  if (typeof detail === "string" && detail) return detail;
+  if (Array.isArray(detail) && detail.length) {
+    return "Verifique os dados informados: algum valor é inválido ou longo demais.";
+  }
+  return fallback;
+}
+
+/**
  * Classe base dos inputs "cheios" dos formulários (input nativo, não o <Input>
  * do shadcn, que tem estilo próprio). Compartilhada por Goals/Recurring/Transactions.
  */

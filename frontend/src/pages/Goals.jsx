@@ -8,7 +8,7 @@ import { goalsApi } from "@/api/goals";
 import { aiApi } from "@/api/ai";
 import { CATEGORIES } from "@/lib/categories";
 import { goalSchema } from "@/lib/schemas";
-import { formatBRL, inputCls } from "@/lib/utils";
+import { apiErrorMessage, formatBRL, inputCls } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { AmountPromptDialog } from "@/components/shared/AmountPromptDialog";
 import Money from "@/components/shared/Money";
@@ -100,7 +100,7 @@ export default function Goals() {
       setOpen(false);
       load();
     } catch (err) {
-      setServerError(err.response?.data?.detail || "Não foi possível salvar a meta.");
+      setServerError(apiErrorMessage(err, "Não foi possível salvar a meta."));
     }
   }
 
