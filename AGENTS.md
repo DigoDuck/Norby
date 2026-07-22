@@ -39,7 +39,7 @@ alembic upgrade head                                        # aplica migrations
 alembic revision -m "descricao"                             # nova migration (preencher upgrade/downgrade)
 uv pip install -r requirements.txt                          # instala deps
 uv pip install -r requirements-dev.txt                      # deps + pytest (dev/CI)
-pip-audit                                                   # advisories das deps
+pip-audit --ignore-vuln PYSEC-2026-1325                    # audit; exceção documentada abaixo
 ```
 Banco de teste (uma vez, apenas em dev): criar um banco `norby_test` no Postgres local usando um usuário com permissão de criar bancos. Essa permissão é específica do ambiente de desenvolvimento — não replicar em produção.
 
@@ -69,7 +69,11 @@ npm run test     # Vitest
 - Specs e planos vivem no Second Brain (Obsidian), **não** no repo (`docs/` está
   no `.gitignore`).
 - Dependências: `requirements.txt` é **só produção**; pytest e afins vivem em
-  `requirements-dev.txt`. Rodar `pip-audit` antes de cada release.
+  `requirements-dev.txt`. Rodar o comando de audit acima antes de cada release.
+- Exceção do audit: `python-jose` traz `ecdsa`, afetado por
+  `PYSEC-2026-1325` sem versão corrigida. O Norby suporta somente `HS256`, então
+  o caminho vulnerável de assinatura ECDSA/ECDH não é usado. Não configurar
+  `ALGORITHM=ES*` enquanto essa dependência existir.
 
 ## NÃO faça
 
