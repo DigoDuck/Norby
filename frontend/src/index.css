@@ -47,11 +47,14 @@
   --grid-line: 255 255 255;
   --axis: 154 160 178;
 
+  /* Rampa sequencial monotônica, mínimo 3:1 contra o vidro do card já no nível
+     1 (medido: 3,01 / 4,37 / 6,18 / 9,43). A versão anterior começava em 1,69
+     e ainda invertia entre os níveis 1 e 2. */
   --heat-0: 30 34 44;            /* dia sem lançamento */
-  --heat-1: 30 58 110;
-  --heat-2: 43 87 176;
-  --heat-3: 66 120 232;
-  --heat-4: 116 165 255;
+  --heat-1: 56 96 168;
+  --heat-2: 77 122 202;
+  --heat-3: 105 148 232;
+  --heat-4: 150 185 255;
   --heat-over: 251 113 133;      /* estourou a cota diária */
 }
 
@@ -93,11 +96,13 @@
   --grid-line: 24 27 38;
   --axis: 88 95 115;
 
+  /* No claro a intensidade cresce escurecendo (medido: 3,18 / 4,27 / 6,27 /
+     9,56 contra o vidro). Não é o escuro invertido: os passos são próprios. */
   --heat-0: 226 230 241;
-  --heat-1: 197 213 248;
-  --heat-2: 148 178 240;
-  --heat-3: 96 133 226;
-  --heat-4: 47 87 197;
+  --heat-1: 110 143 206;
+  --heat-2: 86 120 190;
+  --heat-3: 60 92 168;
+  --heat-4: 37 63 138;
   --heat-over: 225 66 92;
 }
 

@@ -263,16 +263,20 @@ export default function Dashboard() {
     [streakTx],
   );
 
-  // Intensidade do heatmap: teal escala com a folga do dia contra a cota;
-  // vermelho = estourou a cota; neutro = dia sem lançamento.
-  function cellClass(cell) {
-    if (!cell.active) return "bg-white/[0.06]";
-    if (!cell.onPace) return "bg-norby-danger/60";
+  // Intensidade do heatmap: escala sequencial própria (--heat-*), nunca a
+  // paleta categórica do donut — reusá-la aqui faria o painel parecer que
+  // codifica categoria, quando codifica intensidade. 4 = folga total,
+  // 2 = raspou a cota, over = estourou, 0 = dia sem lançamento.
+  function heatLevel(cell) {
+    if (!cell.active) return 0;
+    if (!cell.onPace) return "over";
     const folga = headroom(cell, ritmo.dailyPace);
-    if (folga > 0.66) return "bg-norby-teal";
-    if (folga > 0.33) return "bg-norby-teal/70";
-    return "bg-norby-teal/40";
+    if (folga > 0.66) return 4;
+    if (folga > 0.33) return 3;
+    return 2;
   }
+  const heatColor = (level) =>
+    level === "over" ? "rgb(var(--heat-over))" : `rgb(var(--heat-${level}))`;
 
   // ── Meta em destaque: a SAVINGS mais próxima de concluir ──
   const featuredGoal = goals
@@ -550,9 +554,10 @@ export default function Dashboard() {
                     ? `${formatBRL(cell.spent)} de ${formatBRL(ritmo.dailyPace)}`
                     : "sem lançamentos"
                 }`}
-                className={`aspect-square rounded-[3px] ${cellClass(cell)} ${
+                style={{ background: heatColor(heatLevel(cell)) }}
+                className={`aspect-square rounded-[3px] ${
                   i === ritmo.cells.length - 1
-                    ? "ring-1 ring-norby-teal ring-offset-1 ring-offset-norby-surface"
+                    ? "ring-1 ring-accent ring-offset-1 ring-offset-surface"
                     : ""
                 }`}
               />
@@ -560,15 +565,18 @@ export default function Dashboard() {
           </div>
 
           <div className="flex items-center justify-between mt-auto pt-4">
-            <span className="text-[11px] text-norby-ivory/40">
+            <span className="text-[11px] text-content-3">
               Últimos {STREAK_DAYS} dias
             </span>
-            <span className="flex items-center gap-1 text-[11px] text-norby-ivory/40">
+            <span className="flex items-center gap-1 text-[11px] text-content-3">
               Menos
-              <span className="w-2.5 h-2.5 rounded-[3px] bg-norby-teal/20" />
-              <span className="w-2.5 h-2.5 rounded-[3px] bg-norby-teal/40" />
-              <span className="w-2.5 h-2.5 rounded-[3px] bg-norby-teal/70" />
-              <span className="w-2.5 h-2.5 rounded-[3px] bg-norby-teal" />
+              {[1, 2, 3, 4].map((level) => (
+                <span
+                  key={level}
+                  className="w-2.5 h-2.5 rounded-[3px]"
+                  style={{ background: heatColor(level) }}
+                />
+              ))}
               Mais
             </span>
           </div>
