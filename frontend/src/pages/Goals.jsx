@@ -123,17 +123,17 @@ export default function Goals() {
   return (
     <div className="space-y-6">
       {/* Header com estatística viva */}
-      <div className="flex items-start justify-between gap-6">
+      <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:gap-6">
         <div>
-          <h1 className="text-3xl font-bold text-norby-ivory tracking-tight">
+          <h1 className="text-3xl font-bold text-content tracking-tight">
             Suas metas
           </h1>
-          <p className="text-norby-ivory/50 text-sm mt-1">
+          <p className="text-content-2 text-sm mt-1">
             {goals.length} {goals.length === 1 ? "meta ativa" : "metas ativas"}
             {totalSaved > 0 && (
               <>
                 {" "}· você já guardou{" "}
-                <span className="text-norby-teal font-medium tnum">
+                <span className="text-accent font-medium tnum">
                   {formatBRL(totalSaved)}
                 </span>{" "}
                 rumo aos seus objetivos
@@ -144,20 +144,20 @@ export default function Goals() {
         <Dialog open={open} onOpenChange={handleOpenChange}>
           <DialogTrigger
             render={
-              <Button className="bg-norby-teal hover:bg-norby-teal-soft text-norby-night font-medium shadow-lg shadow-norby-teal/20" />
+              <Button className="bg-accent-fill text-accent-contrast hover:bg-accent-fill/90 font-medium" />
             }
           >
             <Plus size={16} /> Nova meta
           </DialogTrigger>
-          <DialogContent className="bg-norby-surface border-white/10 text-norby-ivory">
+          <DialogContent className="bg-surface border-line/10 text-content">
             <DialogHeader>
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-norby-teal flex items-center justify-center shrink-0">
-                  <Target size={20} className="text-norby-night" />
+                <div className="w-10 h-10 rounded-xl bg-accent-fill flex items-center justify-center shrink-0">
+                  <Target size={20} className="text-accent-contrast" />
                 </div>
                 <div>
                   <DialogTitle>Nova meta</DialogTitle>
-                  <p className="text-xs text-norby-ivory/50 mt-0.5">
+                  <p className="text-xs text-content-2 mt-0.5">
                     Poupança para um objetivo ou orçamento de uma categoria
                   </p>
                 </div>
@@ -247,7 +247,7 @@ export default function Goals() {
               )}
 
               {serverError && (
-                <p className="text-norby-danger text-xs">{serverError}</p>
+                <p className="text-danger text-xs">{serverError}</p>
               )}
 
               <div className="flex gap-2.5 pt-1">
@@ -255,14 +255,14 @@ export default function Goals() {
                   type="button"
                   variant="outline"
                   onClick={() => handleOpenChange(false)}
-                  className="flex-1 border-white/14 bg-transparent text-norby-ivory/70 hover:bg-white/5"
+                  className="flex-1 border-line/10 bg-transparent text-content-2 hover:bg-state/5"
                 >
                   Cancelar
                 </Button>
                 <Button
                   type="submit"
                   disabled={isSubmitting}
-                  className="flex-[1.4] bg-norby-teal hover:bg-norby-teal-soft text-norby-night font-medium"
+                  className="flex-[1.4] bg-accent-fill text-accent-contrast hover:bg-accent-fill/90 font-medium"
                 >
                   {isSubmitting ? "Salvando…" : "Criar meta"}
                 </Button>
@@ -274,26 +274,22 @@ export default function Goals() {
 
       {/* Banner Sugestão da Norby (some quando não há insight) */}
       {insight?.suggested_action && (
-        <div className="relative overflow-hidden glass-card border-norby-teal/25 p-6">
-          <div
-            className="absolute -top-16 -right-8 w-80 h-48 rounded-full pointer-events-none opacity-[0.10]"
-            style={{ background: "#2DB5A3", filter: "blur(90px)" }}
-          />
+        <div className="relative overflow-hidden glass border-accent/25 p-6">
           <div className="relative flex items-center gap-5 flex-wrap">
-            <div className="flex items-start gap-4 flex-1 min-w-[300px]">
+            <div className="flex min-w-0 flex-1 items-start gap-4 sm:min-w-[300px]">
               <AiOrb size={44} className="mt-0.5" />
               <div>
-                <div className="text-[11px] font-semibold text-norby-teal-soft tracking-widest mb-1.5">
+                <div className="microlabel mb-1.5 text-accent">
                   SUGESTÃO DA NORBY
                 </div>
-                <p className="text-[15px] leading-relaxed text-norby-ivory max-w-xl text-pretty">
+                <p className="text-[15px] leading-relaxed text-content max-w-xl text-pretty">
                   {insight.suggested_action}
                 </p>
               </div>
             </div>
             <Button
               onClick={() => navigate("/ai")}
-              className="bg-norby-teal hover:bg-norby-teal-soft text-norby-night font-medium shrink-0"
+              className="bg-accent-fill text-accent-contrast hover:bg-accent-fill/90 font-medium shrink-0"
             >
               Conversar com a Norby <ArrowRight size={15} />
             </Button>
@@ -302,16 +298,16 @@ export default function Goals() {
       )}
 
       {/* Grid de metas */}
-      <div className="grid grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
         {goals.length === 0 && (
-          <div className="col-span-3 glass-card p-10 flex flex-col items-center text-center">
-            <div className="w-11 h-11 rounded-xl bg-norby-teal/15 flex items-center justify-center mb-3">
-              <Target size={20} className="text-norby-teal" />
+          <div className="col-span-full glass p-10 flex flex-col items-center text-center">
+            <div className="w-11 h-11 rounded-xl bg-accent/[0.15] flex items-center justify-center mb-3">
+              <Target size={20} className="text-accent" />
             </div>
-            <p className="text-sm font-medium text-norby-ivory">
+            <p className="text-sm font-medium text-content">
               Nenhuma meta ainda
             </p>
-            <p className="text-xs text-norby-ivory/50 mt-1 max-w-xs leading-relaxed">
+            <p className="text-xs text-content-2 mt-1 max-w-xs leading-relaxed">
               Crie uma meta de poupança para acompanhar um objetivo, ou um
               orçamento para limitar os gastos de uma categoria.
             </p>
@@ -322,76 +318,64 @@ export default function Goals() {
           const isSavings = g.type === "SAVINGS";
           const pct = Math.min(g.progress_pct, 100);
           const over = g.type === "BUDGET" && g.progress_pct >= 100;
-          const near = g.type === "BUDGET" && g.progress_pct >= 80 && !over;
           const done = isSavings && g.progress_pct >= 100;
-          // Cor da barra: verde p/ SAVINGS (concluída ou não), semântica p/ BUDGET
-          const barColor = over
-            ? "bg-norby-danger"
-            : near
-              ? "bg-[#E0B341]"
-              : isSavings
-                ? "bg-norby-income"
-                : "bg-norby-teal";
-          const glow = over ? "#E06A4A" : isSavings ? "#5FBF7E" : "#2DB5A3";
+          const barColor = isSavings ? "bg-income" : "bg-accent";
           const Icon = isSavings ? PiggyBank : Target;
           const deadline = deadlineLabel(g.deadline);
 
           return (
             <div
               key={g.id}
-              className="group relative overflow-hidden glass-card-hover p-6 flex flex-col"
+              className="group relative overflow-hidden glass-hover p-6 flex flex-col"
             >
-              <div
-                className="absolute -top-12 -right-10 w-36 h-28 rounded-full pointer-events-none opacity-[0.10]"
-                style={{ background: glow, filter: "blur(60px)" }}
-              />
-
-              {/* topo: ícone + status/prazo */}
+              {/* topo: tipo textual + status/prazo */}
               <div className="relative flex items-start justify-between mb-4">
-                <div
-                  className={`w-11 h-11 rounded-2xl flex items-center justify-center ${
-                    isSavings
-                      ? "bg-norby-income/15 text-norby-income"
-                      : "bg-norby-teal/15 text-norby-teal"
-                  }`}
-                >
-                  <Icon size={19} />
-                </div>
+                <span className="chip-neutral">
+                  <Icon size={12} />
+                  {isSavings ? "Reserva" : "Orçamento"}
+                </span>
                 {done ? (
-                  <span className="chip bg-norby-income/15 text-norby-income">
+                  <span className="chip-pos">
                     <Check size={12} /> Concluída
                   </span>
                 ) : over ? (
-                  <span className="chip bg-norby-danger/15 text-norby-danger">
+                  <span className="chip-neg">
                     Estourou
                   </span>
                 ) : deadline ? (
-                  <span className="text-[11px] text-norby-ivory/45">
+                  <span className="text-[11px] text-content-2">
                     {deadline}
                   </span>
                 ) : null}
               </div>
 
-              <p className="relative text-base font-semibold text-norby-ivory mb-0.5">
+              <p className="relative text-base font-semibold text-content mb-0.5">
                 {g.name}
               </p>
-              <p className="relative text-xs text-norby-ivory/40 mb-4">
-                {isSavings ? "Poupança" : `Orçamento · ${g.category}`}
+              <p className="relative text-xs text-content-3 mb-4">
+                {isSavings ? "Objetivo de reserva" : g.category}
               </p>
 
               <div className="relative flex items-baseline gap-2 mb-3">
                 <Money
                   value={g.current_amount}
-                  className="text-2xl font-semibold text-norby-ivory tracking-tight"
-                  centsClassName="text-norby-ivory/45"
+                  className="text-2xl font-semibold text-content tracking-tight"
+                  centsClassName="text-content-2"
                 />
-                <span className="text-sm text-norby-ivory/40">
+                <span className="text-sm text-content-3">
                   de {formatBRL(g.target_amount)}
                 </span>
               </div>
 
               <div className="relative flex items-center gap-2.5">
-                <div className="flex-1 h-2 rounded-full bg-white/[0.06] overflow-hidden">
+                <div
+                  className="flex-1 h-2 rounded-full bg-line/[0.06] overflow-hidden"
+                  role="progressbar"
+                  aria-label={`Progresso de ${g.name}`}
+                  aria-valuenow={pct}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                >
                   <div
                     className={`h-full rounded-full ${barColor} transition-all duration-500`}
                     style={{ width: `${pct}%` }}
@@ -400,17 +384,17 @@ export default function Goals() {
                 <span
                   className={`text-[13px] font-semibold tnum ${
                     over
-                      ? "text-norby-danger"
+                      ? "text-expense"
                       : isSavings
-                        ? "text-norby-income"
-                        : "text-norby-teal"
+                        ? "text-income"
+                        : "text-accent"
                   }`}
                 >
                   {g.progress_pct}%
                 </span>
               </div>
 
-              <p className="relative text-xs text-norby-ivory/45 mt-3">
+              <p className="relative text-xs text-content-2 mt-3">
                 {done
                   ? "Meta alcançada 🎉"
                   : over
@@ -419,7 +403,7 @@ export default function Goals() {
               </p>
 
               {/* rodapé: ações */}
-              <div className="relative flex items-center justify-end gap-1.5 mt-5 pt-4 border-t border-white/[0.07]">
+              <div className="relative flex items-center justify-end gap-1.5 mt-5 pt-4 border-t border-line/[0.08]">
                 {isSavings && (
                   <AmountPromptDialog
                     title={`Aporte em "${g.name}"`}
@@ -431,7 +415,7 @@ export default function Goals() {
                       <button
                         type="button"
                         title="Adicionar aporte"
-                        className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-norby-teal/25 text-norby-teal text-xs font-medium hover:bg-norby-teal/10 transition-colors"
+                        className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-accent/25 text-accent text-xs font-medium hover:bg-accent/10 transition-colors"
                       >
                         <Plus size={13} /> Aporte
                       </button>
@@ -447,7 +431,7 @@ export default function Goals() {
                     <button
                       type="button"
                       title="Excluir"
-                      className="w-8 h-8 flex items-center justify-center rounded-lg border border-white/10 text-norby-ivory/50 hover:text-norby-danger hover:border-norby-danger/40 transition-colors"
+                      className="w-8 h-8 flex items-center justify-center rounded-lg border border-line/10 text-content-3 hover:text-danger hover:border-danger/40 transition-colors"
                     >
                       <Trash2 size={14} />
                       <span className="sr-only">Excluir meta</span>
@@ -462,11 +446,12 @@ export default function Goals() {
         {/* Card tracejado "criar" */}
         {goals.length > 0 && (
           <button
+            type="button"
             onClick={() => setOpen(true)}
-            className="min-h-[236px] rounded-3xl border border-dashed border-white/[0.14] flex flex-col items-center justify-center gap-3 text-norby-ivory/60 hover:border-norby-teal/40 hover:text-norby-ivory hover:bg-white/[0.02] transition-colors"
+            className="inset-panel min-h-[236px] border-dashed border-line/20 flex flex-col items-center justify-center gap-3 text-content-2 hover:border-accent/40 hover:text-content hover:bg-state/[0.02] transition-colors"
           >
-            <div className="w-11 h-11 rounded-xl bg-norby-teal/12 flex items-center justify-center">
-              <Plus size={20} className="text-norby-teal" />
+            <div className="w-11 h-11 rounded-xl bg-accent/[0.12] flex items-center justify-center">
+              <Plus size={20} className="text-accent" />
             </div>
             <span className="text-sm font-medium">Criar nova meta</span>
           </button>
