@@ -1,3 +1,7 @@
+// Toda cor vem de um token em canal RGB declarado em src/index.css. O
+// <alpha-value> preserva os modificadores do Tailwind (bg-surface/70).
+const c = (v) => `rgb(var(${v}) / <alpha-value>)`;
+
 /** @type {import('tailwindcss').Config} */
 export default {
   darkMode: ["selector", '[data-theme="dark"]'],
@@ -5,30 +9,63 @@ export default {
   theme: {
     extend: {
         colors: {
+          "bg-base": c("--bg-base"),
+          surface: c("--surface"),
+          "surface-inset": c("--surface-inset"),
+
+          content: c("--content"),
+          "content-2": c("--content-2"),
+          "content-3": c("--content-3"),
+
+          line: c("--line"),
+          state: c("--state-hover"),
+          overlay: c("--overlay"),
+
+          accent: c("--accent"),
+          "accent-fill": c("--accent-fill"),
+          "accent-contrast": c("--accent-contrast"),
+          focus: c("--focus"),
+          "focus-offset": c("--focus-offset"),
+
+          income: c("--income"),
+          expense: c("--expense"),
+          warning: c("--warning"),
+
+          "chart-1": c("--chart-1"),
+          "chart-2": c("--chart-2"),
+          "chart-3": c("--chart-3"),
+          "chart-4": c("--chart-4"),
+          "chart-5": c("--chart-5"),
+          "chart-6": c("--chart-6"),
+          "grid-line": c("--grid-line"),
+          axis: c("--axis"),
+
+          // Aliases shadcn: os primitivos em ui/ referenciam estes nomes.
+          background: c("--bg-base"),
+          foreground: c("--content"),
+          card: { DEFAULT: c("--surface"), foreground: c("--content") },
+          popover: { DEFAULT: c("--surface-inset"), foreground: c("--content") },
+          primary: { DEFAULT: c("--accent-fill"), foreground: c("--accent-contrast") },
+          secondary: { DEFAULT: c("--surface-inset"), foreground: c("--content") },
+          muted: { DEFAULT: c("--surface-inset"), foreground: c("--content-2") },
+          destructive: { DEFAULT: c("--danger"), foreground: c("--accent-contrast") },
+          border: c("--line"),
+          input: c("--line"),
+          ring: c("--focus"),
+
+          // Ponte enquanto as páginas ainda não migradas usam norby-*.
+          // Removida na Task 18, quando não sobrar nenhum consumidor.
           norby: {
-            night: "#07100F",
-            surface: "#0E1B19",
-            surface2: "#152624",
-            teal: "#2DB5A3",
-            "teal-soft": "#6FD4C6",
-            ivory: "#EFFAF8",
-            income: "#5FBF7E",
-            expense: "#8A8580",
-            danger: "#E06A4A",
+            night: c("--bg-base"),
+            surface: c("--surface"),
+            surface2: c("--surface-inset"),
+            teal: c("--accent"),
+            "teal-soft": c("--accent"),
+            ivory: c("--content"),
+            income: c("--income"),
+            expense: c("--content-3"),
+            danger: c("--danger"),
           },
-          // Aliases shadcn → paleta norby (mesmos hex; os primitivos ui/
-          // referenciam esses tokens, que antes não existiam e viravam no-op).
-          background: "#07100F",
-          foreground: "#EFFAF8",
-          card: { DEFAULT: "#0E1B19", foreground: "#EFFAF8" },
-          popover: { DEFAULT: "#152624", foreground: "#EFFAF8" },
-          primary: { DEFAULT: "#2DB5A3", foreground: "#07100F" },
-          secondary: { DEFAULT: "#152624", foreground: "#EFFAF8" },
-          muted: { DEFAULT: "rgba(255,255,255,0.05)", foreground: "rgba(239,250,248,0.60)" },
-          destructive: { DEFAULT: "#E06A4A", foreground: "#EFFAF8" },
-          border: "rgba(255,255,255,0.10)",
-          input: "rgba(255,255,255,0.10)",
-          ring: "#2DB5A3",
         },
         fontFamily: {
           sans: ["Inter", "sans-serif"],

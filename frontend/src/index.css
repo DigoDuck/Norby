@@ -2,6 +2,94 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Tokens de cor em canais RGB: o Tailwind aplica a opacidade via
+   rgb(var(--x) / <alpha-value>), então bg-surface/70 continua funcionando.
+   Valores de superfície amostrados dos PNGs de referência — a calibração
+   canônica acontece na Task 19 do plano. */
+[data-theme="dark"] {
+  --bg-base: 8 9 12;
+  --surface: 16 18 24;
+  --surface-inset: 24 27 35;
+
+  --content: 244 246 251;
+  --content-2: 154 160 178;
+  --content-3: 106 112 130;
+
+  --line: 255 255 255;           /* usado sempre com alpha: border-line/10 */
+  --state-hover: 255 255 255;
+  --state-active: 255 255 255;
+  --overlay: 4 5 8;
+
+  --accent: 99 122 250;          /* #637AFA — texto, links, ícone de ação */
+  --accent-fill: 79 102 234;     /* preenchimento de CTA */
+  --accent-contrast: 255 255 255;/* texto sobre o preenchimento */
+  --focus: 139 155 255;          /* #8B9BFF */
+  --focus-offset: 8 9 12;
+
+  --income: 52 211 153;          /* #34D399 */
+  --expense: 251 113 133;        /* #FB7185 */
+  --danger: 244 63 94;
+  --warning: 251 146 60;
+
+  --chart-1: 99 122 250;
+  --chart-2: 34 211 238;
+  --chart-3: 167 139 250;
+  --chart-4: 251 146 60;
+  --chart-5: 52 211 153;
+  --chart-6: 244 114 182;
+  --grid-line: 255 255 255;
+  --axis: 154 160 178;
+
+  --heat-0: 30 34 44;            /* dia sem lançamento */
+  --heat-1: 30 58 110;
+  --heat-2: 43 87 176;
+  --heat-3: 66 120 232;
+  --heat-4: 116 165 255;
+  --heat-over: 251 113 133;      /* estourou a cota diária */
+}
+
+[data-theme="light"] {
+  --bg-base: 246 247 252;
+  --surface: 255 255 255;
+  --surface-inset: 240 242 249;
+
+  --content: 24 27 38;
+  --content-2: 88 95 115;
+  --content-3: 130 137 158;
+
+  --line: 24 27 38;
+  --state-hover: 24 27 38;
+  --state-active: 24 27 38;
+  --overlay: 24 27 38;
+
+  --accent: 79 102 234;          /* #4F66EA */
+  --accent-fill: 79 102 234;
+  --accent-contrast: 255 255 255;
+  --focus: 52 73 198;            /* #3449C6 */
+  --focus-offset: 255 255 255;
+
+  --income: 4 120 87;            /* #047857 */
+  --expense: 190 18 60;          /* #BE123C */
+  --danger: 190 18 60;
+  --warning: 194 65 12;          /* #C2410C */
+
+  --chart-1: 63 87 219;
+  --chart-2: 14 138 168;
+  --chart-3: 124 78 230;
+  --chart-4: 194 96 12;
+  --chart-5: 4 120 87;
+  --chart-6: 190 24 93;
+  --grid-line: 24 27 38;
+  --axis: 88 95 115;
+
+  --heat-0: 226 230 241;
+  --heat-1: 197 213 248;
+  --heat-2: 148 178 240;
+  --heat-3: 96 133 226;
+  --heat-4: 47 87 197;
+  --heat-over: 225 66 92;
+}
+
 @layer base {
   * { box-sizing: border-box; }
   body {
