@@ -9,6 +9,7 @@ import {
   AlertTriangle,
   Check,
   Sparkles,
+  CalendarDays,
 } from "lucide-react";
 import {
   AreaChart,
@@ -31,6 +32,7 @@ import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import NorthStar from "@/components/shared/NorthStar";
 import AiOrb from "@/components/shared/AiOrb";
+import NorbyRing from "@/components/shared/NorbyRing";
 import { useAuthStore } from "@/store/authStore";
 import { formatDateBR, formatBRL, parseDateOnly } from "@/lib/utils";
 import { colorForCategory } from "@/lib/palette";
@@ -51,10 +53,10 @@ const EMPTY_SUMMARY = {
   top_categories: [],
 };
 
-const INCOME_COLOR = "#5FBF7E";
-const EXPENSE_COLOR = "#E0725C";
+const INCOME_COLOR = "rgb(var(--income))";
+const EXPENSE_COLOR = "rgb(var(--expense))";
 
-const axisTick = { fill: "rgba(239,250,248,0.40)", fontSize: 11 };
+const axisTick = { fill: "rgb(var(--axis))", fontSize: 11 };
 
 // Emoji por categoria (rascunho aprovado): chip visual das movimentações.
 const CATEGORY_EMOJI = {
@@ -92,10 +94,10 @@ function relativeDay(value) {
 function insightStyle(text) {
   const t = text.toLowerCase();
   if (/(caminho certo|parab|bom |ótimo|no azul|guarda|econom|caíram|caiu|reduz)/.test(t))
-    return { Icon: Check, chip: "bg-norby-income/15 text-norby-income", bg: "bg-norby-income/[0.07]" };
+    return { Icon: Check, chip: "bg-income/15 text-income", bg: "bg-income/[0.07]" };
   if (/(crítico|urgente|déficit|acima|estour|exced|negativ|cuidado|risco|falta|imped|ausência|não )/.test(t))
-    return { Icon: AlertTriangle, chip: "bg-norby-danger/15 text-norby-danger", bg: "bg-norby-danger/[0.07]" };
-  return { Icon: Sparkles, chip: "bg-norby-teal/15 text-norby-teal", bg: "bg-white/[0.03]" };
+    return { Icon: AlertTriangle, chip: "bg-danger/15 text-danger", bg: "bg-danger/[0.07]" };
+  return { Icon: Sparkles, chip: "bg-accent/15 text-accent", bg: "bg-line/[0.03]" };
 }
 
 // Janela do heatmap "Ritmo financeiro" (dias, terminando hoje)
@@ -118,9 +120,9 @@ function monthsForWindow(days) {
 function ChartTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-xl bg-norby-surface2/95 backdrop-blur-md border border-white/10 px-3 py-2 shadow-xl">
+    <div className="rounded-xl bg-surface-inset border border-line/10 px-3 py-2 shadow-xl">
       {label && (
-        <p className="text-[11px] font-medium text-norby-ivory/50 mb-1 capitalize">
+        <p className="text-[11px] font-medium text-content-2 mb-1 capitalize">
           {label}
         </p>
       )}
@@ -130,8 +132,8 @@ function ChartTooltip({ active, payload, label }) {
             className="w-2 h-2 rounded-full"
             style={{ background: p.color || p.payload?.fill }}
           />
-          <span className="text-norby-ivory/70">{p.name}</span>
-          <span className="ml-auto font-semibold text-norby-ivory tnum">
+          <span className="text-content-2">{p.name}</span>
+          <span className="ml-auto font-semibold text-content tnum">
             {formatBRL(p.value)}
           </span>
         </div>
@@ -140,16 +142,17 @@ function ChartTooltip({ active, payload, label }) {
   );
 }
 
-// Valor monetário grande com centavos em teal-soft ("R$ 8.240" + ",50")
+// Valor monetário grande com os centavos rebaixados ("R$ 8.240" + ",50").
+// Mesmo tratamento do Money.jsx: centavos são informação secundária, não acento.
 function MoneyHero({ value }) {
   const formatted = formatBRL(value);
   const idx = formatted.lastIndexOf(",");
   return (
     <span className="tnum tracking-tight">
-      <span className="text-4xl font-semibold text-norby-ivory">
+      <span className="text-4xl font-semibold text-content">
         {formatted.slice(0, idx)}
       </span>
-      <span className="text-2xl font-semibold text-norby-teal-soft">
+      <span className="text-2xl font-semibold text-content-2">
         {formatted.slice(idx)}
       </span>
     </span>
@@ -319,51 +322,47 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-4">
-      {/* ── Linha 1: hero + saldo total ─────────────────────────────── */}
-      <div className="grid grid-cols-[1.15fr_1fr] gap-4">
-        {/* Hero: saudação + convite à IA */}
-        <div
-          className="relative overflow-hidden rounded-3xl p-7 flex flex-col animate-fade-up"
-          style={{
-            background:
-              "linear-gradient(130deg, #156358 0%, #2DB5A3 48%, #6FD4C6 115%)",
-          }}
-        >
-          {/* Círculos decorativos, como no rascunho aprovado */}
-          <div className="absolute -right-10 -top-10 w-56 h-56 rounded-full bg-white/[0.08] pointer-events-none" />
-          <div className="absolute right-5 -bottom-16 w-40 h-40 rounded-full bg-norby-night/[0.16] pointer-events-none" />
+      {/* ── Linha contextual: a data, sozinha, à esquerda ────────────── */}
+      <div className="flex items-center">
+        <span className="inline-flex items-center gap-2 rounded-full glass px-3.5 py-1.5 text-[11px] font-semibold text-content-2 uppercase tracking-widest">
+          <CalendarDays size={13} className="text-accent" />
+          {todayLabel}
+        </span>
+      </div>
 
-          <span className="relative inline-flex items-center gap-1.5 w-fit rounded-full bg-white/25 px-3 py-1 text-[11px] font-semibold text-norby-night/80 uppercase tracking-widest">
-            <span className="w-1.5 h-1.5 rounded-full bg-norby-night/70" />
-            {todayLabel}
-          </span>
+      {/* ── Linha 1: hero (7 col) + saldo total (5 col) ──────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        {/* Hero: saudação + convite à IA + anel da marca */}
+        <section className="lg:col-span-7 relative overflow-hidden glass p-6 flex items-center gap-6 min-h-[228px] animate-fade-up">
+          {/* Único glow do dashboard junto com o card da IA (ver DESIGN.md) */}
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{ background: "var(--glow-accent)" }}
+          />
 
-          <h1 className="relative text-3xl font-bold text-norby-night mt-3.5 tracking-tight">
-            Olá, {firstName} 👋
-          </h1>
-          <p className="relative text-sm text-norby-night/70 mt-1.5 max-w-sm leading-relaxed">
-            Pergunte qualquer coisa sobre suas finanças — a Norby está pronta.
-          </p>
-
-          <div className="relative mt-auto pt-5">
+          <div className="relative min-w-0">
+            <h1 className="text-3xl font-bold text-content tracking-tight">
+              Olá, {firstName} 👋
+            </h1>
+            <p className="text-sm text-content-2 mt-2 max-w-sm leading-relaxed">
+              Pergunte qualquer coisa sobre suas finanças — a Norby está pronta.
+            </p>
             <Button
               onClick={() => navigate("/ai")}
-              className="bg-norby-night text-norby-teal-soft hover:bg-norby-night/85"
+              className="mt-5 h-10 px-5 bg-accent-fill text-accent-contrast hover:bg-accent-fill/90 font-medium"
             >
               Falar com a Norby <ArrowRight size={15} />
             </Button>
           </div>
-        </div>
+
+          <NorbyRing
+            size={200}
+            className="hidden md:block ml-auto motion-safe:animate-[ring-float_11s_ease-in-out_infinite]"
+          />
+        </section>
 
         {/* Saldo total */}
-        <div className="relative overflow-hidden glass-card border-norby-teal/20 p-6 flex flex-col gap-4 animate-fade-up">
-          <div
-            className="absolute inset-0 pointer-events-none"
-            style={{
-              background:
-                "radial-gradient(circle at 90% 12%, rgba(45,181,163,0.14), transparent 55%)",
-            }}
-          />
+        <section className="lg:col-span-5 glass p-6 flex flex-col gap-4 animate-fade-up">
           <div className="relative flex items-center justify-between gap-3">
             <span className="microlabel">Saldo total</span>
             {wallets.length > 1 && (
@@ -381,7 +380,7 @@ export default function Dashboard() {
           <div className="relative">
             <div className="flex items-baseline gap-2">
               <MoneyHero value={shownBalance} />
-              <span className="text-xs font-medium text-norby-ivory/40">BRL</span>
+              <span className="text-xs font-medium text-content-3">BRL</span>
             </div>
             {balanceChange !== undefined && (
               <div className="flex items-center gap-2 mt-2">
@@ -393,9 +392,7 @@ export default function Dashboard() {
                   )}
                   {Math.abs(balanceChange).toFixed(1)}%
                 </span>
-                <span className="text-xs text-norby-ivory/40">
-                  vs. mês passado
-                </span>
+                <span className="text-xs text-content-3">vs. mês passado</span>
               </div>
             )}
           </div>
@@ -403,40 +400,40 @@ export default function Dashboard() {
           <div className="relative flex gap-2">
             <Button
               onClick={() => newTransaction("INCOME")}
-              className="flex-1 bg-norby-teal text-norby-night hover:bg-norby-teal-soft font-medium shadow-lg shadow-norby-teal/20"
+              className="flex-1 bg-accent-fill text-accent-contrast hover:bg-accent-fill/90 font-medium"
             >
               <Plus size={15} /> Receita
             </Button>
             <Button
               onClick={() => newTransaction("EXPENSE")}
               variant="outline"
-              className="flex-1 border-norby-teal/25 bg-norby-teal/[0.08] text-norby-teal hover:bg-norby-teal/[0.15]"
+              className="flex-1 border-line/15 bg-line/[0.04] text-content-2 hover:bg-state/[0.08] hover:text-content"
             >
               <Minus size={15} /> Despesa
             </Button>
           </div>
 
-          <div className="relative grid grid-cols-3 divide-x divide-white/[0.06] border-t border-dashed border-white/10 pt-4 mt-auto">
+          <div className="relative grid grid-cols-3 divide-x divide-line/[0.08] border-t border-dashed border-line/10 pt-4 mt-auto">
             <div className="pr-3">
               <p className="microlabel">Receitas</p>
-              <p className="text-sm font-semibold text-norby-income tnum mt-1">
+              <p className="text-sm font-semibold text-income tnum mt-1">
                 {formatBRL(monthIncome)}
               </p>
             </div>
             <div className="px-3">
               <p className="microlabel">Despesas</p>
-              <p className="text-sm font-semibold text-norby-ivory tnum mt-1">
+              <p className="text-sm font-semibold text-content tnum mt-1">
                 {formatBRL(monthExpenses)}
               </p>
             </div>
             <div className="pl-3">
               <p className="microlabel">Score IA</p>
-              <p className="text-sm font-semibold text-norby-teal-soft tnum mt-1">
+              <p className="text-sm font-semibold text-accent tnum mt-1">
                 {insight?.score != null ? `${insight.score}/100` : "—"}
               </p>
             </div>
           </div>
-        </div>
+        </section>
       </div>
 
       {/* ── Linha 2: categorias + ritmo + meta ──────────────────────── */}

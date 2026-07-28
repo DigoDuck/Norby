@@ -9,8 +9,10 @@ export default function AppLayout() {
       {/* Atmosfera de fundo. O Aurora (WebGL) fica até a Task 21 comparar o
           build com e sem ele; o mesh CSS já é a camada de base. */}
       <div className="fixed inset-0 z-0 pointer-events-none">
+        {/* Sem ciano nos stops: o ramp do shader o transformava num lavado
+            esverdeado que brigava com o mesh violeta. Família índigo/violeta só. */}
         <Aurora
-          colorStops={["#637AFA", "#A78BFA", "#22D3EE"]}
+          colorStops={["#4F46E5", "#8B7BF7", "#A78BFA"]}
           amplitude={1}
           blend={0.75}
         />
