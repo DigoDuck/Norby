@@ -9,7 +9,6 @@ import { apiErrorMessage } from "@/lib/utils";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Eye, EyeOff } from "lucide-react";
-import Aurora from "../components/Aurora";
 import NorbyMark from "../components/shared/Logo";
 import NorbyRing from "../components/shared/NorbyRing";
 
@@ -86,19 +85,10 @@ export default function Auth() {
 
   return (
     <div className="app-mesh relative flex min-h-screen w-full items-center justify-center overflow-x-hidden bg-bg-base p-4">
-      {/* Aurora ambiente, sempre atrás da camada de contraste */}
-      <div className="fixed inset-0 z-0 pointer-events-none">
-        <Aurora
-          colorStops={["#637AFA", "#A78BFA", "#22D3EE"]}
-          amplitude={1}
-          blend={0.6}
-        />
-        <div className="absolute inset-0 bg-bg-base/70" />
-      </div>
-
       <div className="relative z-10 flex w-full max-w-5xl items-center justify-center gap-20">
         <NorbyRing
           size={280}
+          variant="glass"
           className="hidden lg:block motion-safe:animate-[ring-float_11s_ease-in-out_infinite]"
         />
 
