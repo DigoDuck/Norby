@@ -82,17 +82,20 @@
   --state-active: 24 27 38;
   --overlay: 24 27 38;
 
-  /* Mesma família azure do escuro. A referência usa #2C6FF4 (4,2:1 sobre
-     branco); descemos para blue-600, que passa AA e mantém o matiz. */
-  --accent: 37 99 235;           /* #2563EB */
+  /* Mesma família azure do escuro. A referência usa #2C6FF4, que dá 4,2:1
+     sobre branco; blue-600 chega a 4,43 e ainda reprova quando o texto cai
+     sobre uma pílula tingida. Este passa com folga sem sair do matiz. */
+  --accent: 31 95 216;           /* #1F5FD8 */
   --accent-fill: 79 102 234;
   --accent-contrast: 255 255 255;
   --focus: 52 73 198;            /* #3449C6 */
   --focus-offset: 255 255 255;
 
   /* Ciano como no escuro, mas escurecido: o #1CA1BB da referência dá 2,8:1
-     sobre branco e valores monetários não podem reprovar contraste. */
-  --income: 14 116 144;          /* #0E7490 */
+     sobre branco e valores monetários não podem reprovar contraste. Mais
+     escuro que cyan-700 porque o texto também aparece sobre a pílula tingida
+     de ciano, onde o fundo já não é branco. */
+  --income: 12 102 128;          /* #0C6680 */
   --expense: 190 18 60;          /* #BE123C — o #F55669 da referência dá 3,3:1 */
   --danger: 190 18 60;
   --warning: 194 65 12;          /* #C2410C */
