@@ -185,6 +185,13 @@
 }
 .star-loading { animation: star-pulse 1.4s ease-in-out infinite; }
 
+/* Anel da Norby: a ousadia visual do app inteiro mora aqui e só aqui. */
+[data-theme="dark"]  { --ring-sat: 1.15; --ring-glow: 0.45; --ring-veil: 0; }
+[data-theme="light"] { --ring-sat: 0.72; --ring-glow: 0.26; --ring-veil: 0.34; }
+
+@keyframes ring-spin  { to { transform: rotate(360deg); } }
+@keyframes ring-float { 0%, 100% { translate: 0 0; } 50% { translate: 0 -10px; } }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
