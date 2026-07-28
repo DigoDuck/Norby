@@ -280,6 +280,10 @@ export default function Dashboard() {
   }
   const heatColor = (level) =>
     level === "over" ? "rgb(var(--heat-over))" : `rgb(var(--heat-${level}))`;
+  const heatGlow = (level) =>
+    level === "over" || level >= 3
+      ? { boxShadow: `0 0 12px -2px ${heatColor(level)}` }
+      : undefined;
 
   // ── Meta em destaque: a SAVINGS mais próxima de concluir ──
   const featuredGoal = goals
@@ -544,22 +548,28 @@ export default function Dashboard() {
             className="grid gap-1 mt-4"
             style={{ gridTemplateColumns: "repeat(14, minmax(0, 1fr))" }}
           >
-            {ritmo.cells.map((cell, i) => (
-              <div
-                key={cell.key}
-                title={`${formatDateBR(cell.key)} · ${
-                  cell.active
-                    ? `${formatBRL(cell.spent)} de ${formatBRL(ritmo.dailyPace)}`
-                    : "sem lançamentos"
-                }`}
-                style={{ background: heatColor(heatLevel(cell)) }}
-                className={`aspect-square rounded-[3px] ${
-                  i === ritmo.cells.length - 1
-                    ? "ring-1 ring-accent ring-offset-1 ring-offset-surface"
-                    : ""
-                }`}
-              />
-            ))}
+            {ritmo.cells.map((cell, i) => {
+              const level = heatLevel(cell);
+              return (
+                <div
+                  key={cell.key}
+                  title={`${formatDateBR(cell.key)} · ${
+                    cell.active
+                      ? `${formatBRL(cell.spent)} de ${formatBRL(ritmo.dailyPace)}`
+                      : "sem lançamentos"
+                  }`}
+                  style={{
+                    backgroundColor: heatColor(level),
+                    ...heatGlow(level),
+                  }}
+                  className={`heat-cell ${
+                    i === ritmo.cells.length - 1
+                      ? "ring-1 ring-accent ring-offset-1 ring-offset-surface"
+                      : ""
+                  }`}
+                />
+              );
+            })}
           </div>
 
           <div className="flex items-center justify-between mt-auto pt-4">
@@ -568,11 +578,11 @@ export default function Dashboard() {
             </span>
             <span className="flex items-center gap-1 text-[11px] text-content-3">
               Menos
-              {[1, 2, 3, 4].map((level) => (
+              {[0, 1, 2, 3, 4].map((level) => (
                 <span
                   key={level}
-                  className="w-2.5 h-2.5 rounded-[3px]"
-                  style={{ background: heatColor(level) }}
+                  className="heat-cell w-2.5 h-2.5 shrink-0"
+                  style={{ backgroundColor: heatColor(level) }}
                 />
               ))}
               Mais
