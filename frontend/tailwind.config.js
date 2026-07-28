@@ -38,6 +38,9 @@ export default {
           "chart-4": c("--chart-4"),
           "chart-5": c("--chart-5"),
           "chart-6": c("--chart-6"),
+          "chart-7": c("--chart-7"),
+          "chart-8": c("--chart-8"),
+          "chart-9": c("--chart-9"),
           "grid-line": c("--grid-line"),
           axis: c("--axis"),
 

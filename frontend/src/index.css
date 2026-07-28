@@ -13,7 +13,9 @@
 
   --content: 244 246 251;
   --content-2: 154 160 178;
-  --content-3: 106 112 130;
+  /* .microlabel é 11px: texto normal pelo WCAG, não texto grande, então precisa
+     de 4,5:1. O valor amostrado do PNG (106 112 130) media 3,81 sobre o vidro. */
+  --content-3: 120 127 146;
 
   --line: 255 255 255;           /* usado sempre com alpha: border-line/10 */
   --state-hover: 255 255 255;
@@ -31,12 +33,17 @@
   --danger: 244 63 94;
   --warning: 251 146 60;
 
+  /* Uma cor por categoria de despesa (são 9 em lib/categories.js). Menos que
+     isso e duas fatias do mesmo donut saem iguais — ver Desvios da Fase 1. */
   --chart-1: 99 122 250;
   --chart-2: 34 211 238;
   --chart-3: 167 139 250;
   --chart-4: 251 146 60;
   --chart-5: 52 211 153;
   --chart-6: 244 114 182;
+  --chart-7: 163 230 53;
+  --chart-8: 56 189 248;
+  --chart-9: 148 163 184;        /* neutro: cai em "Outros", a categoria-resto */
   --grid-line: 255 255 255;
   --axis: 154 160 178;
 
@@ -55,7 +62,8 @@
 
   --content: 24 27 38;
   --content-2: 88 95 115;
-  --content-3: 130 137 158;
+  /* Mesma razão do escuro: media 3,42 sobre o vidro claro. */
+  --content-3: 104 111 132;
 
   --line: 24 27 38;
   --state-hover: 24 27 38;
@@ -79,6 +87,9 @@
   --chart-4: 194 96 12;
   --chart-5: 4 120 87;
   --chart-6: 190 24 93;
+  --chart-7: 77 124 15;
+  --chart-8: 3 105 161;
+  --chart-9: 71 85 105;          /* neutro: cai em "Outros", a categoria-resto */
   --grid-line: 24 27 38;
   --axis: 88 95 115;
 

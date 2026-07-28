@@ -9,14 +9,23 @@ describe("palette", () => {
     expect(antes).toBe(depois);
   });
 
-  it("distribui as categorias conhecidas sem colisão entre as 6 primeiras", () => {
-    const cores = EXPENSE_CATEGORIES.slice(0, 6).map(colorForCategory);
-    expect(new Set(cores).size).toBe(6);
+  // O donut mostra o top-5 de despesas do mês, e o top-5 muda de mês para mês.
+  // Como a cor precisa ser estável por categoria, qualquer par de despesas pode
+  // acabar na mesma rosca: TODAS as 9 têm que ser distintas, não só as 6
+  // primeiras. A versão fraca deste teste deixou passar Moradia e
+  // "Contas & Serviços" com a mesma cor.
+  it("dá uma cor distinta a cada categoria de despesa", () => {
+    const cores = EXPENSE_CATEGORIES.map(colorForCategory);
+    expect(new Set(cores).size).toBe(EXPENSE_CATEGORIES.length);
+  });
+
+  it("tem espectro suficiente para cobrir todas as despesas", () => {
+    expect(CHART_SERIES.length).toBeGreaterThanOrEqual(EXPENSE_CATEGORIES.length);
   });
 
   it("usa o espectro de gráfico tokenizado, nunca hex fixo", () => {
-    expect(colorForCategory("Alimentação")).toMatch(/^rgb\(var\(--chart-[1-6]\)\)$/);
-    CHART_SERIES.forEach((c) => expect(c).toMatch(/^rgb\(var\(--chart-[1-6]\)\)$/));
+    expect(colorForCategory("Alimentação")).toMatch(/^rgb\(var\(--chart-[1-9]\)\)$/);
+    CHART_SERIES.forEach((c) => expect(c).toMatch(/^rgb\(var\(--chart-[1-9]\)\)$/));
   });
 
   it("categoria desconhecida cai num fallback determinístico", () => {
