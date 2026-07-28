@@ -138,6 +138,15 @@
     radial-gradient(90% 60% at 12% 0%, rgba(59, 130, 246, 0.10), transparent 70%),
     radial-gradient(70% 50% at 92% 8%, rgba(167, 139, 250, 0.08), transparent 70%);
   --glow-accent: radial-gradient(60% 60% at 50% 0%, rgba(59, 130, 246, 0.26), transparent 70%);
+
+  /* Espectro iridescente. São canais, e não um gradiente pronto, porque a
+     cáustica do herói e o glow precisam dos stops soltos com alpha próprio.
+     DECORATIVO: nenhum destes é cor semântica, e nenhum deles pode virar
+     sinal de receita, despesa ou alerta. */
+  --iris-1: 34 211 238;
+  --iris-2: 99 122 250;
+  --iris-3: 167 139 250;
+  --iris-4: 232 121 249;
 }
 
 [data-theme="light"] {
@@ -152,6 +161,22 @@
     radial-gradient(90% 60% at 12% 0%, rgba(129, 140, 248, 0.14), transparent 70%),
     radial-gradient(70% 50% at 92% 8%, rgba(196, 181, 253, 0.12), transparent 70%);
   --glow-accent: radial-gradient(60% 60% at 50% 0%, rgba(129, 140, 248, 0.18), transparent 70%);
+
+  /* Mais claros e menos saturados: os mesmos stops do escuro sobre branco
+     viram neon e comem o texto que estiver por perto. */
+  --iris-1: 103 232 249;
+  --iris-2: 129 140 248;
+  --iris-3: 196 181 253;
+  --iris-4: 240 171 252;
+}
+
+/* Derivados dos stops acima. Ficam fora dos blocos de tema justamente para não
+   existirem em duas versões: quem muda por tema são os canais, não a receita. */
+:root {
+  --iris: linear-gradient(105deg,
+    rgb(var(--iris-1)) 0%, rgb(var(--iris-2)) 42%,
+    rgb(var(--iris-3)) 68%, rgb(var(--iris-4)) 100%);
+  --iris-glow: 0 0 22px -6px rgb(var(--iris-3) / 0.55);
 }
 
 @layer base {
@@ -200,6 +225,57 @@
   .microlabel {
     @apply text-[11px] font-medium text-content-3 uppercase tracking-widest;
   }
+
+}
+
+/* Os três utilitários abaixo ficam FORA de @layer components de propósito: o
+   Tailwind purga o que está na layer e não aparece em nenhum arquivo escaneado,
+   e estes são consumidos por outro agente, em outro arquivo, depois. Purgar em
+   silêncio custa mais do que os poucos bytes de mantê-los sempre. */
+
+/* Moldura iridescente de 1px com miolo transparente. Não sai de border-image,
+   que ignora border-radius; o caminho é pintar o retângulo inteiro num pseudo
+   e recortar o miolo com mask-composite.
+   Uso definido (DESIGN.md): item ativo da navegação, CTA secundário e o
+   primeiro insight da IA. Não é enfeite de card qualquer. */
+.stroke-iris { position: relative; }
+.stroke-iris::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: var(--iris);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+}
+.stroke-iris-glow { box-shadow: var(--iris-glow); }
+
+/* Tile da marca: o mesmo espectro, agora chapado. rounded-[28%] mantém o
+   squircle proporcional em qualquer tamanho, coisa que um raio fixo perde. */
+.brand-tile {
+  background: var(--iris);
+  box-shadow: var(--iris-glow), inset 0 1px 0 rgb(255 255 255 / 0.25);
+  @apply rounded-[28%] grid place-items-center text-accent-contrast;
+}
+
+/* Célula do heatmap: a referência mostra um azulejo com borda própria, não um
+   quadrado chapado. O gradiente diagonal é o que dá o volume.
+   A cor vem inline via backgroundColor — nunca pelo atalho background, que
+   apagaria este background-image. */
+.heat-cell {
+  @apply aspect-square rounded-lg border border-line/[0.07] transition-colors;
+  background-image: linear-gradient(135deg, rgb(255 255 255 / 0.06), transparent 60%);
+}
+
+/* Sem mask-composite o pseudo pintaria um retângulo cheio por cima do conteúdo
+   — pior que não ter o efeito. Aí a moldura vira uma borda sólida do acento. */
+@supports not ((mask-composite: exclude) or (-webkit-mask-composite: xor)) {
+  .stroke-iris::before { display: none; }
+  .stroke-iris { border: 1px solid rgb(var(--accent) / 0.45); }
 }
 
 /* Sem backdrop-filter (navegador antigo ou GPU desligada): superfície opaca
@@ -281,8 +357,8 @@
   transform: rotate(-8deg) skewX(-24deg);
   transform-origin: right center;
   background:
-    linear-gradient(90deg, transparent 0 14%, rgb(99 122 250 / 0.08) 38%, rgb(34 211 238 / 0.38) 72%, transparent 100%),
-    linear-gradient(96deg, transparent 12%, rgb(167 139 250 / 0.18) 48%, rgb(232 121 249 / 0.34) 78%, transparent 100%);
+    linear-gradient(90deg, transparent 0 14%, rgb(var(--iris-2) / 0.08) 38%, rgb(var(--iris-1) / 0.38) 72%, transparent 100%),
+    linear-gradient(96deg, transparent 12%, rgb(var(--iris-3) / 0.18) 48%, rgb(var(--iris-4) / 0.34) 78%, transparent 100%);
   filter: blur(13px);
   opacity: 0.9;
 }
@@ -302,13 +378,13 @@
 .hero-ring__caustic::before {
   bottom: 43%;
   transform: rotate(5deg);
-  background: linear-gradient(90deg, transparent, rgb(34 211 238 / 0.48), rgb(99 122 250 / 0.1));
+  background: linear-gradient(90deg, transparent, rgb(var(--iris-1) / 0.48), rgb(var(--iris-2) / 0.1));
 }
 
 .hero-ring__caustic::after {
   bottom: 22%;
   transform: rotate(-4deg);
-  background: linear-gradient(90deg, transparent, rgb(167 139 250 / 0.4), rgb(244 114 182 / 0.12));
+  background: linear-gradient(90deg, transparent, rgb(var(--iris-3) / 0.4), rgb(var(--iris-4) / 0.12));
 }
 
 [data-theme="light"] .hero-ring__caustic {
