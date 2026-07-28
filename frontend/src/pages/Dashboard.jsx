@@ -252,7 +252,7 @@ export default function Dashboard() {
           cx={cx}
           cy={cy}
           r={4.5}
-          fill="#0E1B19"
+          fill="rgb(var(--surface))"
           stroke={color}
           strokeWidth={2.5}
         />
@@ -304,7 +304,7 @@ export default function Dashboard() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <NorthStar size={32} className="text-norby-teal star-loading" />
+        <NorthStar size={32} className="text-accent star-loading" />
       </div>
     );
   }
@@ -437,14 +437,14 @@ export default function Dashboard() {
       </div>
 
       {/* ── Linha 2: categorias + ritmo + meta ──────────────────────── */}
-      <div className="grid grid-cols-[1.1fr_1fr_1fr] gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* Onde vai seu dinheiro */}
-        <div className="glass-card p-6">
+        <div className="lg:col-span-4 glass p-6">
           <div>
-            <h2 className="font-semibold text-norby-ivory">
+            <h2 className="font-semibold text-content">
               Onde vai seu dinheiro
             </h2>
-            <p className="text-xs text-norby-ivory/50 mt-0.5">
+            <p className="text-xs text-content-2 mt-0.5">
               <span className="capitalize">
                 {new Date().toLocaleDateString("pt-BR", { month: "long" })}
               </span>
@@ -455,7 +455,7 @@ export default function Dashboard() {
           </div>
 
           {categoryData.length === 0 ? (
-            <div className="flex items-center justify-center h-[150px] text-norby-ivory/40 text-xs text-center px-4">
+            <div className="flex items-center justify-center h-[150px] text-content-3 text-xs text-center px-4">
               Registre despesas para ver a distribuição por categoria
             </div>
           ) : (
@@ -485,10 +485,10 @@ export default function Dashboard() {
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                  <span className="text-[10px] text-norby-ivory/45 uppercase tracking-widest">
+                  <span className="text-[10px] text-content-3 uppercase tracking-widest">
                     Maior
                   </span>
-                  <span className="text-[15px] font-semibold text-norby-teal-soft tnum mt-0.5">
+                  <span className="text-[15px] font-semibold text-accent tnum mt-0.5">
                     {topCategoryPct}%
                   </span>
                 </div>
@@ -506,10 +506,10 @@ export default function Dashboard() {
                         className="w-2 h-2 rounded-[3px] shrink-0"
                         style={{ background: colorForCategory(c.name) }}
                       />
-                      <span className="text-norby-ivory/75 flex-1 truncate">
+                      <span className="text-content-2 flex-1 truncate">
                         {c.name}
                       </span>
-                      <span className="text-norby-ivory/55 tnum">{pct}%</span>
+                      <span className="text-content-2 tnum">{pct}%</span>
                     </div>
                   );
                 })}
@@ -519,11 +519,11 @@ export default function Dashboard() {
         </div>
 
         {/* Ritmo financeiro: dias dentro da cota diária + streak como bônus */}
-        <div className="glass-card p-6 flex flex-col">
+        <div className="lg:col-span-5 glass p-6 flex flex-col">
           <div className="flex items-start justify-between gap-2">
             <div>
-              <h2 className="font-semibold text-norby-ivory">Ritmo financeiro</h2>
-              <p className="text-xs text-norby-ivory/50 mt-0.5">
+              <h2 className="font-semibold text-content">Ritmo financeiro</h2>
+              <p className="text-xs text-content-2 mt-0.5">
                 {!ritmo.hasActivity
                   ? "Registre lançamentos para acompanhar seu ritmo"
                   : !ritmo.hasPace
@@ -533,7 +533,7 @@ export default function Dashboard() {
             </div>
             {/* Só a partir de 3 dias: sequência curta vira cobrança, não prêmio */}
             {ritmo.hasPace && ritmo.streak >= 3 && (
-              <span className="chip bg-norby-teal/15 text-norby-teal">
+              <span className="chip bg-accent/15 text-accent">
                 🔥 {ritmo.streak}
               </span>
             )}
@@ -580,34 +580,34 @@ export default function Dashboard() {
         </div>
 
         {/* Meta em destaque */}
-        <div className="relative overflow-hidden glass-card border-norby-income/25 p-6 flex flex-col">
+        <div className="lg:col-span-3 relative overflow-hidden glass border-income/25 p-6 flex flex-col">
           <div
             className="absolute inset-0 pointer-events-none"
             style={{
               background:
-                "radial-gradient(circle at 15% 90%, rgba(95,191,126,0.13), transparent 55%)",
+                "radial-gradient(circle at 15% 90%, rgb(var(--income) / 0.13), transparent 55%)",
             }}
           />
           {featuredGoal ? (
             <>
               <div className="relative flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-norby-income/15 flex items-center justify-center shrink-0 text-base">
+                <div className="w-9 h-9 rounded-xl bg-income/15 flex items-center justify-center shrink-0 text-base">
                   🎯
                 </div>
                 <div className="min-w-0">
-                  <h2 className="font-semibold text-norby-ivory truncate">
+                  <h2 className="font-semibold text-content truncate">
                     {featuredGoal.name}
                   </h2>
-                  <p className="text-xs text-norby-ivory/50">meta ativa</p>
+                  <p className="text-xs text-content-2">meta ativa</p>
                 </div>
               </div>
 
               <div className="relative mt-4">
                 <p className="tnum tracking-tight">
-                  <span className="text-2xl font-semibold text-norby-ivory">
+                  <span className="text-2xl font-semibold text-content">
                     {formatBRL(featuredGoal.current_amount)}
                   </span>
-                  <span className="text-sm font-medium text-norby-ivory/40">
+                  <span className="text-sm font-medium text-content-3">
                     {" "}/ {formatBRL(featuredGoal.target_amount)}
                   </span>
                 </p>
@@ -616,17 +616,17 @@ export default function Dashboard() {
                   aria-valuenow={goalPct}
                   aria-valuemin={0}
                   aria-valuemax={100}
-                  className="h-2 rounded-full bg-white/[0.06] mt-3 overflow-hidden"
+                  className="h-2 rounded-full bg-line/[0.06] mt-3 overflow-hidden"
                 >
                   <div
                     className="h-full rounded-full transition-all duration-500"
                     style={{
                       width: `${goalPct}%`,
-                      background: "linear-gradient(90deg, #5FBF7E, #7BD88F)",
+                      background: "rgb(var(--income))",
                     }}
                   />
                 </div>
-                <p className="text-xs text-norby-ivory/50 mt-2 tnum">
+                <p className="text-xs text-content-2 mt-2 tnum">
                   {goalPct}% concluído
                 </p>
               </div>
@@ -634,7 +634,7 @@ export default function Dashboard() {
               <Button
                 onClick={() => navigate("/goals")}
                 variant="outline"
-                className="relative mt-auto w-full border-norby-income/25 bg-norby-income/[0.08] text-norby-income hover:bg-norby-income/[0.15]"
+                className="relative mt-auto w-full border-income/25 bg-income/[0.08] text-income hover:bg-income/[0.15]"
               >
                 Ver todas as metas <ArrowRight size={14} />
               </Button>
@@ -642,19 +642,19 @@ export default function Dashboard() {
           ) : (
             <>
               <div className="relative flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-norby-income/15 flex items-center justify-center shrink-0 text-base">
+                <div className="w-9 h-9 rounded-xl bg-income/15 flex items-center justify-center shrink-0 text-base">
                   🎯
                 </div>
-                <h2 className="font-semibold text-norby-ivory">Metas</h2>
+                <h2 className="font-semibold text-content">Metas</h2>
               </div>
-              <p className="relative text-xs text-norby-ivory/50 leading-relaxed mt-4 flex-1">
+              <p className="relative text-xs text-content-2 leading-relaxed mt-4 flex-1">
                 Crie uma meta de reserva para acompanhar o progresso dela aqui
                 no painel.
               </p>
               <Button
                 onClick={() => navigate("/goals")}
                 variant="outline"
-                className="relative mt-4 w-full border-norby-income/25 bg-norby-income/[0.08] text-norby-income hover:bg-norby-income/[0.15]"
+                className="relative mt-4 w-full border-income/25 bg-income/[0.08] text-income hover:bg-income/[0.15]"
               >
                 Criar uma meta <ArrowRight size={14} />
               </Button>
@@ -664,24 +664,24 @@ export default function Dashboard() {
       </div>
 
       {/* ── Linha 3: fluxo de caixa + leitura da IA ─────────────────── */}
-      <div className="grid grid-cols-[2fr_1fr] gap-4">
-        <div className="glass-card p-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        <div className="lg:col-span-8 glass p-6">
           <div className="flex items-start justify-between mb-4">
             <div>
-              <h2 className="font-semibold text-norby-ivory">Fluxo de caixa</h2>
-              <p className="text-xs text-norby-ivory/50 mt-0.5">
+              <h2 className="font-semibold text-content">Fluxo de caixa</h2>
+              <p className="text-xs text-content-2 mt-0.5">
                 Entradas vs. saídas · últimos meses
               </p>
             </div>
             <div className="flex items-center gap-4 text-xs">
-              <span className="flex items-center gap-1.5 text-norby-ivory/60">
+              <span className="flex items-center gap-1.5 text-content-2">
                 <span
                   className="w-2.5 h-2.5 rounded-full"
                   style={{ background: INCOME_COLOR }}
                 />
                 Entradas
               </span>
-              <span className="flex items-center gap-1.5 text-norby-ivory/60">
+              <span className="flex items-center gap-1.5 text-content-2">
                 <span
                   className="w-2.5 h-2.5 rounded-full"
                   style={{ background: EXPENSE_COLOR }}
@@ -691,7 +691,7 @@ export default function Dashboard() {
             </div>
           </div>
           {cashFlowData.length === 0 ? (
-            <div className="flex items-center justify-center h-[230px] text-norby-ivory/40 text-sm">
+            <div className="flex items-center justify-center h-[230px] text-content-3 text-sm">
               Nenhuma transação registrada ainda
             </div>
           ) : (
@@ -711,7 +711,7 @@ export default function Dashboard() {
                   </linearGradient>
                 </defs>
                 <CartesianGrid
-                  stroke="rgba(255,255,255,0.05)"
+                  stroke="rgb(var(--grid-line) / 0.08)"
                   vertical={false}
                 />
                 <XAxis
@@ -724,7 +724,7 @@ export default function Dashboard() {
                 />
                 <Tooltip
                   content={<ChartTooltip />}
-                  cursor={{ stroke: "rgba(255,255,255,0.12)", strokeWidth: 1 }}
+                  cursor={{ stroke: "rgb(var(--grid-line) / 0.18)", strokeWidth: 1 }}
                 />
                 <Area
                   type="monotone"
@@ -750,18 +750,23 @@ export default function Dashboard() {
         </div>
 
         {/* Leitura da IA */}
-        <div className="glass-card border-norby-teal/20 p-6 flex flex-col gap-3">
-          <div className="flex items-center gap-3">
+        <div className="lg:col-span-4 relative overflow-hidden glass border-accent/20 p-6 flex flex-col gap-3">
+          {/* Segundo e último glow do dashboard: presença da IA (ver DESIGN.md) */}
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{ background: "var(--glow-accent)" }}
+          />
+          <div className="relative flex items-center gap-3">
             <AiOrb size={34} />
             <div>
-              <h2 className="font-semibold text-norby-ivory">Leitura da IA</h2>
-              <p className="text-[11px] text-norby-teal-soft tracking-wide">
+              <h2 className="font-semibold text-content">Leitura da IA</h2>
+              <p className="text-[11px] text-accent tracking-wide">
                 resumo do seu comportamento
               </p>
             </div>
           </div>
           {insightItems.length === 0 ? (
-            <div className="flex-1 flex items-center justify-center text-norby-ivory/40 text-xs text-center">
+            <div className="flex-1 flex items-center justify-center text-content-3 text-xs text-center">
               Adicione transações para gerar sua análise de IA
             </div>
           ) : (
@@ -773,7 +778,7 @@ export default function Dashboard() {
                   return (
                     <div
                       key={i}
-                      className="p-3.5 rounded-xl bg-norby-night/60 border border-white/[0.06] text-[13px] text-norby-ivory/85 leading-relaxed"
+                      className="p-3.5 rounded-xl bg-surface-inset border border-line/[0.08] text-[13px] text-content leading-relaxed"
                     >
                       {text}
                     </div>
@@ -783,7 +788,7 @@ export default function Dashboard() {
                 return (
                   <div
                     key={i}
-                    className={`flex items-start gap-2.5 p-3 rounded-xl ${bg} text-xs text-norby-ivory/75 leading-relaxed`}
+                    className={`flex items-start gap-2.5 p-3 rounded-xl ${bg} text-xs text-content-2 leading-relaxed`}
                   >
                     <span
                       className={`shrink-0 w-5 h-5 rounded-md flex items-center justify-center mt-0.5 ${chip}`}
@@ -798,11 +803,11 @@ export default function Dashboard() {
           )}
 
           {insight?.suggested_action && (
-            <div className="p-3 rounded-xl bg-norby-teal/10 border border-norby-teal/20">
-              <p className="text-[11px] font-semibold text-norby-teal mb-1 uppercase tracking-wider">
+            <div className="p-3 rounded-xl bg-accent/10 border border-accent/20">
+              <p className="text-[11px] font-semibold text-accent mb-1 uppercase tracking-wider">
                 Sugestão prática
               </p>
-              <p className="text-xs text-norby-ivory/80">
+              <p className="text-xs text-content-2">
                 {insight.suggested_action}
               </p>
             </div>
@@ -811,7 +816,7 @@ export default function Dashboard() {
           <Button
             onClick={() => navigate("/ai")}
             variant="outline"
-            className="w-full border-norby-teal/40 bg-transparent text-norby-teal hover:bg-norby-teal/10"
+            className="w-full border-accent/40 bg-transparent text-accent hover:bg-accent/10"
           >
             Conversar com a Norby <ArrowRight size={14} />
           </Button>
@@ -819,20 +824,20 @@ export default function Dashboard() {
       </div>
 
       {/* ── Linha 4: gastos por categoria + movimentações recentes ──── */}
-      <div className="grid grid-cols-[1fr_1.15fr] gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* Gastos por categoria (barras) */}
-        <div className="glass-card p-6">
+        <div className="lg:col-span-6 glass p-6">
           <div className="flex items-center justify-between mb-5">
-            <h2 className="font-semibold text-norby-ivory">
+            <h2 className="font-semibold text-content">
               Gastos por categoria
             </h2>
-            <span className="text-xs text-norby-ivory/45">
+            <span className="text-xs text-content-3">
               {monthYearLabel}
             </span>
           </div>
 
           {categoryData.length === 0 ? (
-            <div className="flex items-center justify-center h-[150px] text-norby-ivory/40 text-xs text-center px-4">
+            <div className="flex items-center justify-center h-[150px] text-content-3 text-xs text-center px-4">
               Registre despesas para ver o ranking de categorias
             </div>
           ) : (
@@ -843,25 +848,25 @@ export default function Dashboard() {
                 return (
                   <div key={c.name}>
                     <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-[13px] text-norby-ivory/75">
+                      <span className="text-[13px] text-content-2">
                         {c.name}
                       </span>
                       <span
                         className={`text-[13px] tnum ${
                           i === 0
-                            ? "font-semibold text-norby-teal-soft"
-                            : "font-medium text-norby-ivory/60"
+                            ? "font-semibold text-accent"
+                            : "font-medium text-content-2"
                         }`}
                       >
                         {formatBRL(c.value)}
                       </span>
                     </div>
-                    <div className="h-2 rounded-full bg-white/[0.06] overflow-hidden">
+                    <div className="h-2 rounded-full bg-line/[0.06] overflow-hidden">
                       <div
                         className="h-full rounded-full"
                         style={{
                           width: `${width}%`,
-                          background: `rgba(45,181,163,${barOpacity})`,
+                          background: `rgb(var(--accent) / ${barOpacity})`,
                         }}
                       />
                     </div>
@@ -873,16 +878,16 @@ export default function Dashboard() {
         </div>
 
         {/* Movimentações recentes */}
-        <div className="glass-card p-6 flex flex-col">
+        <div className="lg:col-span-6 glass p-6 flex flex-col">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="font-semibold text-norby-ivory">
+            <h2 className="font-semibold text-content">
               Movimentações recentes
             </h2>
             <Button
               onClick={() => navigate("/transactions")}
               variant="ghost"
               size="sm"
-              className="text-norby-teal hover:text-norby-teal-soft hover:bg-norby-teal/10"
+              className="text-accent hover:text-accent hover:bg-accent/10"
             >
               Ver todas <ArrowRight size={13} />
             </Button>
@@ -890,7 +895,7 @@ export default function Dashboard() {
 
           <div className="flex flex-col flex-1">
             {transactions.length === 0 ? (
-              <div className="flex-1 flex items-center justify-center text-norby-ivory/40 text-xs text-center py-8">
+              <div className="flex-1 flex items-center justify-center text-content-3 text-xs text-center py-8">
                 Nenhuma movimentação ainda — use “+ Receita” ou “− Despesa”
                 para começar
               </div>
@@ -903,14 +908,14 @@ export default function Dashboard() {
                     className="flex items-center justify-between py-2.5 border-b border-white/5 last:border-0"
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-9 h-9 rounded-[10px] bg-norby-surface2 flex items-center justify-center shrink-0 text-base">
+                      <div className="w-9 h-9 rounded-[10px] bg-surface-inset flex items-center justify-center shrink-0 text-base">
                         {emojiFor(t)}
                       </div>
                       <div className="min-w-0">
-                        <p className="text-[13px] font-medium text-norby-ivory truncate">
+                        <p className="text-[13px] font-medium text-content truncate">
                           {t.category}
                         </p>
-                        <p className="text-xs text-norby-ivory/40 truncate">
+                        <p className="text-xs text-content-3 truncate">
                           {relativeDay(t.date)}
                           {t.description && ` · ${t.description}`}
                         </p>
@@ -919,8 +924,8 @@ export default function Dashboard() {
                     <p
                       className={`text-[13px] tnum shrink-0 ${
                         isIncome
-                          ? "font-semibold text-norby-income"
-                          : "font-medium text-norby-ivory/60"
+                          ? "font-semibold text-income"
+                          : "font-medium text-content-2"
                       }`}
                     >
                       {isIncome ? "+" : "−"} {formatBRL(parseFloat(t.amount))}
