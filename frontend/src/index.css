@@ -236,6 +236,91 @@
 @keyframes ring-spin  { to { transform: rotate(360deg); } }
 @keyframes ring-float { 0%, 100% { translate: 0 0; } 50% { translate: 0 -10px; } }
 
+/* O hero usa um toro renderizado em perspectiva. O NorbyRing em CSS continua
+   sendo o orbe leve e escalável dos contextos menores da IA e do login. */
+.hero-ring {
+  position: absolute;
+  right: -2.375rem;
+  bottom: -2.625rem;
+  width: 20rem;
+  aspect-ratio: 1;
+  pointer-events: none;
+  isolation: isolate;
+}
+
+.hero-ring__asset {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+  animation: hero-ring-float 11s ease-in-out infinite;
+}
+
+.hero-ring__asset--light {
+  display: none;
+}
+
+[data-theme="light"] .hero-ring__asset--dark {
+  display: none;
+}
+
+[data-theme="light"] .hero-ring__asset--light {
+  display: block;
+}
+
+.hero-ring__caustic {
+  position: absolute;
+  z-index: 1;
+  left: -42%;
+  right: -1%;
+  bottom: 12%;
+  height: 27%;
+  transform: rotate(-8deg) skewX(-24deg);
+  transform-origin: right center;
+  background:
+    linear-gradient(90deg, transparent 0 14%, rgb(99 122 250 / 0.08) 38%, rgb(34 211 238 / 0.38) 72%, transparent 100%),
+    linear-gradient(96deg, transparent 12%, rgb(167 139 250 / 0.18) 48%, rgb(232 121 249 / 0.34) 78%, transparent 100%);
+  filter: blur(13px);
+  opacity: 0.9;
+}
+
+.hero-ring__caustic::before,
+.hero-ring__caustic::after {
+  content: "";
+  position: absolute;
+  right: 4%;
+  width: 82%;
+  height: 16%;
+  border-radius: 999px;
+  transform-origin: right center;
+  filter: blur(2px);
+}
+
+.hero-ring__caustic::before {
+  bottom: 43%;
+  transform: rotate(5deg);
+  background: linear-gradient(90deg, transparent, rgb(34 211 238 / 0.48), rgb(99 122 250 / 0.1));
+}
+
+.hero-ring__caustic::after {
+  bottom: 22%;
+  transform: rotate(-4deg);
+  background: linear-gradient(90deg, transparent, rgb(167 139 250 / 0.4), rgb(244 114 182 / 0.12));
+}
+
+[data-theme="light"] .hero-ring__caustic {
+  opacity: 0.58;
+  filter: blur(15px);
+}
+
+@keyframes hero-ring-float {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, -4px, 0); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

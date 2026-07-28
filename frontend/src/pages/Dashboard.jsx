@@ -32,7 +32,7 @@ import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import NorthStar from "@/components/shared/NorthStar";
 import AiOrb from "@/components/shared/AiOrb";
-import NorbyRing from "@/components/shared/NorbyRing";
+import HeroRing from "@/components/shared/HeroRing";
 import { useAuthStore } from "@/store/authStore";
 import { formatDateBR, formatBRL, parseDateOnly } from "@/lib/utils";
 import { colorForCategory } from "@/lib/palette";
@@ -333,7 +333,7 @@ export default function Dashboard() {
       {/* ── Linha 1: hero (7 col) + saldo total (5 col) ──────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* Hero: saudação + convite à IA + anel da marca */}
-        <section className="lg:col-span-7 relative overflow-hidden glass p-6 flex items-center gap-6 min-h-[228px] animate-fade-up">
+        <section className="lg:col-span-7 relative overflow-hidden glass p-6 md:pr-[250px] flex items-center min-h-[228px] animate-fade-up">
           {/* Único glow do dashboard junto com o card da IA (ver DESIGN.md) */}
           <div
             className="absolute inset-0 pointer-events-none"
@@ -355,11 +355,7 @@ export default function Dashboard() {
             </Button>
           </div>
 
-          <NorbyRing
-            size={200}
-            variant="glass"
-            className="hidden md:block ml-auto motion-safe:animate-[ring-float_11s_ease-in-out_infinite]"
-          />
+          <HeroRing className="hidden md:block" />
         </section>
 
         {/* Saldo total */}
