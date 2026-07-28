@@ -33,6 +33,7 @@ import NorthStar from "@/components/shared/NorthStar";
 import AiOrb from "@/components/shared/AiOrb";
 import { useAuthStore } from "@/store/authStore";
 import { formatDateBR, formatBRL, parseDateOnly } from "@/lib/utils";
+import { colorForCategory } from "@/lib/palette";
 import { computeRitmo, headroom } from "@/lib/ritmo";
 
 // Rótulo curto pt-BR de uma chave ano-mês ("2026-07" → "jul"), em horário local.
@@ -49,16 +50,6 @@ const EMPTY_SUMMARY = {
   cash_flow: [],
   top_categories: [],
 };
-
-// Paleta categórica de hues distintos (resolve o "2 cores parecidas" do donut)
-const CATEGORY_COLORS = [
-  "#2DB5A3", // teal
-  "#5B8DEF", // azul
-  "#E0B341", // dourado
-  "#E0725C", // coral
-  "#7BD88F", // verde
-  "#6FD4C6", // teal-soft (reserva p/ 6ª categoria)
-];
 
 const INCOME_COLOR = "#5FBF7E";
 const EXPENSE_COLOR = "#E0725C";
@@ -485,11 +476,8 @@ export default function Dashboard() {
                       endAngle={-270}
                       stroke="none"
                     >
-                      {categoryData.map((_, i) => (
-                        <Cell
-                          key={i}
-                          fill={CATEGORY_COLORS[i % CATEGORY_COLORS.length]}
-                        />
+                      {categoryData.map((c) => (
+                        <Cell key={c.name} fill={colorForCategory(c.name)} />
                       ))}
                     </Pie>
                     <Tooltip content={<ChartTooltip />} cursor={false} />
@@ -507,7 +495,7 @@ export default function Dashboard() {
 
               {/* Legenda: quadradinho de cor + categoria + % (valor no tooltip) */}
               <div className="flex-1 flex flex-col gap-2 min-w-0">
-                {categoryData.map((c, i) => {
+                {categoryData.map((c) => {
                   const pct = categoryTotal
                     ? Math.round((c.value / categoryTotal) * 100)
                     : 0;
@@ -515,9 +503,7 @@ export default function Dashboard() {
                     <div key={c.name} className="flex items-center gap-2 text-xs">
                       <span
                         className="w-2 h-2 rounded-[3px] shrink-0"
-                        style={{
-                          background: CATEGORY_COLORS[i % CATEGORY_COLORS.length],
-                        }}
+                        style={{ background: colorForCategory(c.name) }}
                       />
                       <span className="text-norby-ivory/75 flex-1 truncate">
                         {c.name}

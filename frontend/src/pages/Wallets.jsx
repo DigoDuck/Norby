@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Plus, Pencil, Trash2, Wallet } from "lucide-react";
 import { walletsApi } from "@/api/wallets";
 import { apiErrorMessage, formatBRL } from "@/lib/utils";
+import { CHART_SERIES, hashIndex } from "@/lib/palette";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import Money from "@/components/shared/Money";
 import { Button } from "@/components/ui/button";
@@ -15,15 +16,7 @@ import {
 } from "@/components/ui/dialog";
 
 // Cor do chip do ícone, determinística pelo nome da carteira (só apresentação).
-// Mesma paleta categórica do donut do dashboard; renderizada em tom suave.
-const CHIP_COLORS = [
-  "#2DB5A3", "#5B8DEF", "#E0B341", "#E0725C", "#7BD88F", "#6FD4C6",
-];
-function chipColor(name) {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
-  return CHIP_COLORS[hash % CHIP_COLORS.length];
-}
+const chipColor = (name) => CHART_SERIES[hashIndex(name, CHART_SERIES.length)];
 
 export default function Wallets() {
   const [wallets, setWallets] = useState([]);
