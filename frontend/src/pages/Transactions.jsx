@@ -27,9 +27,34 @@ import {
 } from "@/components/ui/dialog";
 
 const TYPE_OPTIONS = [
-  { value: "EXPENSE", label: "Despesa", activeClass: "bg-norby-danger text-norby-ivory" },
-  { value: "INCOME", label: "Receita", activeClass: "bg-norby-income text-norby-night" },
+  {
+    value: "EXPENSE",
+    label: "Despesa",
+    activeClass: "bg-expense/[0.15] text-expense ring-1 ring-inset ring-expense/30",
+  },
+  {
+    value: "INCOME",
+    label: "Receita",
+    activeClass: "bg-income/[0.15] text-income ring-1 ring-inset ring-income/30",
+  },
 ];
+
+const CATEGORY_EMOJI = {
+  Alimentação: "🍽️",
+  Moradia: "🏠",
+  Transporte: "🚗",
+  Saúde: "🩺",
+  Educação: "📚",
+  Lazer: "🎬",
+  Compras: "🛍️",
+  "Contas & Serviços": "🧾",
+  Salário: "💼",
+  "Freelance/Extra": "✨",
+  Investimentos: "📈",
+  Reembolso: "↩️",
+  Presente: "🎁",
+  Outros: "🏷️",
+};
 
 // Valores iniciais do formulário (date sempre fresca → função).
 const emptyForm = () => ({
@@ -189,12 +214,12 @@ export default function Transactions() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
         <div>
-          <h1 className="text-3xl font-bold text-norby-ivory tracking-tight">
+          <h1 className="text-3xl font-bold text-content tracking-tight">
             Relatórios
           </h1>
-          <p className="text-norby-ivory/50 text-sm mt-1">
+          <p className="text-content-2 text-sm mt-1">
             Histórico completo de transações
           </p>
         </div>
@@ -203,13 +228,13 @@ export default function Transactions() {
             render={
               <Button
                 onClick={openNew}
-                className="bg-norby-teal hover:bg-norby-teal-soft text-norby-night font-medium"
+                className="bg-accent-fill text-accent-contrast hover:bg-accent-fill/90 font-medium"
               />
             }
           >
             <Plus size={16} className="mr-1" /> Nova Transação
           </DialogTrigger>
-          <DialogContent className="bg-norby-surface border-white/10 text-norby-ivory">
+          <DialogContent className="bg-surface border-line/10 text-content">
             <DialogHeader>
               <DialogTitle>
                 {editing ? "Editar Transação" : "Nova Transação"}
@@ -323,13 +348,13 @@ export default function Transactions() {
               </Field>
 
               {serverError && (
-                <p className="text-norby-danger text-xs">{serverError}</p>
+                <p className="text-danger text-xs">{serverError}</p>
               )}
 
               <Button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full bg-norby-teal hover:bg-norby-teal-soft text-norby-night font-medium"
+                className="w-full bg-accent-fill text-accent-contrast hover:bg-accent-fill/90 font-medium"
               >
                 {isSubmitting
                   ? "Salvando..."
@@ -342,42 +367,44 @@ export default function Transactions() {
         </Dialog>
       </div>
 
-      {/* Filtros */}
-      <div className="flex gap-3">
-        <div className="relative flex-1 max-w-xs">
-          <Search size={16} className="absolute left-3 top-2.5 text-norby-ivory/30" />
-          <Input
-            placeholder="Buscar..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 bg-white/5 border-white/10 text-norby-ivory placeholder:text-norby-ivory/30"
-          />
+      {/* Filtros e relatório em uma única superfície */}
+      <div className="glass overflow-hidden p-4 sm:p-5">
+        <div className="inset-panel mb-4 flex flex-col gap-3 p-4 sm:flex-row">
+          <div className="relative flex-1 sm:max-w-xs">
+            <Search size={16} className="absolute left-3 top-2.5 text-content-3" />
+            <Input
+              placeholder="Buscar..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9 bg-surface border-line/10 text-content placeholder:text-content-3"
+            />
+          </div>
+          <div className="grid grid-cols-3 gap-2 sm:flex">
+            {["", "INCOME", "EXPENSE"].map((t) => (
+              <button
+                key={t}
+                type="button"
+                aria-pressed={filterType === t}
+                onClick={() => setFilterType(t)}
+                className={`rounded-xl px-3 py-2 text-sm transition-colors ${
+                  filterType === t
+                    ? "bg-accent-fill text-accent-contrast font-medium"
+                    : "bg-line/5 text-content-2 hover:text-content"
+                }`}
+              >
+                {t === "" ? "Todos" : t === "INCOME" ? "Receitas" : "Despesas"}
+              </button>
+            ))}
+          </div>
         </div>
-        {["", "INCOME", "EXPENSE"].map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => setFilterType(t)}
-            className={`px-4 py-2 rounded-lg text-sm transition-all ${
-              filterType === t
-                ? "bg-norby-teal text-norby-night font-medium"
-                : "glass-card text-norby-ivory/50 hover:text-norby-ivory"
-            }`}
-          >
-            {t === "" ? "Todos" : t === "INCOME" ? "Receitas" : "Despesas"}
-          </button>
-        ))}
-      </div>
 
-      {/* Tabela */}
-      <div className="glass-card overflow-hidden">
-        <table className="w-full">
+        <table className="hidden w-full md:table">
           <thead>
-            <tr className="border-b border-white/10">
+            <tr className="border-b border-line/10">
               {["Categoria", "Descrição", "Tipo", "Valor", "Data", ""].map((h) => (
                 <th
                   key={h}
-                  className="text-left text-xs font-medium text-norby-ivory/50 uppercase tracking-wider px-4 py-3"
+                  className="microlabel px-4 py-3 text-left"
                 >
                   {h}
                 </th>
@@ -388,20 +415,20 @@ export default function Transactions() {
             {filtered.map((t) => (
               <tr
                 key={t.id}
-                className="border-b border-white/5 last:border-0 hover:bg-white/[0.03] transition-colors"
+                className="border-b border-line/5 last:border-0 hover:bg-state/[0.03] transition-colors"
               >
-                <td className="px-4 py-3 text-sm font-medium text-norby-ivory/90">
+                <td className="px-4 py-3 text-sm font-medium text-content">
                   {t.category}
                 </td>
-                <td className="px-4 py-3 text-sm text-norby-ivory/60">
+                <td className="px-4 py-3 text-sm text-content-2">
                   {t.description || "-"}
                 </td>
                 <td className="px-4 py-3">
                   <Badge
                     className={
                       t.type === "INCOME"
-                        ? "bg-norby-income/15 text-norby-income border-norby-income/20 rounded-lg"
-                        : "bg-norby-danger/15 text-norby-danger border-norby-danger/20 rounded-lg"
+                        ? "bg-income/[0.15] text-income border-income/20 rounded-lg"
+                        : "bg-expense/[0.15] text-expense border-expense/20 rounded-lg"
                     }
                   >
                     {t.type === "INCOME" ? "Receita" : "Despesa"}
@@ -409,13 +436,13 @@ export default function Transactions() {
                 </td>
                 <td
                   className={`px-4 py-3 text-sm font-semibold tnum ${
-                    t.type === "INCOME" ? "text-norby-income" : "text-norby-danger"
+                    t.type === "INCOME" ? "text-income" : "text-expense"
                   }`}
                 >
                   {t.type === "INCOME" ? "+" : "-"}
                   {formatBRL(t.amount)}
                 </td>
-                <td className="px-4 py-3 text-sm text-norby-ivory/60">
+                <td className="px-4 py-3 text-sm text-content-2 tnum">
                   {formatDateBR(t.date)}
                 </td>
                 <td className="px-4 py-3">
@@ -423,9 +450,10 @@ export default function Transactions() {
                     <button
                       type="button"
                       onClick={() => openEdit(t)}
-                      className="text-norby-ivory/50 hover:text-norby-ivory transition-colors"
+                      className="text-content-3 hover:text-content transition-colors"
                     >
                       <Pencil size={16} />
+                      <span className="sr-only">Editar transação</span>
                     </button>
                     <ConfirmDialog
                       title="Remover esta transação?"
@@ -435,9 +463,10 @@ export default function Transactions() {
                       trigger={
                         <button
                           type="button"
-                          className="text-norby-ivory/50 hover:text-norby-danger transition-colors"
+                          className="text-content-3 hover:text-danger transition-colors"
                         >
                           <Trash2 size={16} />
+                          <span className="sr-only">Excluir transação</span>
                         </button>
                       }
                     />
@@ -447,8 +476,71 @@ export default function Transactions() {
             ))}
           </tbody>
         </table>
+
+        <div className="space-y-3 md:hidden">
+          {filtered.map((t) => (
+            <article key={t.id} className="inset-panel p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="flex items-center gap-2 text-sm font-medium text-content">
+                    <span aria-hidden="true">{CATEGORY_EMOJI[t.category] ?? "🏷️"}</span>
+                    <span className="truncate">{t.category}</span>
+                  </p>
+                  <p className="mt-1 truncate text-xs text-content-2">
+                    {t.description || "Sem descrição"}
+                  </p>
+                </div>
+                <p
+                  className={`shrink-0 text-sm font-semibold tnum ${
+                    t.type === "INCOME" ? "text-income" : "text-expense"
+                  }`}
+                >
+                  {t.type === "INCOME" ? "+" : "-"}
+                  {formatBRL(t.amount)}
+                </p>
+              </div>
+
+              <div className="mt-4 flex items-center justify-between gap-3 border-t border-line/[0.08] pt-3">
+                <div className="flex items-center gap-2">
+                  <span className={t.type === "INCOME" ? "chip-pos" : "chip-neg"}>
+                    {t.type === "INCOME" ? "Receita" : "Despesa"}
+                  </span>
+                  <time className="text-xs text-content-3 tnum">
+                    {formatDateBR(t.date)}
+                  </time>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => openEdit(t)}
+                    className="text-content-3 hover:text-content transition-colors"
+                  >
+                    <Pencil size={16} />
+                    <span className="sr-only">Editar transação</span>
+                  </button>
+                  <ConfirmDialog
+                    title="Remover esta transação?"
+                    confirmLabel="Remover"
+                    errorFallback="Não foi possível remover a transação."
+                    onConfirm={() => deleteTransaction(t.id)}
+                    trigger={
+                      <button
+                        type="button"
+                        className="text-content-3 hover:text-danger transition-colors"
+                      >
+                        <Trash2 size={16} />
+                        <span className="sr-only">Excluir transação</span>
+                      </button>
+                    }
+                  />
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+
         {filtered.length === 0 && (
-          <div className="text-center py-12 text-norby-ivory/40 text-sm">
+          <div className="text-center py-12 text-content-3 text-sm">
             Nenhuma transação encontrada.
           </div>
         )}
