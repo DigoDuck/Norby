@@ -11,6 +11,7 @@ import { Input } from "../components/ui/input";
 import { Eye, EyeOff } from "lucide-react";
 import Aurora from "../components/Aurora";
 import NorbyMark from "../components/shared/Logo";
+import NorbyRing from "../components/shared/NorbyRing";
 
 const loginSchema = z.object({
   email: z.string().email("Email inválido"),
@@ -37,7 +38,7 @@ const registerSchema = loginSchema
   });
 
 const inputCls =
-  "bg-white/5 border-white/10 text-norby-ivory placeholder:text-norby-ivory/30 focus-visible:ring-norby-teal";
+  "bg-line/5 border-line/10 text-content placeholder:text-content-3 focus-visible:ring-focus";
 
 export default function Auth() {
   const [mode, setMode] = useState("login"); // "login" | "register"
@@ -84,133 +85,154 @@ export default function Auth() {
   }
 
   return (
-    <div className="relative min-h-screen w-full overflow-hidden bg-norby-night flex items-center justify-center p-4">
-      {/* Fundo Aurora teal */}
+    <div className="app-mesh relative flex min-h-screen w-full items-center justify-center overflow-x-hidden bg-bg-base p-4">
+      {/* Aurora ambiente, sempre atrás da camada de contraste */}
       <div className="fixed inset-0 z-0 pointer-events-none">
-        <Aurora colorStops={["#2DB5A3", "#6FD4C6", "#156358"]} amplitude={1} blend={0.6} />
-        <div className="absolute inset-0 bg-norby-night/70 backdrop-blur-[20px]" />
+        <Aurora
+          colorStops={["#637AFA", "#A78BFA", "#22D3EE"]}
+          amplitude={1}
+          blend={0.6}
+        />
+        <div className="absolute inset-0 bg-bg-base/70" />
       </div>
 
-      <div className="relative z-10 w-full max-w-md">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-norby-teal mb-4 shadow-lg shadow-norby-teal/30">
-            <NorbyMark size={30} color="#07100F" />
-          </div>
-          <h1 className="text-2xl font-bold text-norby-ivory">Norby</h1>
-          <p className="text-norby-ivory/60 text-sm mt-1">seu norte financeiro</p>
-        </div>
+      <div className="relative z-10 flex w-full max-w-5xl items-center justify-center gap-20">
+        <NorbyRing
+          size={280}
+          className="hidden lg:block motion-safe:animate-[ring-float_11s_ease-in-out_infinite]"
+        />
 
-        {/* Card */}
-        <div className="glass-card p-8">
-          {/* Tabs */}
-          <div className="flex gap-1 p-1 rounded-full bg-white/5 mb-6">
-            {["login", "register"].map((m) => (
-              <button
-                key={m}
-                onClick={() => setMode(m)}
-                className={`flex-1 py-2 rounded-full text-sm font-medium transition-all ${
-                  mode === m
-                    ? "bg-norby-teal text-norby-night"
-                    : "text-norby-ivory/50 hover:text-norby-ivory"
-                }`}
-              >
-                {m === "login" ? "Entrar" : "Cadastrar"}
-              </button>
-            ))}
+        <div className="w-full max-w-md py-6">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <div className="mb-4 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-accent-fill text-accent-contrast">
+              <NorbyMark size={30} color="currentColor" />
+            </div>
+            <h1 className="text-2xl font-bold text-content">Norby</h1>
+            <p className="mt-1 text-sm text-content-2">seu norte financeiro</p>
           </div>
 
-          {/* Form */}
-          <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
-            {mode === "register" && (
+          {/* Card */}
+          <div className="glass w-full max-w-md p-8">
+            {/* Tabs */}
+            <div className="mb-6 flex gap-1 rounded-full bg-line/5 p-1">
+              {["login", "register"].map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setMode(m)}
+                  className={`flex-1 rounded-full py-2 text-sm font-medium transition-all ${
+                    mode === m
+                      ? "bg-accent-fill text-accent-contrast"
+                      : "text-content-2 hover:text-content"
+                  }`}
+                >
+                  {m === "login" ? "Entrar" : "Cadastrar"}
+                </button>
+              ))}
+            </div>
+
+            {/* Form */}
+            <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
+              {mode === "register" && (
+                <div>
+                  <Input placeholder="Seu nome" {...register("name")} className={inputCls} />
+                  {errors.name && (
+                    <p className="text-danger text-xs mt-1">{errors.name.message}</p>
+                  )}
+                </div>
+              )}
               <div>
-                <Input placeholder="Seu nome" {...register("name")} className={inputCls} />
-                {errors.name && (
-                  <p className="text-norby-danger text-xs mt-1">{errors.name.message}</p>
+                <Input type="email" placeholder="Email" {...register("email")} className={inputCls} />
+                {errors.email && (
+                  <p className="text-danger text-xs mt-1">{errors.email.message}</p>
                 )}
               </div>
-            )}
-            <div>
-              <Input type="email" placeholder="Email" {...register("email")} className={inputCls} />
-              {errors.email && (
-                <p className="text-norby-danger text-xs mt-1">{errors.email.message}</p>
-              )}
-            </div>
 
-            <div className="relative">
-              <Input
-                type={showPass ? "text" : "password"}
-                placeholder="Senha"
-                {...register("password")}
-                className={`${inputCls} pr-10`}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPass(!showPass)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-norby-ivory/30 hover:text-norby-ivory/70"
-              >
-                {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
-              {errors.password && (
-                <p className="text-norby-danger text-xs mt-1">{errors.password.message}</p>
-              )}
-            </div>
-
-            {mode === "register" && (
-              <div>
+              <div className="relative">
                 <Input
-                  type="password"
-                  placeholder="Confirmar Senha"
-                  {...register("confirmPassword")}
-                  className={inputCls}
+                  type={showPass ? "text" : "password"}
+                  placeholder="Senha"
+                  {...register("password")}
+                  className={`${inputCls} pr-10`}
                 />
-                {errors.confirmPassword && (
-                  <p className="text-norby-danger text-xs mt-1">
-                    {errors.confirmPassword.message}
-                  </p>
-                )}
-              </div>
-            )}
-
-            {mode === "register" && (
-              <div>
-                <label className="flex items-start gap-2 text-xs text-norby-ivory/60">
-                  <input
-                    type="checkbox"
-                    {...register("acceptedTerms")}
-                    className="mt-0.5 accent-norby-teal"
-                  />
-                  <span>
-                    Li e aceito os{" "}
-                    <Link to="/termos" target="_blank" className="text-norby-teal hover:underline">
-                      Termos de Uso
-                    </Link>{" "}
-                    e a{" "}
-                    <Link to="/privacidade" target="_blank" className="text-norby-teal hover:underline">
-                      Política de Privacidade
-                    </Link>
-                    .
+                <button
+                  type="button"
+                  onClick={() => setShowPass(!showPass)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-content-3 hover:text-content"
+                >
+                  {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                  <span className="sr-only">
+                    {showPass ? "Ocultar senha" : "Mostrar senha"}
                   </span>
-                </label>
-                {errors.acceptedTerms && (
-                  <p className="text-norby-danger text-xs mt-1">{errors.acceptedTerms.message}</p>
+                </button>
+                {errors.password && (
+                  <p className="text-danger text-xs mt-1">{errors.password.message}</p>
                 )}
               </div>
-            )}
 
-            {error && (
-              <div className="p-3 rounded-xl bg-norby-danger/10 border border-norby-danger/20 text-norby-danger text-sm">
-                {error}
-              </div>
-            )}
-            <Button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-norby-teal hover:bg-norby-teal-soft text-norby-night font-medium shadow-lg shadow-norby-teal/30"
-            >
-              {loading ? "Carregando..." : mode === "login" ? "Entrar" : "Criar Conta"}
-            </Button>
-          </form>
+              {mode === "register" && (
+                <div>
+                  <Input
+                    type="password"
+                    placeholder="Confirmar Senha"
+                    {...register("confirmPassword")}
+                    className={inputCls}
+                  />
+                  {errors.confirmPassword && (
+                    <p className="text-danger text-xs mt-1">
+                      {errors.confirmPassword.message}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {mode === "register" && (
+                <div>
+                  <label className="flex items-start gap-2 text-xs text-content-2">
+                    <input
+                      type="checkbox"
+                      {...register("acceptedTerms")}
+                      className="mt-0.5 accent-accent"
+                    />
+                    <span>
+                      Li e aceito os{" "}
+                      <Link to="/termos" target="_blank" className="text-accent hover:underline">
+                        Termos de Uso
+                      </Link>{" "}
+                      e a{" "}
+                      <Link
+                        to="/privacidade"
+                        target="_blank"
+                        className="text-accent hover:underline"
+                      >
+                        Política de Privacidade
+                      </Link>
+                      .
+                    </span>
+                  </label>
+                  {errors.acceptedTerms && (
+                    <p className="text-danger text-xs mt-1">
+                      {errors.acceptedTerms.message}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {error && (
+                <div className="rounded-xl border border-danger/20 bg-danger/10 p-3 text-sm text-danger">
+                  {error}
+                </div>
+              )}
+              <Button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-accent-fill text-accent-contrast hover:bg-accent-fill/90 font-medium"
+              >
+                {loading ? "Carregando..." : mode === "login" ? "Entrar" : "Criar Conta"}
+              </Button>
+            </form>
+          </div>
         </div>
       </div>
     </div>
