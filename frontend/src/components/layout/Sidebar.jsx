@@ -46,7 +46,7 @@ export default function Sidebar() {
     <aside className="hidden lg:flex w-64 h-full glass flex-col px-4 py-6 shrink-0 mr-[18px]">
       {/* Logo */}
       <div className="flex items-center gap-3 mb-8 px-2">
-        <div className="w-9 h-9 rounded-xl bg-accent-fill flex items-center justify-center text-accent-contrast">
+        <div className="brand-tile w-9 h-9">
           <NorbyMark size={20} />
         </div>
         <div>

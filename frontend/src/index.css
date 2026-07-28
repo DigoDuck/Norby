@@ -177,6 +177,13 @@
     rgb(var(--iris-1)) 0%, rgb(var(--iris-2)) 42%,
     rgb(var(--iris-3)) 68%, rgb(var(--iris-4)) 100%);
   --iris-glow: 0 0 22px -6px rgb(var(--iris-3) / 0.55);
+
+  /* A marca NÃO segue o tema: a referência mostra o mesmo gradiente saturado
+     no claro e no escuro. Com os stops claros do tema light o monograma branco
+     cairia para 1,45:1 — ilegível. Superfície muda, marca é constante.
+     (Contraste de logo é isento pelo WCAG 1.4.3, mas ilegível é ilegível.) */
+  --iris-brand: linear-gradient(140deg,
+    #22D3EE 0%, #4F7BFA 45%, #8B5CF6 72%, #D946EF 100%);
 }
 
 @layer base {
@@ -257,7 +264,7 @@
 /* Tile da marca: o mesmo espectro, agora chapado. rounded-[28%] mantém o
    squircle proporcional em qualquer tamanho, coisa que um raio fixo perde. */
 .brand-tile {
-  background: var(--iris);
+  background: var(--iris-brand);
   box-shadow: var(--iris-glow), inset 0 1px 0 rgb(255 255 255 / 0.25);
   @apply rounded-[28%] grid place-items-center text-accent-contrast;
 }

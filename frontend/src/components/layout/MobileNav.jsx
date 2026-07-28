@@ -29,7 +29,7 @@ export default function MobileNav() {
         >
           <Menu size={20} />
         </button>
-        <div className="w-8 h-8 rounded-lg bg-accent-fill grid place-items-center text-accent-contrast">
+        <div className="brand-tile w-8 h-8">
           <NorbyMark size={18} />
         </div>
         <p className="font-bold text-content">Norby</p>

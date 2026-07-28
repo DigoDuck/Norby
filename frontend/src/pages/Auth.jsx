@@ -95,7 +95,7 @@ export default function Auth() {
         <div className="w-full max-w-md py-6">
           {/* Header */}
           <div className="text-center mb-8">
-            <div className="mb-4 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-accent-fill text-accent-contrast">
+            <div className="brand-tile mb-4 inline-grid h-14 w-14">
               <NorbyMark size={30} color="currentColor" />
             </div>
             <h1 className="text-2xl font-bold text-content">Norby</h1>
