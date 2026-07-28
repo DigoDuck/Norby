@@ -91,13 +91,13 @@ function relativeDay(value) {
 }
 
 // Ícone contextual dos insights da IA (heurística simples em pt-BR).
-function insightStyle(text) {
+function insightIcon(text) {
   const t = text.toLowerCase();
   if (/(caminho certo|parab|bom |ótimo|no azul|guarda|econom|caíram|caiu|reduz)/.test(t))
-    return { Icon: Check, chip: "bg-income/15 text-income", bg: "bg-income/[0.07]" };
+    return Check;
   if (/(crítico|urgente|déficit|acima|estour|exced|negativ|cuidado|risco|falta|imped|ausência|não )/.test(t))
-    return { Icon: AlertTriangle, chip: "bg-danger/15 text-danger", bg: "bg-danger/[0.07]" };
-  return { Icon: Sparkles, chip: "bg-accent/15 text-accent", bg: "bg-line/[0.03]" };
+    return AlertTriangle;
+  return Sparkles;
 }
 
 // Janela do heatmap "Ritmo financeiro" (dias, terminando hoje)
@@ -789,22 +789,20 @@ export default function Dashboard() {
                   return (
                     <div
                       key={i}
-                      className="p-3.5 rounded-xl bg-surface-inset border border-line/[0.08] text-[13px] text-content leading-relaxed"
+                      className="stroke-iris p-3.5 rounded-xl text-[13px] font-semibold text-content leading-relaxed"
                     >
                       {text}
                     </div>
                   );
                 }
-                const { Icon, chip, bg } = insightStyle(text);
+                const Icon = insightIcon(text);
                 return (
                   <div
                     key={i}
-                    className={`flex items-start gap-2.5 p-3 rounded-xl ${bg} text-xs text-content-2 leading-relaxed`}
+                    className="inset-panel flex items-start gap-3 p-3 text-xs text-content-2 leading-relaxed"
                   >
-                    <span
-                      className={`shrink-0 w-5 h-5 rounded-md flex items-center justify-center mt-0.5 ${chip}`}
-                    >
-                      <Icon size={12} />
+                    <span className="shrink-0 w-9 h-9 rounded-xl bg-accent/[0.12] border border-accent/25 grid place-items-center text-accent">
+                      <Icon size={16} />
                     </span>
                     {text}
                   </div>
