@@ -7,26 +7,29 @@ import NorthStar from "../shared/NorthStar";
 import AiOrb from "../shared/AiOrb";
 import { mainItems, prefItems } from "./navItems";
 
-// Item de navegação: ativo = estrela-norte no acento sobre fundo sutil (o
-// acento chapado fica reservado ao CTA primário — ver DESIGN.md).
+// Item de navegação: ativo = moldura iridescente + acento no ícone, no label e
+// na estrela. O acento chapado segue reservado ao CTA primário (ver DESIGN.md);
+// aqui o que marca a posição é a moldura, não um bloco de cor.
 function NavItem({ to, icon, label }) {
   const Icon = icon;
   return (
     <NavLink
       to={to}
       className={({ isActive }) =>
-        `group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-focus-offset ${
+        `group relative flex items-center gap-3 px-3.5 py-3 rounded-2xl text-sm font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-focus-offset ${
           isActive
-            ? "bg-accent/[0.10] text-content"
+            ? // No escuro a referência mantém o label branco e deixa o azure só
+              // no ícone e na estrela; no claro o label é que carrega o acento.
+              "stroke-iris stroke-iris-glow bg-state/[0.05] text-accent dark:text-content"
             : "text-content-2 hover:text-content hover:bg-state/[0.04]"
         }`
       }
     >
       {({ isActive }) => (
         <>
-          <Icon size={18} className={isActive ? "text-accent" : ""} />
+          <Icon size={19} className={isActive ? "text-accent" : ""} />
           {label}
-          {isActive && <NorthStar size={12} className="ml-auto text-accent" />}
+          {isActive && <NorthStar size={14} className="ml-auto text-accent" />}
         </>
       )}
     </NavLink>
@@ -56,13 +59,15 @@ export default function Sidebar() {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 flex flex-col gap-1 overflow-y-auto">
-        <p className="microlabel px-3 mb-1.5">Menu principal</p>
+      {/* Sem rótulos de seção: a referência separa preferências com um filete.
+          Com sete itens, dois cabeçalhos custam mais ruído do que organizam. */}
+      <nav className="flex-1 flex flex-col gap-1.5 overflow-y-auto">
         {mainItems.map((item) => (
           <NavItem key={item.to} {...item} />
         ))}
 
-        <p className="microlabel px-3 mt-6 mb-1.5">Preferências</p>
+        <div className="my-3 border-t border-line/[0.08]" />
+
         {prefItems.map((item) => (
           <NavItem key={item.to} {...item} />
         ))}
