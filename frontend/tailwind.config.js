@@ -29,6 +29,7 @@ export default {
 
           income: c("--income"),
           expense: c("--expense"),
+          danger: c("--danger"),
           warning: c("--warning"),
 
           "chart-1": c("--chart-1"),

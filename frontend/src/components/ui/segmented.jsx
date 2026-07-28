@@ -26,8 +26,8 @@ export function Segmented({ value, onChange, options, className }) {
             className={cn(
               "rounded-xl py-2 text-sm font-medium transition-all",
               isActive
-                ? (opt.activeClass ?? "bg-norby-teal text-norby-night")
-                : "bg-white/5 text-norby-ivory/70 hover:text-norby-ivory"
+                ? (opt.activeClass ?? "bg-accent-fill text-accent-contrast")
+                : "bg-line/5 text-content-2 hover:text-content"
             )}
           >
             {opt.label}

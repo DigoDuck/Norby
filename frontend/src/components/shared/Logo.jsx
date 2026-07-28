@@ -1,6 +1,8 @@
 // Monograma Norby: N coroado pela estrela-norte (brand book v3).
-// color = cor do traço/estrela (#07100F sobre chip teal; #2DB5A3 sobre dark).
-export default function NorbyMark({ size = 28, color = "#07100F", className }) {
+// O path é intocável. color = cor do traço/estrela; o default herda a cor do
+// texto, então o consumidor decide via token (text-accent-contrast sobre o
+// chip preenchido, text-accent sobre superfície).
+export default function NorbyMark({ size = 28, color = "currentColor", className }) {
   return (
     <svg
       width={size}
