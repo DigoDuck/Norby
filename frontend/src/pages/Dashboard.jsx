@@ -664,8 +664,8 @@ export default function Dashboard() {
               </p>
               <Button
                 onClick={() => navigate("/goals")}
-                variant="outline"
-                className="relative mt-4 w-full border-income/25 bg-income/[0.08] text-income hover:bg-income/[0.15]"
+                variant="ghost"
+                className="w-full stroke-iris bg-transparent text-accent font-semibold hover:bg-accent/[0.06]"
               >
                 Criar uma meta <ArrowRight size={14} />
               </Button>
@@ -826,8 +826,8 @@ export default function Dashboard() {
 
           <Button
             onClick={() => navigate("/ai")}
-            variant="outline"
-            className="w-full border-accent/40 bg-transparent text-accent hover:bg-accent/10"
+            variant="ghost"
+            className="w-full stroke-iris bg-transparent text-accent font-semibold hover:bg-accent/[0.06]"
           >
             Conversar com a Norby <ArrowRight size={14} />
           </Button>
