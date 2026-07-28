@@ -357,6 +357,7 @@ export default function Dashboard() {
 
           <NorbyRing
             size={200}
+            variant="glass"
             className="hidden md:block ml-auto motion-safe:animate-[ring-float_11s_ease-in-out_infinite]"
           />
         </section>
@@ -397,17 +398,21 @@ export default function Dashboard() {
             )}
           </div>
 
+          {/* Duas pílulas tingidas, não um CTA sólido: na referência os dois
+              atalhos têm o mesmo peso e carregam a cor do próprio fluxo. O
+              sólido do painel é só o "Falar com a Norby". */}
           <div className="relative flex gap-2">
             <Button
               onClick={() => newTransaction("INCOME")}
-              className="flex-1 bg-accent-fill text-accent-contrast hover:bg-accent-fill/90 font-medium"
+              variant="ghost"
+              className="flex-1 border-income/25 bg-income/[0.12] text-income hover:bg-income/[0.18] hover:text-income"
             >
               <Plus size={15} /> Receita
             </Button>
             <Button
               onClick={() => newTransaction("EXPENSE")}
-              variant="outline"
-              className="flex-1 border-line/15 bg-line/[0.04] text-content-2 hover:bg-state/[0.08] hover:text-content"
+              variant="ghost"
+              className="flex-1 border-expense/25 bg-expense/[0.10] text-expense hover:bg-expense/[0.16] hover:text-expense"
             >
               <Minus size={15} /> Despesa
             </Button>
@@ -422,7 +427,7 @@ export default function Dashboard() {
             </div>
             <div className="px-3">
               <p className="microlabel">Despesas</p>
-              <p className="text-sm font-semibold text-content tnum mt-1">
+              <p className="text-sm font-semibold text-expense tnum mt-1">
                 {formatBRL(monthExpenses)}
               </p>
             </div>

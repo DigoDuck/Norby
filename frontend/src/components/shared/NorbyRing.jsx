@@ -13,7 +13,22 @@ import NorthStar from "./NorthStar";
 const RING_SPECTRUM =
   "conic-gradient(from 200deg, #22D3EE, #637AFA, #8B7BF7, #A78BFA, #E879F9, #F472B6, #22D3EE)";
 
-export default function NorbyRing({ size = 220, withStar = false, className = "" }) {
+// O anel grande da referência NÃO é o mesmo objeto: medindo o PNG, o corpo dele
+// é azul-escuro (moda 28 56 120) com dois brilhos estreitos. Espectro cheio nos
+// 360° é o que fazia o herói sair neon. O toro vem de --ring-torus para que cada
+// tema traga o seu (escuro no dark, leitoso no light).
+const RING_VARIANT = {
+  spectrum: RING_SPECTRUM,   // orbe da IA: iridescente inteiro
+  glass: "var(--ring-torus)", // herói: vidro escuro com especular
+};
+
+export default function NorbyRing({
+  size = 220,
+  withStar = false,
+  variant = "spectrum",
+  className = "",
+}) {
+  const paint = RING_VARIANT[variant] ?? RING_SPECTRUM;
   const thickness = Math.round(size * 0.13);
   const ringMask = `radial-gradient(farthest-side, transparent calc(100% - ${thickness}px), #000 calc(100% - ${thickness}px))`;
 
@@ -28,7 +43,7 @@ export default function NorbyRing({ size = 220, withStar = false, className = ""
         className="absolute rounded-full"
         style={{
           inset: "-16%",
-          background: RING_SPECTRUM,
+          background: paint,
           filter: "blur(44px)",
           opacity: "var(--ring-glow)",
         }}
@@ -37,20 +52,23 @@ export default function NorbyRing({ size = 220, withStar = false, className = ""
       <div
         className="absolute inset-0 rounded-full motion-safe:animate-[ring-spin_28s_linear_infinite]"
         style={{
-          background: RING_SPECTRUM,
+          background: paint,
           WebkitMask: ringMask,
           mask: ringMask,
         }}
       />
-      {/* Véu leitoso: no claro transforma o anel de "energia" em vidro fosco */}
-      <div
-        className="absolute inset-0 rounded-full"
-        style={{
-          background: "rgba(255,255,255,var(--ring-veil))",
-          WebkitMask: ringMask,
-          mask: ringMask,
-        }}
-      />
+      {/* Véu leitoso: no claro transforma o espectro de "energia" em vidro
+          fosco. O toro não precisa — já vem pronto do token do tema. */}
+      {variant === "spectrum" && (
+        <div
+          className="absolute inset-0 rounded-full"
+          style={{
+            background: "rgba(255,255,255,var(--ring-veil))",
+            WebkitMask: ringMask,
+            mask: ringMask,
+          }}
+        />
+      )}
       {withStar && (
         <NorthStar size={Math.round(size * 0.16)} className="relative text-content" />
       )}

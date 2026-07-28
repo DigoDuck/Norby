@@ -7,65 +7,74 @@
    Valores de superfície amostrados dos PNGs de referência — a calibração
    canônica acontece na Task 19 do plano. */
 [data-theme="dark"] {
-  --bg-base: 8 9 12;
-  --surface: 16 18 24;
-  --surface-inset: 24 27 35;
+  /* Amostrados dos PNGs de referência na Task 19 (média/decil/moda de regiões
+     do arquivo, não a olho). O fundo da referência é azul-escuro, não cinza. */
+  --bg-base: 3 5 14;
+  --surface: 10 14 28;
+  --surface-inset: 20 26 44;
 
   --content: 244 246 251;
-  --content-2: 154 160 178;
+  --content-2: 176 182 196;
   /* .microlabel é 11px: texto normal pelo WCAG, não texto grande, então precisa
-     de 4,5:1. O valor amostrado do PNG (106 112 130) media 3,81 sobre o vidro. */
-  --content-3: 120 127 146;
+     de 4,5:1. A referência usa ~165 172 186 e diferencia hierarquia por tamanho
+     e tracking, não por valor — subimos até um passo abaixo de --content-2. */
+  --content-3: 148 156 174;
 
   --line: 255 255 255;           /* usado sempre com alpha: border-line/10 */
   --state-hover: 255 255 255;
   --state-active: 255 255 255;
   --overlay: 4 5 8;
 
-  --accent: 99 122 250;          /* #637AFA — texto, links, ícone de ação */
+  /* A referência separa os dois: azure no texto interativo, índigo no
+     preenchimento do CTA. Medido 59-61 / 131 / 244-246 em links e valores. */
+  --accent: 59 130 246;          /* #3B82F6 — texto, links, ícone de ação */
   --accent-fill: 79 102 234;     /* preenchimento de CTA */
   --accent-contrast: 255 255 255;/* texto sobre o preenchimento */
-  --focus: 139 155 255;          /* #8B9BFF */
-  --focus-offset: 8 9 12;
+  --focus: 139 155 255;          /* #8B9BFF — índigo claro, distinto do accent */
+  --focus-offset: 3 5 14;
 
-  --income: 52 211 153;          /* #34D399 */
-  --expense: 251 113 133;        /* #FB7185 */
+  /* Ciano, não verde: é o que a referência usa no valor de receita, no botão
+     "+ Receita" e na linha Entradas (medido 35 212 238). */
+  --income: 34 211 238;          /* #22D3EE */
+  --expense: 251 113 133;        /* #FB7185 — bate com o medido (250 113 127) */
   --danger: 244 63 94;
   --warning: 251 146 60;
 
   /* Uma cor por categoria de despesa (são 9 em lib/categories.js). Menos que
      isso e duas fatias do mesmo donut saem iguais — ver Desvios da Fase 1. */
-  --chart-1: 99 122 250;
+  /* As quatro primeiras vêm dos pontos da legenda do donut na referência. */
+  --chart-1: 13 127 249;
   --chart-2: 34 211 238;
-  --chart-3: 167 139 250;
-  --chart-4: 251 146 60;
+  --chart-3: 151 75 250;
+  --chart-4: 252 167 50;
   --chart-5: 52 211 153;
   --chart-6: 244 114 182;
   --chart-7: 163 230 53;
-  --chart-8: 56 189 248;
+  --chart-8: 99 102 241;         /* índigo: o sky anterior colidia com --chart-2 */
   --chart-9: 148 163 184;        /* neutro: cai em "Outros", a categoria-resto */
   --grid-line: 255 255 255;
-  --axis: 154 160 178;
+  --axis: 176 182 196;
 
   /* Rampa sequencial monotônica, mínimo 3:1 contra o vidro do card já no nível
      1 (medido: 3,01 / 4,37 / 6,18 / 9,43). A versão anterior começava em 1,69
      e ainda invertia entre os níveis 1 e 2. */
-  --heat-0: 30 34 44;            /* dia sem lançamento */
-  --heat-1: 56 96 168;
-  --heat-2: 77 122 202;
-  --heat-3: 105 148 232;
-  --heat-4: 150 185 255;
+  --heat-0: 24 32 52;            /* dia sem lançamento (medido na referência) */
+  --heat-1: 46 100 176;
+  --heat-2: 40 130 220;
+  --heat-3: 60 160 250;
+  --heat-4: 130 200 255;
   --heat-over: 251 113 133;      /* estourou a cota diária */
 }
 
 [data-theme="light"] {
-  --bg-base: 246 247 252;
+  --bg-base: 248 248 251;
   --surface: 255 255 255;
   --surface-inset: 240 242 249;
 
-  --content: 24 27 38;
-  --content-2: 88 95 115;
-  /* Mesma razão do escuro: media 3,42 sobre o vidro claro. */
+  --content: 6 9 24;
+  --content-2: 100 108 136;
+  /* A referência clara usa 122 127 144 aqui, que dá 4,0:1 sobre o vidro e
+     reprova AA em 11px. Mantemos o valor mais escuro: hierarquia por tamanho. */
   --content-3: 104 111 132;
 
   --line: 24 27 38;
@@ -73,18 +82,22 @@
   --state-active: 24 27 38;
   --overlay: 24 27 38;
 
-  --accent: 79 102 234;          /* #4F66EA */
+  /* Mesma família azure do escuro. A referência usa #2C6FF4 (4,2:1 sobre
+     branco); descemos para blue-600, que passa AA e mantém o matiz. */
+  --accent: 37 99 235;           /* #2563EB */
   --accent-fill: 79 102 234;
   --accent-contrast: 255 255 255;
   --focus: 52 73 198;            /* #3449C6 */
   --focus-offset: 255 255 255;
 
-  --income: 4 120 87;            /* #047857 */
-  --expense: 190 18 60;          /* #BE123C */
+  /* Ciano como no escuro, mas escurecido: o #1CA1BB da referência dá 2,8:1
+     sobre branco e valores monetários não podem reprovar contraste. */
+  --income: 14 116 144;          /* #0E7490 */
+  --expense: 190 18 60;          /* #BE123C — o #F55669 da referência dá 3,3:1 */
   --danger: 190 18 60;
   --warning: 194 65 12;          /* #C2410C */
 
-  --chart-1: 63 87 219;
+  --chart-1: 29 101 219;
   --chart-2: 14 138 168;
   --chart-3: 124 78 230;
   --chart-4: 194 96 12;
@@ -110,15 +123,18 @@
    Tailwind. No escuro o vidro é branco a 3,5% sobre quase preto; no claro é
    branco a 72% sobre lavanda. Não é a mesma cor com outra opacidade. */
 [data-theme="dark"] {
-  --glass-bg: rgba(255, 255, 255, 0.035);
+  /* Tinta azul, não branco puro: o card composto da referência mede 8 12 24
+     sobre um fundo 3 5 14, ou seja o vidro ESFRIA a superfície em vez de só
+     clareá-la. Branco a 3,5% dava um cinza neutro que não existe no PNG. */
+  --glass-bg: rgba(140, 175, 255, 0.045);
   --glass-border: rgba(255, 255, 255, 0.08);
   --glass-blur: 24px;
   --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.45);
   --inner-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.05);
   --mesh:
-    radial-gradient(90% 60% at 12% 0%, rgba(99, 122, 250, 0.10), transparent 70%),
+    radial-gradient(90% 60% at 12% 0%, rgba(59, 130, 246, 0.10), transparent 70%),
     radial-gradient(70% 50% at 92% 8%, rgba(167, 139, 250, 0.08), transparent 70%);
-  --glow-accent: radial-gradient(60% 60% at 50% 0%, rgba(99, 122, 250, 0.26), transparent 70%);
+  --glow-accent: radial-gradient(60% 60% at 50% 0%, rgba(59, 130, 246, 0.26), transparent 70%);
 }
 
 [data-theme="light"] {
@@ -199,6 +215,20 @@
 /* Anel da Norby: a ousadia visual do app inteiro mora aqui e só aqui. */
 [data-theme="dark"]  { --ring-sat: 1.15; --ring-glow: 0.45; --ring-veil: 0; }
 [data-theme="light"] { --ring-sat: 0.72; --ring-glow: 0.26; --ring-veil: 0.34; }
+
+/* Toro do herói. Os graus vêm da referência: corpo escuro por quase toda a
+   volta e um especular estreito entre 110° e 160°, que é o que dá a leitura de
+   vidro em vez de neon. */
+[data-theme="dark"] {
+  --ring-torus: conic-gradient(from 200deg,
+    #16244F 0deg, #1B2E63 70deg, #6FD2EA 110deg, #DCEBF2 132deg,
+    #8B7BF7 158deg, #1E2A5E 205deg, #182752 300deg, #16244F 360deg);
+}
+[data-theme="light"] {
+  --ring-torus: conic-gradient(from 200deg,
+    #DDE3F5 0deg, #CBD6F0 70deg, #A8E4F2 110deg, #FFFFFF 132deg,
+    #C9BEF6 158deg, #D5DCF2 205deg, #E4E8F7 300deg, #DDE3F5 360deg);
+}
 
 @keyframes ring-spin  { to { transform: rotate(360deg); } }
 @keyframes ring-float { 0%, 100% { translate: 0 0; } 50% { translate: 0 -10px; } }
