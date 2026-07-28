@@ -90,41 +90,92 @@
   --heat-over: 225 66 92;
 }
 
+/* Tokens de composição: carregam alpha e blur próprios, então NÃO passam pelo
+   Tailwind. No escuro o vidro é branco a 3,5% sobre quase preto; no claro é
+   branco a 72% sobre lavanda. Não é a mesma cor com outra opacidade. */
+[data-theme="dark"] {
+  --glass-bg: rgba(255, 255, 255, 0.035);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-blur: 24px;
+  --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.45);
+  --inner-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --mesh:
+    radial-gradient(90% 60% at 12% 0%, rgba(99, 122, 250, 0.10), transparent 70%),
+    radial-gradient(70% 50% at 92% 8%, rgba(167, 139, 250, 0.08), transparent 70%);
+  --glow-accent: radial-gradient(60% 60% at 50% 0%, rgba(99, 122, 250, 0.26), transparent 70%);
+}
+
+[data-theme="light"] {
+  /* Blur maior no claro: o vidro precisa borrar mais para se separar da
+     lavanda de fundo. É token justamente por isso, não é o escuro invertido. */
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(24, 27, 38, 0.07);
+  --glass-blur: 40px;
+  --shadow-card: 0 12px 32px rgba(79, 102, 234, 0.07), 0 1px 2px rgba(24, 27, 38, 0.04);
+  --inner-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --mesh:
+    radial-gradient(90% 60% at 12% 0%, rgba(129, 140, 248, 0.14), transparent 70%),
+    radial-gradient(70% 50% at 92% 8%, rgba(196, 181, 253, 0.12), transparent 70%);
+  --glow-accent: radial-gradient(60% 60% at 50% 0%, rgba(129, 140, 248, 0.18), transparent 70%);
+}
+
 @layer base {
   * { box-sizing: border-box; }
   body {
-    @apply bg-norby-night text-norby-ivory antialiased;
-    font-family: 'Inter', sans-serif;
+    @apply bg-bg-base text-content antialiased;
+    font-family: theme('fontFamily.sans');
   }
+  /* Números monetários/tabela: figuras tabulares (precisão, sem layout shift) */
+  .tnum { font-variant-numeric: tabular-nums; }
 }
 
 @layer components {
-  /* Card dark "Petróleo Confiável": superfície sólida o bastante p/ ler dados,
-     borda sutil, leve blur deixando o glow teal vazar por trás. */
-  .glass-card {
-    @apply bg-norby-surface/70 backdrop-blur-xl border border-white/[0.06] rounded-3xl;
+  /* Superfície de primeiro nível. É o ÚNICO lugar com backdrop-filter: blocos
+     internos usam .inset-panel. Blur empilhado derruba o frame rate em mobile
+     e não muda nada visualmente no segundo nível. */
+  .glass {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--shadow-card), var(--inner-highlight);
+    backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+    @apply rounded-3xl;
   }
-  .glass-card-hover {
-    @apply glass-card transition-colors duration-200 hover:border-white/[0.14];
+  .glass-hover {
+    @apply glass transition-colors duration-200;
   }
+  .glass-hover:hover { border-color: rgb(var(--accent) / 0.28); }
+
+  /* Bloco interno de card: superfície sólida, sem segundo backdrop-filter. */
+  .inset-panel {
+    @apply bg-surface-inset rounded-2xl border border-line/[0.06];
+  }
+
+  .app-mesh { background-image: var(--mesh); }
 
   /* Chip de tendência (pílula): variação % nunca fica como texto solto */
   .chip {
     @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold tnum;
   }
-  .chip-pos { @apply chip bg-norby-income/15 text-norby-income; }
-  .chip-neg { @apply chip bg-norby-danger/15 text-norby-danger; }
-  .chip-neutral { @apply chip bg-white/[0.06] text-norby-ivory/60; }
+  .chip-pos { @apply chip bg-income/15 text-income; }
+  .chip-neg { @apply chip bg-expense/15 text-expense; }
+  .chip-neutral { @apply chip bg-line/[0.06] text-content-2; }
 
   /* Label micro em uppercase: padrão único de rótulo de dado */
   .microlabel {
-    @apply text-[11px] font-medium text-norby-ivory/40 uppercase tracking-widest;
+    @apply text-[11px] font-medium text-content-3 uppercase tracking-widest;
   }
+
+  /* Ponte enquanto páginas não migradas ainda usam .glass-card.
+     Removida na Task 18. */
+  .glass-card { @apply glass; }
+  .glass-card-hover { @apply glass-hover; }
 }
 
-@layer base {
-  /* Números monetários/tabela: figuras tabulares (precisão, sem layout shift) */
-  .tnum { font-variant-numeric: tabular-nums; }
+/* Sem backdrop-filter (navegador antigo ou GPU desligada): superfície opaca
+   equivalente, para o vidro nunca virar um card ilegível. */
+@supports not (backdrop-filter: blur(1px)) {
+  .glass { background: rgb(var(--surface)); }
 }
 
 /* Estrela-norte pulsando: substituto de spinner genérico (assinatura da marca) */

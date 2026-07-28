@@ -68,8 +68,8 @@ export default {
           },
         },
         fontFamily: {
-          sans: ["Inter", "sans-serif"],
-          heading: ["Inter", "sans-serif"],
+          sans: ["'Geist Variable'", "system-ui", "sans-serif"],
+          heading: ["'Geist Variable'", "system-ui", "sans-serif"],
         },
         ringWidth: { 3: "3px" },
         keyframes: {
