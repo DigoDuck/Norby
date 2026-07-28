@@ -66,7 +66,10 @@ npm run test     # Vitest
   e reuso de enums existentes (`create_type=False`).
 - Frontend: **API client centralizado** em `src/api/` (axios em `axios.js`, um
   módulo fino por recurso). Componentes/páginas não chamam `axios` direto.
-- UI em **português** (pt-BR); tema teal "Petróleo Confiável" (classes `norby-*`).
+- UI em **português** (pt-BR); tema "Vidro Iridescente", escuro e claro, via
+  `data-theme` no `<html>`. Cor **só** por token semântico (`bg-surface`,
+  `text-content-2`, `--glass-bg`…) — hex fixo em componente e o namespace
+  `norby-*` não existem mais. Ver [DESIGN.md](DESIGN.md).
 - Specs e planos vivem no Second Brain (Obsidian), **não** no repo (`docs/` está
   no `.gitignore`).
 - Dependências: `requirements.txt` é **só produção**; pytest e afins vivem em
