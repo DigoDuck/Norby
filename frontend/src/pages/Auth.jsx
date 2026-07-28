@@ -10,7 +10,7 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Eye, EyeOff } from "lucide-react";
 import NorbyMark from "../components/shared/Logo";
-import NorbyRing from "../components/shared/NorbyRing";
+import HeroRing from "../components/shared/HeroRing";
 
 const loginSchema = z.object({
   email: z.string().email("Email inválido"),
@@ -86,16 +86,16 @@ export default function Auth() {
   return (
     <div className="app-mesh relative flex min-h-screen w-full items-center justify-center overflow-x-hidden bg-bg-base p-4">
       <div className="relative z-10 flex w-full max-w-5xl items-center justify-center gap-20">
-        <NorbyRing
-          size={280}
-          variant="glass"
-          className="hidden lg:block motion-safe:animate-[ring-float_11s_ease-in-out_infinite]"
-        />
+        <div className="hidden w-[22rem] shrink-0 lg:block">
+          <HeroRing className="hero-ring--inline" />
+        </div>
 
         <div className="w-full max-w-md py-6">
           {/* Header */}
           <div className="text-center mb-8">
-            <div className="brand-tile mb-4 inline-grid h-14 w-14">
+            {/* mx-auto, não inline-grid: .brand-tile aplica display:grid e
+                vence o inline, então o text-center do pai não centralizaria. */}
+            <div className="brand-tile mx-auto mb-4 h-14 w-14">
               <NorbyMark size={30} color="currentColor" />
             </div>
             <h1 className="text-2xl font-bold text-content">Norby</h1>

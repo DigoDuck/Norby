@@ -268,6 +268,9 @@
   box-shadow: var(--iris-glow), inset 0 1px 0 rgb(255 255 255 / 0.25);
   @apply rounded-[28%] grid place-items-center text-accent-contrast;
 }
+/* Variante redonda: a presença da IA. Classe própria porque .brand-tile é CSS
+   solto e venceria um rounded-full vindo das utilities do Tailwind. */
+.brand-tile-round { border-radius: 9999px; }
 
 /* Célula do heatmap: a referência mostra um azulejo com borda própria, não um
    quadrado chapado. O gradiente diagonal é o que dá o volume.
@@ -298,29 +301,10 @@
 }
 .star-loading { animation: star-pulse 1.4s ease-in-out infinite; }
 
-/* Anel da Norby: a ousadia visual do app inteiro mora aqui e só aqui. */
-[data-theme="dark"]  { --ring-sat: 1.15; --ring-glow: 0.45; --ring-veil: 0; }
-[data-theme="light"] { --ring-sat: 0.72; --ring-glow: 0.26; --ring-veil: 0.34; }
-
-/* Toro do herói. Os graus vêm da referência: corpo escuro por quase toda a
-   volta e um especular estreito entre 110° e 160°, que é o que dá a leitura de
-   vidro em vez de neon. */
-[data-theme="dark"] {
-  --ring-torus: conic-gradient(from 200deg,
-    #16244F 0deg, #1B2E63 70deg, #6FD2EA 110deg, #DCEBF2 132deg,
-    #8B7BF7 158deg, #1E2A5E 205deg, #182752 300deg, #16244F 360deg);
-}
-[data-theme="light"] {
-  --ring-torus: conic-gradient(from 200deg,
-    #DDE3F5 0deg, #CBD6F0 70deg, #A8E4F2 110deg, #FFFFFF 132deg,
-    #C9BEF6 158deg, #D5DCF2 205deg, #E4E8F7 300deg, #DDE3F5 360deg);
-}
-
-@keyframes ring-spin  { to { transform: rotate(360deg); } }
-@keyframes ring-float { 0%, 100% { translate: 0 0; } 50% { translate: 0 -10px; } }
-
-/* O hero usa um toro renderizado em perspectiva. O NorbyRing em CSS continua
-   sendo o orbe leve e escalável dos contextos menores da IA e do login. */
+/* O anel da marca é UM só, e é o toro renderizado. O conic-gradient em CSS
+   (NorbyRing) foi removido: ao lado do asset ele lia como um segundo círculo,
+   chapado, com outra perspectiva. Onde ele marcava a presença da IA agora está
+   o tile redondo da marca; no login, o próprio toro. */
 .hero-ring {
   position: absolute;
   right: -2.375rem;
@@ -329,6 +313,14 @@
   aspect-ratio: 1;
   pointer-events: none;
   isolation: isolate;
+}
+
+/* Fora do card do herói (login) o anel não é sangria de canto: ocupa o próprio
+   espaço. Duas classes para vencer .hero-ring independente da ordem. */
+.hero-ring.hero-ring--inline {
+  position: relative;
+  inset: auto;
+  width: 100%;
 }
 
 .hero-ring__asset {

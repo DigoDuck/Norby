@@ -4,7 +4,7 @@ import { aiApi } from "@/api/ai";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import NorthStar from "@/components/shared/NorthStar";
-import NorbyRing from "@/components/shared/NorbyRing";
+import AiOrb from "@/components/shared/AiOrb";
 
 const WELCOME = {
   role: "assistant",
@@ -181,7 +181,7 @@ export default function AIAnalyst() {
         {/* Header */}
         <div className="flex items-center gap-3 border-b border-line/[0.08] px-4 py-4 sm:px-6">
           <div className="relative shrink-0">
-            <NorbyRing size={32} withStar />
+            <AiOrb size={32} pulse={false} />
             <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-surface bg-income" />
           </div>
           <div>
@@ -200,7 +200,7 @@ export default function AIAnalyst() {
           <div className="max-w-[760px] mx-auto flex flex-col gap-5">
             {showingWelcome && (
               <div className="flex flex-col items-center gap-4 py-2 text-center sm:py-5">
-                <NorbyRing size={160} />
+                <AiOrb size={72} />
                 <p className="max-w-md text-sm leading-relaxed text-content-2">
                   Comece por uma dúvida sobre seus gastos, metas ou organização
                   financeira.
@@ -239,7 +239,7 @@ export default function AIAnalyst() {
 
             {loading && (
               <div className="flex items-center gap-2.5">
-                <NorbyRing size={28} />
+                <AiOrb size={28} />
                 <div className="inset-panel rounded-tl-md border-l-2 border-l-accent/40 px-4 py-3 text-xs text-content-2">
                   Norby está analisando…
                 </div>

@@ -1,15 +1,19 @@
-import NorbyRing from "./NorbyRing";
+import NorthStar from "./NorthStar";
 
-// Presença visual da IA (DESIGN.md › Signature). Passou a ser o anel da marca
-// em escala pequena: mesma assinatura do hero, um elemento só em vez de dois
-// competindo. `pulse=false` para contextos estáticos (listas, avatares).
+// Presença da IA (DESIGN.md › Signature): o tile iridescente da marca, redondo,
+// com a estrela-norte no centro — que é o marcador usado no cabeçalho do card
+// de leitura na referência. O anel em CSS saiu daqui: depois que o herói passou
+// a usar o toro renderizado, um segundo círculo, chapado, brigava com ele.
 export default function AiOrb({ size = 40, pulse = true, className = "" }) {
   return (
     <div
       aria-hidden="true"
-      className={`shrink-0 ${pulse ? "motion-safe:animate-orb-pulse" : ""} ${className}`}
+      style={{ width: size, height: size }}
+      className={`brand-tile brand-tile-round shrink-0 ${
+        pulse ? "motion-safe:animate-orb-pulse" : ""
+      } ${className}`}
     >
-      <NorbyRing size={size} withStar />
+      <NorthStar size={Math.round(size * 0.42)} />
     </div>
   );
 }
