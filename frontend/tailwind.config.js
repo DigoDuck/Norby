@@ -56,20 +56,6 @@ export default {
           border: c("--line"),
           input: c("--line"),
           ring: c("--focus"),
-
-          // Ponte enquanto as páginas ainda não migradas usam norby-*.
-          // Removida na Task 18, quando não sobrar nenhum consumidor.
-          norby: {
-            night: c("--bg-base"),
-            surface: c("--surface"),
-            surface2: c("--surface-inset"),
-            teal: c("--accent"),
-            "teal-soft": c("--accent"),
-            ivory: c("--content"),
-            income: c("--income"),
-            expense: c("--content-3"),
-            danger: c("--danger"),
-          },
         },
         fontFamily: {
           sans: ["'Geist Variable'", "system-ui", "sans-serif"],

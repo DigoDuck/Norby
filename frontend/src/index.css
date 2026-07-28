@@ -181,11 +181,6 @@
   .microlabel {
     @apply text-[11px] font-medium text-content-3 uppercase tracking-widest;
   }
-
-  /* Ponte enquanto páginas não migradas ainda usam .glass-card.
-     Removida na Task 18. */
-  .glass-card { @apply glass; }
-  .glass-card-hover { @apply glass-hover; }
 }
 
 /* Sem backdrop-filter (navegador antigo ou GPU desligada): superfície opaca
