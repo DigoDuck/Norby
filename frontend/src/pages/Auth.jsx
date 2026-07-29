@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Children, cloneElement, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -68,24 +68,40 @@ const benefits = [
   },
 ];
 
-// Campo com ícone à esquerda. O ícone é decorativo — o placeholder já nomeia o
-// campo — então fica aria-hidden para não duplicar o rótulo no leitor de tela.
-function Field({ icon, error, children }) {
+// Campo com rótulo acessível e ícone decorativo à esquerda.
+function Field({ id, label, icon, error, children }) {
   // Variável, não desestruturação no parâmetro: o varsIgnorePattern '^[A-Z_]'
   // do eslint.config.js só perdoa variáveis, e sem eslint-plugin-react o uso
   // em JSX não conta como uso. Mesmo idioma do Sidebar.
   const Icon = icon;
+  const errorId = `${id}-error`;
+
   return (
     <div>
+      <label htmlFor={id} className="sr-only">
+        {label}
+      </label>
       <div className="relative">
         <Icon
           size={18}
           aria-hidden="true"
           className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-content-3"
         />
-        {children}
+        {Children.map(children, (child, index) =>
+          index === 0
+            ? cloneElement(child, {
+                id,
+                "aria-invalid": error ? "true" : undefined,
+                "aria-describedby": error ? errorId : undefined,
+              })
+            : child,
+        )}
       </div>
-      {error && <p className="mt-1.5 text-xs text-danger">{error}</p>}
+      {error && (
+        <p id={errorId} className="mt-1.5 text-xs text-danger">
+          {error}
+        </p>
+      )}
     </div>
   );
 }
@@ -136,9 +152,9 @@ export default function Auth() {
 
   return (
     <div className="app-mesh relative min-h-screen w-full overflow-x-hidden bg-bg-base">
-      {/* Marca no topo. Só no desktop: abaixo de lg o card já traz o tile, e
+      {/* Marca no topo. Só no desktop amplo: abaixo de xl o card já traz o tile, e
           repetir a marca em duas alturas numa tela estreita é ruído. */}
-      <header className="absolute left-8 top-8 z-10 hidden items-center gap-3 lg:flex">
+      <header className="absolute left-8 top-8 z-10 hidden items-center gap-3 xl:flex">
         <div className="brand-tile h-11 w-11">
           <NorbyMark size={24} color="currentColor" />
         </div>
@@ -148,28 +164,28 @@ export default function Auth() {
         </div>
       </header>
 
-      {/* max-w-[92rem]: com 86rem a coluna do meio ficava em 368px e o anel
-          sozinho já media 352px, então painel e anel não cabiam lado a lado e
-          um cortava o outro. As três larguras saem dessa conta, não do olho. */}
-      <main className="mx-auto grid min-h-screen w-full max-w-[92rem] items-center gap-12 px-6 py-12 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)_27rem] lg:gap-6 lg:px-10 lg:py-16">
-        {/* Proposta de valor. Abaixo de lg desce para baixo do card: quem volta
+      <main className="flex min-h-screen w-full items-center">
+        <div className="auth-layout mx-auto grid w-full max-w-[100rem] items-center gap-12 px-6 py-12 xl:grid-cols-[minmax(0,22rem)_minmax(18rem,1fr)_minmax(0,30rem)] xl:gap-6 xl:py-16 2xl:grid-cols-[minmax(0,28rem)_minmax(24rem,1fr)_minmax(0,34rem)] 2xl:px-10">
+        {/* Proposta de valor. Abaixo de xl desce para baixo do card: quem volta
             para entrar quer o formulário primeiro, não o argumento de venda. */}
-        <section className="order-2 lg:order-1">
-          <p className="control-raised inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm text-content">
-            <NorthStar size={15} className="text-accent" />
-            IA que entende suas finanças
-          </p>
+        <section className="auth-copy relative z-10 order-2 xl:order-1">
+          <div>
+            <p className="control-raised inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm text-content">
+              <NorthStar size={15} className="text-accent" />
+              IA que entende suas finanças
+            </p>
 
-          {/* A ênfase de "pessoal" é cor sólida, não gradiente: gradient text é
-              ban do DESIGN.md e some no modo de alto contraste do Windows. */}
-          <h1 className="mt-7 text-balance text-4xl font-bold leading-[1.12] tracking-tight text-content xl:text-[2.7rem]">
-            Seu assistente financeiro <span className="text-accent">pessoal</span>
-          </h1>
+            {/* A ênfase de "pessoal" é cor sólida, não gradiente: gradient text é
+                ban do DESIGN.md e some no modo de alto contraste do Windows. */}
+            <h1 className="mt-7 text-balance text-4xl font-bold leading-[1.12] tracking-tight text-content xl:text-[2.7rem]">
+              Seu assistente financeiro <span className="text-accent">pessoal</span>
+            </h1>
 
-          <p className="mt-5 max-w-md text-pretty text-base leading-relaxed text-content-2">
-            Planeje, acompanhe e tome decisões melhores com insights inteligentes
-            e total clareza.
-          </p>
+            <p className="mt-5 max-w-md text-pretty text-base leading-relaxed text-content-2">
+              Planeje, acompanhe e tome decisões melhores com insights inteligentes
+              e total clareza.
+            </p>
+          </div>
 
           <ul className="mt-10 space-y-6">
             {benefits.map((b) => {
@@ -197,7 +213,7 @@ export default function Auth() {
             exemplo e não podem ser anunciados como saldo de ninguém. */}
         <div
           aria-hidden="true"
-          className="relative order-3 hidden h-[32rem] lg:order-2 lg:block"
+          className="relative z-0 order-3 hidden h-[32rem] xl:order-2 xl:block"
         >
           <div className="ghost-panel absolute right-0 top-[6%] w-48 p-4 opacity-75">
             <p className="text-xs text-content-3">Saldo total</p>
@@ -213,19 +229,15 @@ export default function Auth() {
             <div className="mt-2.5 h-1.5 w-2/3 rounded-full bg-income/40" />
           </div>
 
-          {/* Contêiner posicionado em vez de posicionar o próprio anel: a regra
-              .hero-ring.hero-ring--inline tem duas classes e venceria o
-              `absolute`/`w-*` do Tailwind, que valem uma.
-              Sem pódio: o toro não tem base no asset, e a cáustica do HeroRing
-              já apoia a peça. Um cilindro em CSS ficava invisível nos dois
-              temas (a cor sai de --surface, que é o próprio fundo). */}
-          <div className="absolute left-[29%] top-1/2 w-[18rem] -translate-x-1/2 -translate-y-1/2">
+          {/* O palco cria o apoio óptico visto na referência sem introduzir
+              outra camada de backdrop-filter. */}
+          <div className="auth-ring-stage absolute left-[29%] top-1/2 w-[22rem] -translate-x-1/2 -translate-y-1/2 2xl:w-[26rem]">
             <HeroRing className="hero-ring--inline" />
           </div>
         </div>
 
         {/* Card de acesso */}
-        <div className="order-1 w-full justify-self-center lg:order-3">
+        <div className="relative z-10 order-1 w-full max-w-[34rem] justify-self-center xl:order-3">
           <div className="glass w-full p-8 sm:p-10">
             <div className="text-center">
               {/* mx-auto, não inline-grid: .brand-tile aplica display:grid e
@@ -249,11 +261,10 @@ export default function Auth() {
               </p>
             </div>
 
-            {/* Abas. A seleção usa .nav-active, a mesma pílula de vidro do item
-                ativo da sidebar — repetir aqui o gradiente do CTA deixaria dois
-                botões idênticos no card e o olho não saberia qual é a ação. */}
+            {/* Alternância de modo: são botões pressionáveis, não abas com
+                painéis navegáveis por teclado. */}
             <div
-              role="tablist"
+              role="group"
               aria-label="Entrar ou cadastrar"
               className="mt-7 flex gap-1 rounded-full bg-line/[0.06] p-1"
             >
@@ -261,13 +272,14 @@ export default function Auth() {
                 <button
                   key={m}
                   type="button"
-                  role="tab"
-                  aria-selected={mode === m}
+                  aria-pressed={mode === m}
                   onClick={() => setMode(m)}
                   className={`flex-1 rounded-full py-2.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-focus-offset ${
                     mode === m
-                      ? "nav-active text-accent dark:text-content"
-                      : "text-content-2 hover:text-content"
+                      ? // A aba já selecionada não ganha hover: clicar nela não
+                        // faz nada, e prometer resposta seria mentira.
+                        "auth-mode-active text-accent-contrast"
+                      : "text-content-2 hover:bg-state/[0.05] hover:text-content"
                   }`}
                 >
                   {m === "login" ? "Entrar" : "Cadastrar"}
@@ -277,12 +289,22 @@ export default function Auth() {
 
             <form className="mt-5 space-y-3" onSubmit={handleSubmit(onSubmit)}>
               {mode === "register" && (
-                <Field icon={User} error={errors.name?.message}>
+                <Field
+                  id="auth-name"
+                  label="Seu nome"
+                  icon={User}
+                  error={errors.name?.message}
+                >
                   <Input placeholder="Seu nome" {...register("name")} className={inputCls} />
                 </Field>
               )}
 
-              <Field icon={Mail} error={errors.email?.message}>
+              <Field
+                id="auth-email"
+                label="Email"
+                icon={Mail}
+                error={errors.email?.message}
+              >
                 <Input
                   type="email"
                   placeholder="Email"
@@ -292,7 +314,12 @@ export default function Auth() {
                 />
               </Field>
 
-              <Field icon={Lock} error={errors.password?.message}>
+              <Field
+                id="auth-password"
+                label="Senha"
+                icon={Lock}
+                error={errors.password?.message}
+              >
                 <Input
                   type={showPass ? "text" : "password"}
                   placeholder="Senha"
@@ -302,6 +329,7 @@ export default function Auth() {
                 />
                 <button
                   type="button"
+                  aria-controls="auth-password"
                   onClick={() => setShowPass(!showPass)}
                   className="absolute right-4 top-1/2 -translate-y-1/2 rounded-md text-content-3 transition-colors hover:text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                 >
@@ -313,7 +341,12 @@ export default function Auth() {
               </Field>
 
               {mode === "register" && (
-                <Field icon={Lock} error={errors.confirmPassword?.message}>
+                <Field
+                  id="auth-confirm-password"
+                  label="Confirmar senha"
+                  icon={Lock}
+                  error={errors.confirmPassword?.message}
+                >
                   <Input
                     type="password"
                     placeholder="Confirmar senha"
@@ -351,8 +384,13 @@ export default function Auth() {
                 <div>
                   <label className="flex items-start gap-2 text-xs text-content-2">
                     <input
+                      id="auth-accepted-terms"
                       type="checkbox"
                       {...register("acceptedTerms")}
+                      aria-invalid={errors.acceptedTerms ? "true" : undefined}
+                      aria-describedby={
+                        errors.acceptedTerms ? "auth-accepted-terms-error" : undefined
+                      }
                       className="mt-0.5 accent-accent"
                     />
                     <span>
@@ -372,7 +410,10 @@ export default function Auth() {
                     </span>
                   </label>
                   {errors.acceptedTerms && (
-                    <p className="mt-1.5 text-xs text-danger">
+                    <p
+                      id="auth-accepted-terms-error"
+                      className="mt-1.5 text-xs text-danger"
+                    >
                       {errors.acceptedTerms.message}
                     </p>
                   )}
@@ -414,6 +455,7 @@ export default function Auth() {
               Conexão criptografada e senha guardada só como hash.
             </p>
           </div>
+        </div>
         </div>
       </main>
     </div>

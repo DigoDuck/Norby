@@ -241,6 +241,9 @@
     rgb(var(--iris-1)) 0%, rgb(var(--iris-2)) 42%,
     rgb(var(--iris-3)) 68%, rgb(var(--iris-4)) 100%);
   --iris-glow: 0 0 22px -6px rgb(var(--iris-3) / 0.55);
+  --action-primary-fill:
+    linear-gradient(180deg, rgb(255 255 255 / 0.18), transparent 30%),
+    linear-gradient(108deg, #1e6fd9 0%, #4f66ea 52%, #7a4fe0 100%);
 
   /* A marca NÃO segue o tema: a referência mostra o mesmo gradiente saturado
      no claro e no escuro. Com os stops claros do tema light o monograma branco
@@ -272,10 +275,21 @@
     -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(140%);
     @apply rounded-3xl;
   }
+  /* Hover do card: a peça sobe e o brilho tingido cresce. transition-colors
+     não animava box-shadow, então a sombra pulava; aqui as três propriedades
+     têm curva própria. ease-out-quint, sem bounce. */
   .glass-hover {
-    @apply glass transition-colors duration-200;
+    @apply glass;
+    transition:
+      border-color 200ms cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 200ms cubic-bezier(0.22, 1, 0.36, 1),
+      transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
   }
-  .glass-hover:hover { border-color: rgb(var(--accent) / 0.28); }
+  .glass-hover:hover {
+    border-color: rgb(var(--accent) / 0.28);
+    box-shadow: var(--shadow-card), var(--inner-highlight), var(--elev-glow);
+    transform: translateY(-2px);
+  }
 
   /* Bloco interno de card: superfície sólida, sem segundo backdrop-filter. */
   .inset-panel {
@@ -412,9 +426,7 @@
   isolation: isolate;
   border-radius: 9999px;
   color: rgb(var(--accent-contrast));
-  background:
-    linear-gradient(180deg, rgb(255 255 255 / 0.18), transparent 30%),
-    linear-gradient(108deg, #1e6fd9 0%, #4f66ea 52%, #7a4fe0 100%);
+  background: var(--action-primary-fill);
   box-shadow: var(--hero-cta-shadow);
 }
 
@@ -430,6 +442,9 @@
   filter: blur(7px);
   opacity: var(--hero-cta-aura);
   pointer-events: none;
+  /* O transition-all do Button não alcança pseudo-elemento: a aura precisa da
+     transição declarada aqui, senão ela pisca em vez de crescer. */
+  transition: opacity 180ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .hero-cta::after {
@@ -446,8 +461,21 @@
   pointer-events: none;
 }
 
-.hero-cta:hover {
-  filter: brightness(1.05);
+/* Hover = mais luz EM VOLTA, nunca mais claro por dentro. Clarear o
+   preenchimento de um botão com texto branco sempre derruba o contraste: o
+   brightness(1.05) que estava aqui levava o CTA de 4,75:1 para 4,37:1 e
+   reprovava AA exatamente quando o ponteiro chegava. Crescendo a aura e a
+   sombra, a cor sob o rótulo não se mexe e o contraste fica intacto.
+   Sem translateY: o Button já traz active:scale-[0.98], e um transform aqui
+   apagaria o afundar do clique. */
+.hero-cta:hover,
+.hero-cta:focus-visible {
+  box-shadow: var(--hero-cta-shadow), var(--elev-glow);
+}
+
+.hero-cta:hover::before,
+.hero-cta:focus-visible::before {
+  opacity: calc(var(--hero-cta-aura) * 1.45);
 }
 
 .hero-cta__sep {
@@ -588,10 +616,89 @@
    leitor de tela nunca anuncie os valores de exemplo como saldo do usuário. */
 .ghost-panel {
   border: 1px solid var(--glass-border);
-  background: rgb(var(--surface) / 0.5);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  /* --surface-inset, não --surface-2: esse token nunca existiu, e um var()
+     indefinido invalida o linear-gradient inteiro — o background caía para
+     transparente e o painel ficava só com borda e sombra. */
+  background:
+    linear-gradient(145deg, rgb(var(--surface) / 0.72), rgb(var(--surface-inset) / 0.54));
+  box-shadow: var(--elev-1), var(--rim);
   border-radius: 1.25rem;
+}
+
+.auth-mode-active {
+  color: rgb(var(--accent-contrast));
+  background: var(--action-primary-fill);
+  box-shadow: var(--elev-1), var(--rim);
+}
+
+.auth-layout {
+  transform-origin: center;
+}
+
+@media (min-width: 1920px) and (min-height: 1000px) {
+  .auth-layout {
+    transform: scale(1.08);
+  }
+}
+
+@media (min-width: 2300px) and (min-height: 1200px) {
+  .auth-layout {
+    transform: scale(1.18);
+  }
+
+  .auth-copy {
+    align-self: stretch;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transform: translateX(-12rem);
+  }
+}
+
+.auth-ring-stage {
+  isolation: isolate;
+}
+
+.auth-ring-stage::before {
+  position: absolute;
+  z-index: 0;
+  right: 4%;
+  bottom: -2%;
+  width: 82%;
+  height: 21%;
+  content: "";
+  border: 1px solid var(--glass-border);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 58% 38%, rgb(var(--surface) / 0.88) 0 24%, transparent 56%),
+    linear-gradient(
+      100deg,
+      rgb(var(--iris-1) / 0.26),
+      rgb(var(--iris-3) / 0.22) 56%,
+      rgb(var(--iris-4) / 0.2)
+    );
+  box-shadow: var(--elev-1), var(--rim);
+  transform: perspective(22rem) rotateX(67deg);
+}
+
+.auth-ring-stage::after {
+  position: absolute;
+  z-index: -1;
+  right: -18%;
+  bottom: -20%;
+  width: 126%;
+  height: 52%;
+  content: "";
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse, rgb(var(--iris-1) / 0.15), transparent 58%),
+    radial-gradient(ellipse at 72% 50%, rgb(var(--iris-3) / 0.14), transparent 52%);
+  filter: blur(18px);
+}
+
+.auth-ring-stage .hero-ring {
+  position: relative;
+  z-index: 2;
 }
 
 .hero-ring__caustic {
