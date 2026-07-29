@@ -99,11 +99,28 @@ semântica, e nenhum pode virar sinal de receita, despesa ou alerta.
 - **Card:** `.glass` — o **único** lugar com `backdrop-filter`. Blocos internos
   usam `.inset-panel`, superfície sólida: blur empilhado derruba o frame rate no
   mobile e não muda nada aos olhos no segundo nível.
+- **Profundidade:** todo controle que precisa ler como objeto usa as mesmas três
+  camadas — `--elev-1` (sombra embaixo), `--rim` (luz na aresta superior) e uma
+  borda fina. A sombra é **tingida**, nunca cinza: na referência ela mede
+  204 216 248 sobre uma página em 252 252 252, porque é a luz da cena que a
+  colore. `--shadow-card` continua sendo só do card; controle dentro de card usa
+  `--elev-1` e o card não ganha nada a mais, senão vira borrão.
+- **CTA primário:** `.cta-primary` — gradiente que atravessa o matiz
+  (azul → índigo → violeta), rim no topo, glow tingido embaixo. Iridescência
+  aqui é **matiz, não claridade**: a referência clareia as pontas e com isso o
+  texto branco dela cai para 2,33:1. Os três stops daqui ficam em 4,85 / 4,75 /
+  5,22. Fixo nos dois temas, como o tile da marca.
+- **Item ativo da navegação:** `.nav-active` — pílula elevada por cima de uma
+  forma iridescente 3px mais larga, então só as fatias laterais aparecem. **Não**
+  é moldura: no PNG o topo e a base não têm cor.
+- **Controle elevado:** `.control-raised` — superfície sólida com elevação, para
+  chip de data e afins. `.glass` ali só traria `backdrop-filter` que não faz
+  nada num controle de 28px.
 - **Moldura iridescente:** `.stroke-iris` — 1px de gradiente com miolo
-  transparente, feito com `mask-composite`. Uso **definido**: item ativo da
-  navegação, CTA secundário e o primeiro insight da IA. Não é enfeite de card
-  qualquer. O `.stroke-iris-glow` é opcional e some com o `@supports` de
-  fallback, que degrada para borda sólida do acento.
+  transparente, feito com `mask-composite`. Uso **definido**: CTA secundário e o
+  primeiro insight da IA. Não é enfeite de card qualquer. O `.stroke-iris-glow`
+  é opcional e some com o `@supports` de fallback, que degrada para borda sólida
+  do acento.
 - **Glow:** o limite de **dois por tela** vale para o glow difuso de card
   (`--glow-accent`). A moldura iridescente é padrão de componente e não conta
   nesse limite.

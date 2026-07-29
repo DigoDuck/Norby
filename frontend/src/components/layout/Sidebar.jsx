@@ -20,7 +20,7 @@ function NavItem({ to, icon, label }) {
           isActive
             ? // No escuro a referência mantém o label branco e deixa o azure só
               // no ícone e na estrela; no claro o label é que carrega o acento.
-              "stroke-iris stroke-iris-glow bg-state/[0.05] text-accent dark:text-content"
+              "nav-active text-accent dark:text-content"
             : "text-content-2 hover:text-content hover:bg-state/[0.04]"
         }`
       }

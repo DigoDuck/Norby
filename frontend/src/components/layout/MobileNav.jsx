@@ -63,7 +63,7 @@ export default function MobileNav() {
                   className={({ isActive }) =>
                     `relative flex items-center gap-3 px-3.5 py-3 rounded-2xl text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
                       isActive
-                        ? "stroke-iris bg-state/[0.05] text-accent dark:text-content"
+                        ? "nav-active text-accent dark:text-content"
                         : "text-content-2"
                     }`
                   }

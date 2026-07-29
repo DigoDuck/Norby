@@ -217,7 +217,7 @@ export default function Auth() {
               <Button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-accent-fill text-accent-contrast hover:bg-accent-fill/90 font-medium"
+                className="cta-primary w-full font-medium"
               >
                 {loading ? "Carregando..." : mode === "login" ? "Entrar" : "Criar Conta"}
               </Button>

@@ -147,6 +147,13 @@
   --iris-2: 99 122 250;
   --iris-3: 167 139 250;
   --iris-4: 232 121 249;
+
+  /* Profundidade de CONTROLE (o card usa --shadow-card). São as três camadas
+     que fazem um botão ler como objeto: sombra embaixo, rim de luz no topo,
+     e o glow tingido do CTA. */
+  --elev-1: 0 1px 2px rgb(0 0 0 / 0.4), 0 4px 12px -2px rgb(0 0 0 / 0.35);
+  --elev-glow: 0 6px 20px -6px rgb(var(--accent-fill) / 0.55);
+  --rim: inset 0 1px 0 rgb(255 255 255 / 0.14);
 }
 
 [data-theme="light"] {
@@ -168,6 +175,13 @@
   --iris-2: 129 140 248;
   --iris-3: 196 181 253;
   --iris-4: 240 171 252;
+
+  /* Sombra tingida de azul, não cinza: medido 204 216 248 abaixo do CTA da
+     referência, contra uma página em 252 252 252. É a luz da cena colorindo a
+     sombra — cinza puro aí entrega CSS genérico. */
+  --elev-1: 0 1px 2px rgb(24 27 38 / 0.06), 0 6px 16px -6px rgb(79 102 234 / 0.22);
+  --elev-glow: 0 8px 20px -8px rgb(var(--accent-fill) / 0.45);
+  --rim: inset 0 1px 0 rgb(255 255 255 / 0.55);
 }
 
 /* Derivados dos stops acima. Ficam fora dos blocos de tema justamente para não
@@ -271,6 +285,49 @@
 /* Variante redonda: a presença da IA. Classe própria porque .brand-tile é CSS
    solto e venceria um rounded-full vindo das utilities do Tailwind. */
 .brand-tile-round { border-radius: 9999px; }
+
+/* CTA primário: o gradiente ATRAVESSA o matiz (azul → índigo → violeta) em vez
+   de clarear. A referência clareia — mede 128 168 252 numa ponta e 176 144 252
+   na outra — e por isso o texto branco dela fica em 2,33:1 e 1,84:1. Aqui os
+   três stops ficam abaixo do teto de luminância que o branco exige, medidos em
+   4,85 / 4,75 / 5,22. Iridescência é matiz, não claridade.
+   Fixo nos dois temas, como o tile da marca: é superfície de marca. */
+.cta-primary {
+  background-image: linear-gradient(115deg, #1E6FD9 0%, #4F66EA 45%, #7A4FE0 100%);
+  box-shadow: var(--elev-glow), var(--rim);
+  @apply rounded-full text-accent-contrast;
+}
+.cta-primary:hover { filter: brightness(1.06); }
+/* Divisor antes da estrela — existe na referência e custa um span. */
+.cta-primary__sep { @apply mx-0.5 h-4 w-px bg-accent-contrast/30; }
+
+/* Item ativo da navegação. NÃO é moldura: na referência é uma pílula elevada
+   por cima de uma forma iridescente um pouco mais larga, então só as fatias da
+   esquerda e da direita aparecem — topo e base ficam sem cor. */
+.nav-active {
+  position: relative;
+  background: rgb(var(--surface));
+  box-shadow: var(--elev-1), var(--rim);
+  @apply rounded-full;
+}
+.nav-active::before {
+  content: "";
+  position: absolute;
+  inset: 0 -3px;
+  border-radius: inherit;
+  background: var(--iris);
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* Controle elevado sobre a página: chip de data e afins. Superfície sólida —
+   .glass traria backdrop-filter, que num chip de 28px não faz nada além de
+   custar composição. */
+.control-raised {
+  background: rgb(var(--surface));
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--elev-1), var(--rim);
+}
 
 /* Célula do heatmap: a referência mostra um azulejo com borda própria, não um
    quadrado chapado. O gradiente diagonal é o que dá o volume.

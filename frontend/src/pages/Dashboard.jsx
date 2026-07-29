@@ -328,7 +328,7 @@ export default function Dashboard() {
     <div className="space-y-4">
       {/* ── Linha contextual: a data, sozinha, à esquerda ────────────── */}
       <div className="flex items-center">
-        <span className="inline-flex items-center gap-2 rounded-full glass px-3.5 py-1.5 text-[11px] font-semibold text-content-2 uppercase tracking-widest">
+        <span className="control-raised inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[11px] font-semibold text-content-2 uppercase tracking-widest">
           <CalendarDays size={13} className="text-accent" />
           {todayLabel}
         </span>
@@ -349,13 +349,16 @@ export default function Dashboard() {
               Olá, {firstName} 👋
             </h1>
             <p className="text-sm text-content-2 mt-2 max-w-sm leading-relaxed">
-              Pergunte qualquer coisa sobre suas finanças — a Norby está pronta.
+              Pergunte qualquer coisa sobre suas finanças — a Norby está pronta
+              para te ajudar hoje.
             </p>
             <Button
               onClick={() => navigate("/ai")}
-              className="mt-5 h-10 px-5 bg-accent-fill text-accent-contrast hover:bg-accent-fill/90 font-medium"
+              className="cta-primary mt-5 h-10 px-5 font-medium"
             >
-              Falar com a Norby <ArrowRight size={15} />
+              Falar com a Norby
+              <span className="cta-primary__sep" aria-hidden="true" />
+              <NorthStar size={14} />
             </Button>
           </div>
 
