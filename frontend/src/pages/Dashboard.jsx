@@ -337,14 +337,8 @@ export default function Dashboard() {
       {/* ── Linha 1: hero (7 col) + saldo total (5 col) ──────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* Hero: saudação + convite à IA + anel da marca */}
-        <section className="lg:col-span-7 relative overflow-hidden glass p-6 md:pr-[250px] flex items-center min-h-[228px] animate-fade-up">
-          {/* Único glow do dashboard junto com o card da IA (ver DESIGN.md) */}
-          <div
-            className="absolute inset-0 pointer-events-none"
-            style={{ background: "var(--glow-accent)" }}
-          />
-
-          <div className="relative min-w-0">
+        <section className="hero-card lg:col-span-7 relative overflow-hidden glass p-6 md:pr-[250px] flex items-center min-h-[228px] animate-fade-up">
+          <div className="hero-card__content min-w-0">
             <h1 className="text-3xl font-bold text-content tracking-tight">
               Olá, {firstName} 👋
             </h1>
@@ -354,10 +348,10 @@ export default function Dashboard() {
             </p>
             <Button
               onClick={() => navigate("/ai")}
-              className="cta-primary mt-5 h-10 px-5 font-medium"
+              className="hero-cta mt-5 h-11 min-w-[208px] justify-between px-6 font-medium"
             >
               Falar com a Norby
-              <span className="cta-primary__sep" aria-hidden="true" />
+              <span className="hero-cta__sep" aria-hidden="true" />
               <NorthStar size={14} />
             </Button>
           </div>
