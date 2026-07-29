@@ -177,7 +177,10 @@ export default function Auth() {
 
             {/* A ênfase de "pessoal" é cor sólida, não gradiente: gradient text é
                 ban do DESIGN.md e some no modo de alto contraste do Windows. */}
-            <h1 className="mt-7 text-balance text-4xl font-bold leading-[1.12] tracking-tight text-content xl:text-[2.7rem]">
+            {/* O corpo maior só entra em 2xl. Em xl a coluna tem 352px e
+                "financeiro pessoal" a 43,2px pede ~380px, então quebrava em
+                três linhas e deixava "pessoal" órfã numa linha só. */}
+            <h1 className="mt-7 text-balance text-4xl font-bold leading-[1.12] tracking-tight text-content 2xl:text-[2.7rem]">
               Seu assistente financeiro <span className="text-accent">pessoal</span>
             </h1>
 
@@ -231,7 +234,11 @@ export default function Auth() {
 
           {/* O palco cria o apoio óptico visto na referência sem introduzir
               outra camada de backdrop-filter. */}
-          <div className="auth-ring-stage absolute left-[29%] top-1/2 w-[22rem] -translate-x-1/2 -translate-y-1/2 2xl:w-[26rem]">
+          {/* Largura fixa em 22rem: o 2xl:w-[26rem] levava o anel a 416px numa
+              coluna de 416px em 1536, sem deixar nada para o painel ao lado, e
+              o "Receitas" saía cortado. Em telas maiores o scale do
+              .auth-layout já amplia a peça. */}
+          <div className="auth-ring-stage absolute left-[29%] top-1/2 w-[22rem] -translate-x-1/2 -translate-y-1/2">
             <HeroRing className="hero-ring--inline" />
           </div>
         </div>
