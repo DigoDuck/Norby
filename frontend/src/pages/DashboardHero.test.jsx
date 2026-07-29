@@ -62,7 +62,6 @@ describe("Dashboard hero", () => {
     expect(section).toHaveClass("hero-card");
     expect(hero.parentElement).toHaveClass("hero-card__content");
     expect(button).toHaveClass("hero-cta", "h-11", "min-w-[208px]");
-    expect(button).not.toHaveClass("cta-primary");
     expect(button.querySelector(".hero-cta__sep")).toBeInTheDocument();
     expect(section.querySelector(".hero-ring")).toBeInTheDocument();
   });

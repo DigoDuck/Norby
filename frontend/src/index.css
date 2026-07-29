@@ -350,45 +350,6 @@
    solto e venceria um rounded-full vindo das utilities do Tailwind. */
 .brand-tile-round { border-radius: 9999px; }
 
-/* CTA primário: o gradiente ATRAVESSA o matiz (azul → índigo → violeta) em vez
-   de clarear. A referência clareia — mede 128 168 252 numa ponta e 176 144 252
-   na outra — e por isso o texto branco dela fica em 2,33:1 e 1,84:1. Aqui os
-   três stops ficam abaixo do teto de luminância que o branco exige, medidos em
-   4,85 / 4,75 / 5,22. Iridescência é matiz, não claridade.
-   Fixo nos dois temas, como o tile da marca: é superfície de marca. */
-.cta-primary {
-  position: relative;
-  isolation: isolate;
-  background-image: linear-gradient(115deg, #1E6FD9 0%, #4F66EA 45%, #7A4FE0 100%);
-  /* Mesma gramática de vidro do item ativo da navegação: rim de luz no topo e
-     um retorno mais escuro na base, que é o que dá espessura à pílula. */
-  box-shadow:
-    var(--elev-glow),
-    inset 0 1px 0 rgb(255 255 255 / 0.34),
-    inset 0 -1px 0 rgb(12 18 48 / 0.28);
-  @apply rounded-full text-accent-contrast;
-}
-/* A moldura vai num pseudo mascarado, não em border-box: o Button já traz
-   border-transparent, e trocar o border por gradiente mexeria na caixa. */
-.cta-primary::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  padding: 1px;
-  background: linear-gradient(100deg,
-    rgb(255 255 255 / 0.62) 0%, rgb(255 255 255 / 0.16) 46%,
-    rgb(255 255 255 / 0.5) 100%);
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  mask-composite: exclude;
-  pointer-events: none;
-}
-.cta-primary:hover { filter: brightness(1.06); }
-/* Divisor antes da estrela — existe na referência e custa um span. */
-.cta-primary__sep { @apply mx-0.5 h-4 w-px bg-accent-contrast/30; }
-
 .hero-card::before,
 .hero-card::after {
   content: "";
@@ -646,13 +607,11 @@
     transform: scale(1.18);
   }
 
-  .auth-copy {
-    align-self: stretch;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    transform: translateX(-12rem);
-  }
+  /* Só a escala cresce aqui. O `justify-content: space-between` numa coluna
+     esticada à altura do card (788px em 2560×1440) abria um vão de 299px entre
+     o parágrafo e a lista, contra os 43px de 1920 — lê como quebrado, não como
+     ritmo. E o translateX(-12rem) empurrava só a coluna de texto, deixando a
+     composição com 157px de margem à esquerda e 383px à direita. */
 }
 
 .auth-ring-stage {

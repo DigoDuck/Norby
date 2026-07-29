@@ -105,11 +105,22 @@ semântica, e nenhum pode virar sinal de receita, despesa ou alerta.
   204 216 248 sobre uma página em 252 252 252, porque é a luz da cena que a
   colore. `--shadow-card` continua sendo só do card; controle dentro de card usa
   `--elev-1` e o card não ganha nada a mais, senão vira borrão.
-- **CTA primário:** `.cta-primary` — gradiente que atravessa o matiz
-  (azul → índigo → violeta), rim no topo, glow tingido embaixo. Iridescência
-  aqui é **matiz, não claridade**: a referência clareia as pontas e com isso o
-  texto branco dela cai para 2,33:1. Os três stops daqui ficam em 4,85 / 4,75 /
-  5,22. Fixo nos dois temas, como o tile da marca.
+- **Preenchimento de ação:** `--action-primary-fill` — gradiente que atravessa o
+  matiz (azul → índigo → violeta), rim no topo, glow tingido embaixo.
+  Iridescência aqui é **matiz, não claridade**: a referência clareia as pontas e
+  com isso o texto branco dela cai para 2,33:1; o nosso mede 4,75:1 no pixel
+  renderizado, sob o rótulo. Fixo nos dois temas, como o tile da marca.
+  Tem **dois** consumidores, e os dois são sancionados pelo princípio 2 do
+  PRODUCT.md (o azure marca ação primária **e seleção**): `.hero-cta`, o CTA
+  primário, e `.auth-mode-active`, o modo selecionado no login. O antigo
+  `.cta-primary` foi apagado em 2026-07-29, quando ficou sem nenhum uso.
+- **Hover:** cresce a **luz em volta** (aura do pseudo + `--elev-glow`), nunca o
+  brilho da superfície. `filter: brightness()` em botão preenchido com texto
+  branco sempre derruba o contraste: medido, levava o CTA de 4,75:1 para 4,37:1
+  e reprovava AA justamente quando o ponteiro chegava. Card sobe 2px; botão não
+  sobe, porque o `Button` já traz `active:scale-[0.98]` e um transform apagaria
+  o afundar do clique. Curva ease-out-quint, 180–200ms, sem bounce. Não recebem
+  hover: controle não interativo (`.control-raised`) e item já selecionado.
 - **Item ativo da navegação:** `.nav-active` — pílula elevada por cima de uma
   forma iridescente 3px mais larga, então só as fatias laterais aparecem. **Não**
   é moldura: no PNG o topo e a base não têm cor.
