@@ -41,8 +41,16 @@ const FREQUENCY_OPTIONS = [
 ];
 
 const TYPE_OPTIONS = [
-  { value: "EXPENSE", label: "Despesa", activeClass: "bg-norby-danger text-norby-ivory" },
-  { value: "INCOME", label: "Receita", activeClass: "bg-norby-income text-norby-night" },
+  {
+    value: "EXPENSE",
+    label: "Despesa",
+    activeClass: "bg-expense/[0.15] text-expense ring-1 ring-inset ring-expense/30",
+  },
+  {
+    value: "INCOME",
+    label: "Receita",
+    activeClass: "bg-income/[0.15] text-income ring-1 ring-inset ring-income/30",
+  },
 ];
 
 // Valores iniciais do formulário de recorrência.
@@ -152,24 +160,24 @@ export default function Recurring() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
         <div>
-          <h1 className="text-3xl font-bold text-norby-ivory tracking-tight">
+          <h1 className="text-3xl font-bold text-content tracking-tight">
             Recorrências
           </h1>
-          <p className="text-norby-ivory/50 text-sm mt-1">
+          <p className="text-content-2 text-sm mt-1">
             Contas e receitas que se repetem automaticamente
           </p>
         </div>
         <Dialog open={open} onOpenChange={handleOpenChange}>
           <DialogTrigger
             render={
-              <Button className="bg-norby-teal hover:bg-norby-teal-soft text-norby-night font-medium" />
+              <Button className="bg-accent-fill text-accent-contrast hover:bg-accent-fill/90 font-medium" />
             }
           >
             <Plus size={16} className="mr-1" /> Nova Recorrência
           </DialogTrigger>
-          <DialogContent className="bg-norby-surface border-white/10 text-norby-ivory">
+          <DialogContent className="bg-surface border-line/10 text-content">
             <DialogHeader>
               <DialogTitle>Nova recorrência</DialogTitle>
             </DialogHeader>
@@ -315,13 +323,13 @@ export default function Recurring() {
               )}
 
               {serverError && (
-                <p className="text-norby-danger text-xs">{serverError}</p>
+                <p className="text-danger text-xs">{serverError}</p>
               )}
 
               <Button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full bg-norby-teal hover:bg-norby-teal-soft text-norby-night font-medium"
+                className="w-full bg-accent-fill text-accent-contrast hover:bg-accent-fill/90 font-medium"
               >
                 {isSubmitting ? "Salvando…" : "Criar recorrência"}
               </Button>
@@ -330,55 +338,74 @@ export default function Recurring() {
         </Dialog>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="space-y-3">
         {items.length === 0 && (
-          <p className="text-norby-ivory/40 text-sm">Nenhuma recorrência ainda.</p>
+          <div className="glass p-8 text-center text-content-3 text-sm">
+            Nenhuma recorrência ainda.
+          </div>
         )}
         {items.map((it) => (
-          <div key={it.id} className="glass-card-hover p-5 flex items-center gap-4">
-            <div className="w-10 h-10 rounded-xl bg-norby-teal/15 flex items-center justify-center">
-              <Repeat size={18} className="text-norby-teal" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-norby-ivory font-medium truncate">
-                {it.category}{" "}
-                <span
-                  className={
-                    it.type === "INCOME"
-                      ? "text-norby-income"
-                      : "text-norby-ivory/50"
-                  }
-                >
-                  · {it.type === "INCOME" ? "+" : "−"} {formatBRL(it.amount)}
-                </span>
+          <article
+            key={it.id}
+            className="glass-hover flex flex-col gap-4 p-4 lg:flex-row lg:items-center"
+          >
+            <div className="flex min-w-0 items-center gap-3 lg:flex-1">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent/[0.15]">
+                <Repeat size={18} className="text-accent" />
+              </div>
+              <p className="truncate text-sm font-medium text-content">
+                {it.description || "Recorrência automática"}
               </p>
-              <p className="text-xs text-norby-ivory/40">
-                {cadence(it)} · próx.{" "}
-                {formatDateBR(it.next_run_date)}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 lg:contents">
+              <span className="chip-neutral shrink-0">{cadence(it)}</span>
+              <span className="text-xs text-content-2 lg:max-w-32 lg:truncate">
+                {it.category}
+              </span>
+              <span
+                className={`shrink-0 text-sm font-semibold tnum ${
+                  it.type === "INCOME" ? "text-income" : "text-expense"
+                }`}
+              >
+                <span aria-hidden="true">{it.type === "INCOME" ? "↑" : "↓"}</span>{" "}
+                {it.type === "INCOME" ? "+" : "−"} {formatBRL(it.amount)}
+              </span>
+              <span className="text-xs text-content-3 tnum lg:min-w-40">
+                Próx. {formatDateBR(it.next_run_date)}
                 {!it.active && " · pausada"}
-              </p>
+              </span>
             </div>
-            <button
-              onClick={() => toggleActive(it)}
-              className="p-2 rounded-lg text-norby-ivory/40 hover:text-norby-ivory hover:bg-white/5"
-              title={it.active ? "Pausar" : "Retomar"}
-            >
-              {it.active ? <Pause size={14} /> : <Play size={14} />}
-            </button>
-            <ConfirmDialog
-              title="Remover esta recorrência?"
-              confirmLabel="Remover"
-              errorFallback="Não foi possível remover a recorrência."
-              onConfirm={() => deleteRecurring(it.id)}
-              trigger={
-                <button
-                  className="p-2 rounded-lg text-norby-ivory/40 hover:text-norby-danger hover:bg-white/5"
-                >
-                  <Trash2 size={14} />
-                </button>
-              }
-            />
-          </div>
+
+            <div className="ml-auto flex shrink-0 items-center gap-1">
+              <button
+                type="button"
+                onClick={() => toggleActive(it)}
+                className="p-2 rounded-lg text-content-3 hover:text-content hover:bg-state/5"
+                title={it.active ? "Pausar" : "Retomar"}
+              >
+                {it.active ? <Pause size={14} /> : <Play size={14} />}
+                <span className="sr-only">
+                  {it.active ? "Pausar recorrência" : "Retomar recorrência"}
+                </span>
+              </button>
+              <ConfirmDialog
+                title="Remover esta recorrência?"
+                confirmLabel="Remover"
+                errorFallback="Não foi possível remover a recorrência."
+                onConfirm={() => deleteRecurring(it.id)}
+                trigger={
+                  <button
+                    type="button"
+                    className="p-2 rounded-lg text-content-3 hover:text-danger hover:bg-state/5"
+                  >
+                    <Trash2 size={14} />
+                    <span className="sr-only">Excluir recorrência</span>
+                  </button>
+                }
+              />
+            </div>
+          </article>
         ))}
       </div>
     </div>

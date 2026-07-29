@@ -6,13 +6,13 @@ export function Field({ label, htmlFor, error, children, className }) {
       {label && (
         <label
           htmlFor={htmlFor}
-          className="text-xs font-medium text-norby-ivory/60"
+          className="text-xs font-medium text-content-2"
         >
           {label}
         </label>
       )}
       {children}
-      {error && <p className="text-norby-danger text-xs">{error}</p>}
+      {error && <p className="text-danger text-xs">{error}</p>}
     </div>
   );
 }

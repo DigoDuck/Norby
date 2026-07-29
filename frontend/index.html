@@ -1,10 +1,22 @@
 <!doctype html>
-<html lang="en">
+<html lang="pt-BR">
   <head>
+    <script>
+      // Roda antes do bundle: sem isso o app pinta escuro e "pisca" para claro.
+      // Decisão de produto: primeiro acesso é sempre escuro; o tema do sistema
+      // não é consultado.
+      (function () {
+        var t = null;
+        try { t = localStorage.getItem('norby-theme'); } catch (e) { t = null; }
+        if (t !== 'dark' && t !== 'light') t = 'dark';
+        document.documentElement.dataset.theme = t;
+        document.documentElement.style.colorScheme = t;
+      })();
+    </script>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Norby — seu norte financeiro</title>
+    <title>Norby — Seu norte financeiro</title>
   </head>
   <body>
     <div id="root"></div>

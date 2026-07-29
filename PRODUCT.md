@@ -21,9 +21,10 @@ números à primeira vista e volta todo dia sem fricção.
 
 ## Brand Personality
 
-Confiável, calmo, preciso. Um instrumento de navegação noturna: painel escuro,
-dados nítidos, um único brilho teal orientando a atenção. Voz em pt-BR, direta
-e sem jargão bancário; a IA fala como um copiloto, não como um consultor pomposo.
+Confiável, calmo, preciso. Um painel de instrumentos sob vidro: o conteúdo
+flutua sobre uma atmosfera fria e um único brilho azure orienta a atenção.
+Escuro por padrão, claro por escolha do usuário. Voz em pt-BR, direta e sem
+jargão bancário; a IA fala como um copiloto, não como um consultor pomposo.
 
 ## Anti-references
 
@@ -36,8 +37,9 @@ e sem jargão bancário; a IA fala como um copiloto, não como um consultor pomp
 
 1. **Números primeiro.** Todo layout existe para deixar um número legível em 1s.
    Figuras tabulares, hierarquia por escala, ruído zero ao redor do dado.
-2. **Um brilho só.** O teal marca ação primária, seleção e a presença da IA.
-   Nunca decoração. Estados inativos ficam em neutros.
+2. **Um brilho só.** O azure marca ação primária, seleção e a presença da IA.
+   Nunca decoração. Estados inativos ficam em neutros. O anel é a única exceção
+   deliberada, e é ambiente.
 3. **A estrela orienta.** O motivo estrela-norte (do monograma) é o marcador de
    posição do app: item ativo, presença da IA, loading. Em nenhum outro lugar.
 4. **Familiaridade ganha de surpresa.** Padrões de produto consagrados
@@ -48,7 +50,9 @@ e sem jargão bancário; a IA fala como um copiloto, não como um consultor pomp
 
 ## Accessibility & Inclusion
 
-- Contraste mínimo WCAG AA (4.5:1 corpo, 3:1 texto grande) sobre os fundos escuros.
+- Contraste mínimo WCAG AA (4.5:1 corpo, 3:1 texto grande) **medido sobre o
+  vidro renderizado**, nos dois temas — o valor do token isolado não vale como
+  prova.
 - `prefers-reduced-motion` respeitado em toda animação.
 - Semântica de cor nunca é o único canal (setas/sinais acompanham verde/vermelho).
 - Interface em pt-BR; valores em BRL com `tabular-nums`.

@@ -1,10 +1,7 @@
 import { Select as SelectPrimitive } from "@base-ui/react/select";
 import { ChevronDown, Check } from "lucide-react";
 
-import { cn } from "@/lib/utils";
-
-const fieldBase =
-  "w-full h-10 px-3 rounded-xl bg-white/5 border border-white/10 text-norby-ivory text-sm placeholder:text-norby-ivory/40 focus:outline-none focus:ring-2 focus:ring-norby-teal/40 transition";
+import { cn, inputCls } from "@/lib/utils";
 
 /**
  * Themed dropdown built on @base-ui/react Select.
@@ -37,19 +34,19 @@ export function Select({ id, value, placeholder, options, onChange, disabled }) 
       <SelectPrimitive.Trigger
         data-slot="select-trigger"
         className={cn(
-          fieldBase,
+          inputCls,
           "flex items-center justify-between cursor-pointer",
           disabled && "opacity-50 pointer-events-none"
         )}
       >
         <SelectPrimitive.Value placeholder={placeholder}>
           {isPlaceholder ? (
-            <span className="text-norby-ivory/40">{placeholder}</span>
+            <span className="text-content-3">{placeholder}</span>
           ) : (
             <span>{selectedLabel}</span>
           )}
         </SelectPrimitive.Value>
-        <ChevronDown size={14} className="text-norby-ivory/50 shrink-0" />
+        <ChevronDown size={14} className="text-content-2 shrink-0" />
       </SelectPrimitive.Trigger>
 
       {/* Portal → Positioner → Popup → List → Items */}
@@ -61,7 +58,7 @@ export function Select({ id, value, placeholder, options, onChange, disabled }) 
         >
           <SelectPrimitive.Popup
             data-slot="select-popup"
-            className="bg-norby-surface border border-white/10 rounded-xl shadow-xl p-1 min-w-[var(--anchor-width)] origin-[var(--transform-origin)] outline-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 duration-100"
+            className="bg-surface-inset border border-line/10 rounded-xl shadow-xl p-1 min-w-[var(--anchor-width)] origin-[var(--transform-origin)] outline-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 duration-100"
           >
             <SelectPrimitive.List>
               {options?.map((opt) => (
@@ -69,11 +66,11 @@ export function Select({ id, value, placeholder, options, onChange, disabled }) 
                   key={opt.value}
                   value={opt.value}
                   data-slot="select-item"
-                  className="relative flex items-center justify-between px-3 py-2 rounded-md text-sm text-norby-ivory cursor-default select-none outline-none data-highlighted:bg-white/5"
+                  className="relative flex items-center justify-between px-3 py-2 rounded-md text-sm text-content cursor-default select-none outline-none data-highlighted:bg-state/5"
                 >
                   <SelectPrimitive.ItemText>{opt.label}</SelectPrimitive.ItemText>
                   <SelectPrimitive.ItemIndicator className="flex items-center">
-                    <Check size={12} className="text-norby-teal" />
+                    <Check size={12} className="text-accent" />
                   </SelectPrimitive.ItemIndicator>
                 </SelectPrimitive.Item>
               ))}
