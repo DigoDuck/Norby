@@ -31,7 +31,12 @@ funcionando. É o que o `tailwind.config.js` mapeia.
 
 **2. Composição** — carregam alpha, blur e gradiente próprios, então ficam
 fora do Tailwind: `--glass-bg`, `--glass-border`, `--glass-blur`,
-`--shadow-card`, `--inner-highlight`, `--mesh`, `--glow-accent`, `--ring-torus`.
+`--shadow-card`, `--inner-highlight`, `--mesh`, `--glow-accent`.
+
+**3. Iridescência** — `--iris-1` a `--iris-4` são canais, e não um gradiente
+pronto, porque a cáustica do herói precisa dos stops soltos com alpha próprio.
+Deles derivam `--iris` (a moldura) e `--iris-glow`. O `--iris-brand` é fixo nos
+dois temas — ver Signature.
 
 Regras:
 
@@ -75,20 +80,36 @@ há store, contexto nem classe paralela.
 posição: item ativo da sidebar, presença da IA, loading. O monograma é
 intocável: nenhum path ou stroke muda.
 
-**O anel** (`shared/NorbyRing.jsx`) é a única concessão decorativa do app, feito
-em CSS puro — `conic-gradient` mascarado, sem canvas, sem WebGL, sem asset. São
-dois objetos distintos, e trocá-los é erro:
+**O tile da marca** (`.brand-tile`) carrega o monograma sobre o gradiente
+iridescente. Ele **não segue o tema**: a referência mostra os mesmos stops
+saturados nos dois, e sobre os stops claros do tema light o monograma branco cai
+para 1,45:1. Superfície acompanha o tema, marca é constante. A variante redonda
+(`.brand-tile-round`) com a estrela no centro é a presença da IA.
 
-- `variant="spectrum"` — iridescente nos 360°. É o orbe da IA.
-- `variant="glass"` — corpo escuro com dois especulares estreitos, vindo de
-  `--ring-torus`. É o anel de herói (dashboard e auth).
+**O anel** é **um só**: `shared/HeroRing.jsx`, o toro renderizado em
+`assets/brand/`, usado no herói do dashboard e no login. Não existe segundo
+anel. O `conic-gradient` em CSS que ocupava esse papel foi removido — ao lado do
+asset ele lia como um círculo chapado, desenhado em outra perspectiva.
+
+A cáustica que acompanha o toro deriva dos stops `--iris-*`; nenhum deles é cor
+semântica, e nenhum pode virar sinal de receita, despesa ou alerta.
 
 ## Components
 
 - **Card:** `.glass` — o **único** lugar com `backdrop-filter`. Blocos internos
   usam `.inset-panel`, superfície sólida: blur empilhado derruba o frame rate no
   mobile e não muda nada aos olhos no segundo nível.
-- **Glow:** no máximo dois por tela (`--glow-accent`), sempre ambiente.
+- **Moldura iridescente:** `.stroke-iris` — 1px de gradiente com miolo
+  transparente, feito com `mask-composite`. Uso **definido**: item ativo da
+  navegação, CTA secundário e o primeiro insight da IA. Não é enfeite de card
+  qualquer. O `.stroke-iris-glow` é opcional e some com o `@supports` de
+  fallback, que degrada para borda sólida do acento.
+- **Glow:** o limite de **dois por tela** vale para o glow difuso de card
+  (`--glow-accent`). A moldura iridescente é padrão de componente e não conta
+  nesse limite.
+- **Célula de heatmap:** `.heat-cell` — azulejo com borda própria e gradiente
+  diagonal. A cor entra por `backgroundColor` inline; o atalho `background`
+  apagaria o gradiente do utilitário.
 - **Botão primário:** pill `bg-accent-fill text-accent-contrast`.
 - **Atalhos de fluxo:** pílulas tingidas (`bg-income/[0.12] text-income` e o
   par de despesa), mesmo peso entre si.
@@ -104,6 +125,8 @@ dois objetos distintos, e trocá-los é erro:
 
 - Shell: sidebar flutuante de 16rem (`lg:` para cima) que vira gaveta abaixo
   disso, com todas as rotas e o logout — nada some, só recolhe.
+- A navegação **não tem rótulos de seção**: um filete separa preferências do
+  resto. Com sete itens, dois cabeçalhos custam mais ruído do que organizam.
 - Dashboard em **grade de 12 colunas**; proporções por `col-span`, não por
   frações arbitrárias.
 - Padding interno de card: `p-6` (compacto `p-5`).
@@ -111,8 +134,8 @@ dois objetos distintos, e trocá-los é erro:
 ## Motion
 
 - 150–250ms, `ease-out`; nada de bounce ou elastic.
-- Motion comunica estado. Ambiente permitido: o giro lento do anel e o pulso do
-  orbe. Nada mais.
+- Motion comunica estado. Ambiente permitido: a flutuação lenta do anel do herói
+  e o pulso da marca da IA. Nada mais.
 - `@media (prefers-reduced-motion: reduce)` desativa tudo, sempre — verificado
   com a preferência emulada, não presumido.
 
