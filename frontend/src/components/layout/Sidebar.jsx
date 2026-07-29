@@ -60,8 +60,12 @@ export default function Sidebar() {
 
       {/* Nav */}
       {/* Sem rótulos de seção: a referência separa preferências com um filete.
-          Com sete itens, dois cabeçalhos custam mais ruído do que organizam. */}
-      <nav className="flex-1 flex flex-col gap-1.5 overflow-y-auto">
+          Com sete itens, dois cabeçalhos custam mais ruído do que organizam.
+          -mx-1 px-1: o nav é contêiner de scroll e recorta o que passa da borda.
+          As fatias iridescentes do item ativo vivem 3px além da pílula, então
+          precisam dessa folga por dentro — alargar a sidebar não resolveria,
+          porque a pílula é w-full e encosta na borda em qualquer largura. */}
+      <nav className="flex-1 flex flex-col gap-1.5 overflow-y-auto -mx-1 px-1">
         {mainItems.map((item) => (
           <NavItem key={item.to} {...item} />
         ))}
