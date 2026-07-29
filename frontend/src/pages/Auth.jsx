@@ -99,7 +99,7 @@ export default function Auth() {
               <NorbyMark size={30} color="currentColor" />
             </div>
             <h1 className="text-2xl font-bold text-content">Norby</h1>
-            <p className="mt-1 text-sm text-content-2">seu norte financeiro</p>
+            <p className="mt-1 text-sm text-content-2">Seu norte financeiro</p>
           </div>
 
           {/* Card */}

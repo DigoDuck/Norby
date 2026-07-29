@@ -54,7 +54,7 @@ export default function Sidebar() {
         </div>
         <div>
           <p className="font-bold text-content leading-none">Norby</p>
-          <p className="text-xs text-content-2 mt-0.5">seu norte financeiro</p>
+          <p className="text-xs text-content-2 mt-0.5">Seu norte financeiro</p>
         </div>
       </div>
 
