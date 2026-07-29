@@ -80,6 +80,29 @@ npm run test     # Vitest
   `PYSEC-2026-1325` sem versão corrigida. `Settings.algorithm` aceita somente
   `HS256`, então o caminho vulnerável de assinatura ECDSA/ECDH não é alcançável.
 
+## Skills neste repo
+
+Roteamento geral em `~/.claude/SKILLS.md`. Aqui só o que é específico do Norby:
+
+- **Design = `impeccable`, sempre.** Este repo tem `PRODUCT.md` + `DESIGN.md` +
+  tokens fechados, então a skill lê a fonte em vez de inventar estética.
+  **Não** usar `taste-skill` nem `ui-ux-pro-max`: as duas trazem paleta e
+  tipografia próprias e brigariam com os tokens amostrados das referências.
+  Register do projeto é **product** (design serve a tarefa).
+- **Referências visuais são obrigatórias.** Abrir os PNGs de
+  `design-references/` (não rastreados) antes de implementar e a cada revisão
+  visual. Contraste se mede **no pixel renderizado sobre o vidro**, nunca no
+  valor do token.
+- **`graphify-out/` existe** → pergunta sobre arquitetura vira `graphify query`
+  antes de varrer arquivo.
+- **Verificação visual** usa a skill de projeto `run-app` (sobe a stack e
+  dirige o Edge via Playwright). Frame branco é falha de launch, não sucesso.
+- **Fluxos de tracker do mattpocock não se aplicam** (`triage`, `to-spec`,
+  `to-tickets`, `wayfinder`): specs vivem no Obsidian e `docs/` é gitignored,
+  então não há tracker configurado. Usar `grilling` e `writing-plans`.
+- **`pytest` e `alembic` rodam dentro do container** `norby_backend`; o host não
+  conecta no Postgres do Docker.
+
 ## NÃO faça
 
 - **Nunca** commitar direto na `main` — trabalhe em branch e abra PR.
