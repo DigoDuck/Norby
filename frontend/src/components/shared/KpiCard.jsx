@@ -13,23 +13,23 @@ export default function KpiCard({
   const isGood = changeInverted ? !rising : rising;
 
   return (
-    <div className="group rounded-2xl bg-norby-surface/70 border border-white/[0.06] p-5 flex flex-col gap-3 transition-colors duration-200 hover:border-white/[0.14]">
+    <div className="group rounded-2xl bg-surface border border-line/[0.08] p-5 flex flex-col gap-3 transition-colors duration-200 hover:border-line/[0.16]">
       <div className="flex items-center justify-between">
-        <span className="text-[11px] font-medium text-norby-ivory/40 uppercase tracking-wider">
+        <span className="text-[11px] font-medium text-content-3 uppercase tracking-wider">
           {title}
         </span>
         <div
           className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-            accent || "bg-norby-teal/10 text-norby-teal"
+            accent || "bg-accent/10 text-accent"
           }`}
         >
           {Icon && <Icon size={16} />}
         </div>
       </div>
-      <p className="text-2xl font-semibold text-norby-ivory tracking-tight tnum">
+      <p className="text-2xl font-semibold text-content tracking-tight tnum">
         {value}
         {suffix && (
-          <span className="text-sm font-medium text-norby-ivory/40 ml-0.5">
+          <span className="text-sm font-medium text-content-3 ml-0.5">
             {suffix}
           </span>
         )}
@@ -37,7 +37,7 @@ export default function KpiCard({
       {hasChange && (
         <p
           className={`text-xs font-medium flex items-center gap-1 tnum ${
-            isGood ? "text-norby-income" : "text-norby-danger"
+            isGood ? "text-income" : "text-danger"
           }`}
         >
           {rising ? "▲" : "▼"} {Math.abs(change).toFixed(1)}% vs. mês anterior

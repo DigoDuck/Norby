@@ -43,7 +43,7 @@ export default function App() {
 
   if (booting) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0A0A0A] text-white/60">
+      <div className="min-h-screen flex items-center justify-center bg-bg-base text-content-2">
         Carregando...
       </div>
     );

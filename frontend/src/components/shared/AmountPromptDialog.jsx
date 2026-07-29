@@ -71,7 +71,7 @@ export function AmountPromptDialog({
 
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="space-y-1">
-            <label htmlFor={inputId} className="text-xs text-norby-ivory/60">
+            <label htmlFor={inputId} className="text-xs text-content-2">
               Valor
             </label>
             <input
@@ -85,7 +85,7 @@ export function AmountPromptDialog({
             />
           </div>
 
-          {error && <p className="text-norby-danger text-xs">{error}</p>}
+          {error && <p className="text-danger text-xs">{error}</p>}
 
           <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline" />}>
@@ -94,7 +94,7 @@ export function AmountPromptDialog({
             <Button
               type="submit"
               disabled={loading}
-              className="bg-norby-teal hover:bg-norby-teal-soft text-norby-night font-medium disabled:opacity-40"
+              className="bg-accent-fill hover:bg-accent-fill/90 text-accent-contrast font-medium disabled:opacity-40"
             >
               {loading ? "..." : submitLabel}
             </Button>

@@ -2,41 +2,516 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Tokens de cor em canais RGB: o Tailwind aplica a opacidade via
+   rgb(var(--x) / <alpha-value>), então bg-surface/70 continua funcionando.
+   Valores de superfície amostrados dos PNGs de referência — a calibração
+   canônica acontece na Task 19 do plano. */
+[data-theme="dark"] {
+  /* Amostrados dos PNGs de referência na Task 19 (média/decil/moda de regiões
+     do arquivo, não a olho). O fundo da referência é azul-escuro, não cinza. */
+  --bg-base: 3 5 14;
+  --surface: 10 14 28;
+  --surface-inset: 20 26 44;
+
+  --content: 244 246 251;
+  --content-2: 176 182 196;
+  /* .microlabel é 11px: texto normal pelo WCAG, não texto grande, então precisa
+     de 4,5:1. A referência usa ~165 172 186 e diferencia hierarquia por tamanho
+     e tracking, não por valor — subimos até um passo abaixo de --content-2. */
+  --content-3: 148 156 174;
+
+  --line: 255 255 255;           /* usado sempre com alpha: border-line/10 */
+  --state-hover: 255 255 255;
+  --state-active: 255 255 255;
+  --overlay: 4 5 8;
+
+  /* A referência separa os dois: azure no texto interativo, índigo no
+     preenchimento do CTA. Medido 59-61 / 131 / 244-246 em links e valores. */
+  --accent: 59 130 246;          /* #3B82F6 — texto, links, ícone de ação */
+  --accent-fill: 79 102 234;     /* preenchimento de CTA */
+  --accent-contrast: 255 255 255;/* texto sobre o preenchimento */
+  --focus: 139 155 255;          /* #8B9BFF — índigo claro, distinto do accent */
+  --focus-offset: 3 5 14;
+
+  /* Ciano, não verde: é o que a referência usa no valor de receita, no botão
+     "+ Receita" e na linha Entradas (medido 35 212 238). */
+  --income: 34 211 238;          /* #22D3EE */
+  --expense: 251 113 133;        /* #FB7185 — bate com o medido (250 113 127) */
+  --danger: 244 63 94;
+  --warning: 251 146 60;
+
+  /* Uma cor por categoria de despesa (são 9 em lib/categories.js). Menos que
+     isso e duas fatias do mesmo donut saem iguais — ver Desvios da Fase 1. */
+  /* As quatro primeiras vêm dos pontos da legenda do donut na referência. */
+  --chart-1: 13 127 249;
+  --chart-2: 34 211 238;
+  --chart-3: 151 75 250;
+  --chart-4: 252 167 50;
+  --chart-5: 52 211 153;
+  --chart-6: 244 114 182;
+  --chart-7: 163 230 53;
+  --chart-8: 99 102 241;         /* índigo: o sky anterior colidia com --chart-2 */
+  --chart-9: 148 163 184;        /* neutro: cai em "Outros", a categoria-resto */
+  --grid-line: 255 255 255;
+  --axis: 176 182 196;
+
+  /* Rampa sequencial monotônica, mínimo 3:1 contra o vidro do card já no nível
+     1 (medido: 3,01 / 4,37 / 6,18 / 9,43). A versão anterior começava em 1,69
+     e ainda invertia entre os níveis 1 e 2. */
+  --heat-0: 24 32 52;            /* dia sem lançamento (medido na referência) */
+  --heat-1: 46 100 176;
+  --heat-2: 40 130 220;
+  --heat-3: 60 160 250;
+  --heat-4: 130 200 255;
+  --heat-over: 251 113 133;      /* estourou a cota diária */
+}
+
+[data-theme="light"] {
+  --bg-base: 248 248 251;
+  --surface: 255 255 255;
+  --surface-inset: 240 242 249;
+
+  --content: 6 9 24;
+  --content-2: 100 108 136;
+  /* A referência clara usa 122 127 144 aqui, que dá 4,0:1 sobre o vidro e
+     reprova AA em 11px. Mantemos o valor mais escuro: hierarquia por tamanho. */
+  --content-3: 104 111 132;
+
+  --line: 24 27 38;
+  --state-hover: 24 27 38;
+  --state-active: 24 27 38;
+  --overlay: 24 27 38;
+
+  /* Mesma família azure do escuro. A referência usa #2C6FF4, que dá 4,2:1
+     sobre branco; blue-600 chega a 4,43 e ainda reprova quando o texto cai
+     sobre uma pílula tingida. Este passa com folga sem sair do matiz. */
+  --accent: 31 95 216;           /* #1F5FD8 */
+  --accent-fill: 79 102 234;
+  --accent-contrast: 255 255 255;
+  --focus: 52 73 198;            /* #3449C6 */
+  --focus-offset: 255 255 255;
+
+  /* Ciano como no escuro, mas escurecido: o #1CA1BB da referência dá 2,8:1
+     sobre branco e valores monetários não podem reprovar contraste. Mais
+     escuro que cyan-700 porque o texto também aparece sobre a pílula tingida
+     de ciano, onde o fundo já não é branco. */
+  --income: 12 102 128;          /* #0C6680 */
+  --expense: 190 18 60;          /* #BE123C — o #F55669 da referência dá 3,3:1 */
+  --danger: 190 18 60;
+  --warning: 194 65 12;          /* #C2410C */
+
+  --chart-1: 29 101 219;
+  --chart-2: 14 138 168;
+  --chart-3: 124 78 230;
+  --chart-4: 194 96 12;
+  --chart-5: 4 120 87;
+  --chart-6: 190 24 93;
+  --chart-7: 77 124 15;
+  --chart-8: 3 105 161;
+  --chart-9: 71 85 105;          /* neutro: cai em "Outros", a categoria-resto */
+  --grid-line: 24 27 38;
+  --axis: 88 95 115;
+
+  /* No claro a intensidade cresce escurecendo (medido: 3,18 / 4,27 / 6,27 /
+     9,56 contra o vidro). Não é o escuro invertido: os passos são próprios. */
+  --heat-0: 226 230 241;
+  --heat-1: 110 143 206;
+  --heat-2: 86 120 190;
+  --heat-3: 60 92 168;
+  --heat-4: 37 63 138;
+  --heat-over: 225 66 92;
+}
+
+/* Tokens de composição: carregam alpha e blur próprios, então NÃO passam pelo
+   Tailwind. No escuro o vidro é branco a 3,5% sobre quase preto; no claro é
+   branco a 72% sobre lavanda. Não é a mesma cor com outra opacidade. */
+[data-theme="dark"] {
+  /* Tinta azul, não branco puro: o card composto da referência mede 8 12 24
+     sobre um fundo 3 5 14, ou seja o vidro ESFRIA a superfície em vez de só
+     clareá-la. Branco a 3,5% dava um cinza neutro que não existe no PNG. */
+  --glass-bg: rgba(140, 175, 255, 0.045);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-blur: 24px;
+  --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.45);
+  --inner-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --mesh:
+    radial-gradient(90% 60% at 12% 0%, rgba(59, 130, 246, 0.10), transparent 70%),
+    radial-gradient(70% 50% at 92% 8%, rgba(167, 139, 250, 0.08), transparent 70%);
+  --glow-accent: radial-gradient(60% 60% at 50% 0%, rgba(59, 130, 246, 0.26), transparent 70%);
+  --nav-active-bg:
+    linear-gradient(180deg, rgb(31 39 61 / 0.82), rgb(17 23 40 / 0.7));
+  --nav-active-border:
+    linear-gradient(90deg,
+      rgb(34 211 238 / 0.8) 0%,
+      rgb(255 255 255 / 0.32) 14%,
+      rgb(255 255 255 / 0.12) 50%,
+      rgb(255 255 255 / 0.26) 86%,
+      rgb(232 121 249 / 0.78) 100%);
+  --nav-active-shadow:
+    0 10px 24px -14px rgb(59 130 246 / 0.55),
+    inset 0 1px 0 rgb(255 255 255 / 0.24),
+    inset 0 -1px 0 rgb(99 122 250 / 0.18);
+  --nav-active-aura: 0.54;
+  --hero-atmosphere:
+    radial-gradient(80% 120% at 0% 0%, rgb(var(--iris-2) / 0.14), transparent 58%),
+    radial-gradient(70% 80% at 22% 100%, rgb(var(--accent-fill) / 0.13), transparent 66%),
+    radial-gradient(48% 62% at 88% 100%, rgb(var(--iris-1) / 0.10), transparent 72%);
+  --hero-ribbon:
+    linear-gradient(102deg, transparent 8%, rgb(var(--iris-2) / 0.10) 42%, rgb(var(--iris-1) / 0.09) 72%, transparent 96%);
+  --hero-cta-shadow:
+    0 10px 28px -10px rgb(var(--iris-2) / 0.70),
+    inset 0 1px 0 rgb(255 255 255 / 0.38),
+    inset 0 -1px 0 rgb(12 18 48 / 0.30);
+  --hero-cta-aura: 0.72;
+
+  /* Espectro iridescente. São canais, e não um gradiente pronto, porque a
+     cáustica do herói e o glow precisam dos stops soltos com alpha próprio.
+     DECORATIVO: nenhum destes é cor semântica, e nenhum deles pode virar
+     sinal de receita, despesa ou alerta. */
+  --iris-1: 34 211 238;
+  --iris-2: 99 122 250;
+  --iris-3: 167 139 250;
+  --iris-4: 232 121 249;
+
+  /* Profundidade de CONTROLE (o card usa --shadow-card). São as três camadas
+     que fazem um botão ler como objeto: sombra embaixo, rim de luz no topo,
+     e o glow tingido do CTA. */
+  --elev-1: 0 1px 2px rgb(0 0 0 / 0.4), 0 4px 12px -2px rgb(0 0 0 / 0.35);
+  --elev-glow: 0 6px 20px -6px rgb(var(--accent-fill) / 0.55);
+  --rim: inset 0 1px 0 rgb(255 255 255 / 0.14);
+}
+
+[data-theme="light"] {
+  /* Blur maior no claro: o vidro precisa borrar mais para se separar da
+     lavanda de fundo. É token justamente por isso, não é o escuro invertido. */
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(24, 27, 38, 0.07);
+  --glass-blur: 40px;
+  --shadow-card: 0 12px 32px rgba(79, 102, 234, 0.07), 0 1px 2px rgba(24, 27, 38, 0.04);
+  --inner-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --mesh:
+    radial-gradient(90% 60% at 12% 0%, rgba(129, 140, 248, 0.14), transparent 70%),
+    radial-gradient(70% 50% at 92% 8%, rgba(196, 181, 253, 0.12), transparent 70%);
+  --glow-accent: radial-gradient(60% 60% at 50% 0%, rgba(129, 140, 248, 0.18), transparent 70%);
+  --nav-active-bg:
+    linear-gradient(180deg, rgb(255 255 255 / 0.92), rgb(244 247 255 / 0.8));
+  --nav-active-border:
+    linear-gradient(90deg,
+      rgb(34 211 238 / 0.88) 0%,
+      rgb(255 255 255 / 0.98) 14%,
+      rgb(255 255 255 / 0.7) 50%,
+      rgb(255 255 255 / 0.94) 86%,
+      rgb(232 121 249 / 0.84) 100%);
+  --nav-active-shadow:
+    0 10px 24px -14px rgb(79 102 234 / 0.36),
+    inset 0 1px 0 rgb(255 255 255 / 1),
+    inset 0 -1px 0 rgb(79 102 234 / 0.1);
+  --nav-active-aura: 0.32;
+  --hero-atmosphere:
+    radial-gradient(80% 120% at 0% 0%, rgb(var(--iris-2) / 0.13), transparent 58%),
+    radial-gradient(70% 80% at 22% 100%, rgb(var(--accent-fill) / 0.12), transparent 66%),
+    radial-gradient(48% 62% at 88% 100%, rgb(var(--iris-1) / 0.09), transparent 72%);
+  --hero-ribbon:
+    linear-gradient(102deg, transparent 8%, rgb(var(--iris-2) / 0.06) 42%, rgb(var(--iris-1) / 0.07) 72%, transparent 96%);
+  --hero-cta-shadow:
+    0 10px 26px -10px rgb(var(--iris-2) / 0.48),
+    inset 0 1px 0 rgb(255 255 255 / 0.58),
+    inset 0 -1px 0 rgb(46 55 120 / 0.24);
+  --hero-cta-aura: 0.58;
+
+  /* Mais claros e menos saturados: os mesmos stops do escuro sobre branco
+     viram neon e comem o texto que estiver por perto. */
+  --iris-1: 103 232 249;
+  --iris-2: 129 140 248;
+  --iris-3: 196 181 253;
+  --iris-4: 240 171 252;
+
+  /* Sombra tingida de azul, não cinza: medido 204 216 248 abaixo do CTA da
+     referência, contra uma página em 252 252 252. É a luz da cena colorindo a
+     sombra — cinza puro aí entrega CSS genérico. */
+  --elev-1: 0 1px 2px rgb(24 27 38 / 0.06), 0 6px 16px -6px rgb(79 102 234 / 0.22);
+  --elev-glow: 0 8px 20px -8px rgb(var(--accent-fill) / 0.45);
+  --rim: inset 0 1px 0 rgb(255 255 255 / 0.55);
+}
+
+/* Derivados dos stops acima. Ficam fora dos blocos de tema justamente para não
+   existirem em duas versões: quem muda por tema são os canais, não a receita. */
+:root {
+  --iris: linear-gradient(105deg,
+    rgb(var(--iris-1)) 0%, rgb(var(--iris-2)) 42%,
+    rgb(var(--iris-3)) 68%, rgb(var(--iris-4)) 100%);
+  --iris-glow: 0 0 22px -6px rgb(var(--iris-3) / 0.55);
+  --action-primary-fill:
+    linear-gradient(180deg, rgb(255 255 255 / 0.18), transparent 30%),
+    linear-gradient(108deg, #1e6fd9 0%, #4f66ea 52%, #7a4fe0 100%);
+
+  /* A marca NÃO segue o tema: a referência mostra o mesmo gradiente saturado
+     no claro e no escuro. Com os stops claros do tema light o monograma branco
+     cairia para 1,45:1 — ilegível. Superfície muda, marca é constante.
+     (Contraste de logo é isento pelo WCAG 1.4.3, mas ilegível é ilegível.) */
+  --iris-brand: linear-gradient(140deg,
+    #22D3EE 0%, #4F7BFA 45%, #8B5CF6 72%, #D946EF 100%);
+}
+
 @layer base {
   * { box-sizing: border-box; }
   body {
-    @apply bg-norby-night text-norby-ivory antialiased;
-    font-family: 'Inter', sans-serif;
+    @apply bg-bg-base text-content antialiased;
+    font-family: theme('fontFamily.sans');
   }
+  /* Números monetários/tabela: figuras tabulares (precisão, sem layout shift) */
+  .tnum { font-variant-numeric: tabular-nums; }
 }
 
 @layer components {
-  /* Card dark "Petróleo Confiável": superfície sólida o bastante p/ ler dados,
-     borda sutil, leve blur deixando o glow teal vazar por trás. */
-  .glass-card {
-    @apply bg-norby-surface/70 backdrop-blur-xl border border-white/[0.06] rounded-3xl;
+  /* Superfície de primeiro nível. É o ÚNICO lugar com backdrop-filter: blocos
+     internos usam .inset-panel. Blur empilhado derruba o frame rate em mobile
+     e não muda nada visualmente no segundo nível. */
+  .glass {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--shadow-card), var(--inner-highlight);
+    backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+    @apply rounded-3xl;
   }
-  .glass-card-hover {
-    @apply glass-card transition-colors duration-200 hover:border-white/[0.14];
+  /* Hover do card: a peça sobe e o brilho tingido cresce. transition-colors
+     não animava box-shadow, então a sombra pulava; aqui as três propriedades
+     têm curva própria. ease-out-quint, sem bounce. */
+  .glass-hover {
+    @apply glass;
+    transition:
+      border-color 200ms cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 200ms cubic-bezier(0.22, 1, 0.36, 1),
+      transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
   }
+  .glass-hover:hover {
+    border-color: rgb(var(--accent) / 0.28);
+    box-shadow: var(--shadow-card), var(--inner-highlight), var(--elev-glow);
+    transform: translateY(-2px);
+  }
+
+  /* Bloco interno de card: superfície sólida, sem segundo backdrop-filter. */
+  .inset-panel {
+    @apply bg-surface-inset rounded-2xl border border-line/[0.06];
+  }
+
+  .app-mesh { background-image: var(--mesh); }
 
   /* Chip de tendência (pílula): variação % nunca fica como texto solto */
   .chip {
     @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold tnum;
   }
-  .chip-pos { @apply chip bg-norby-income/15 text-norby-income; }
-  .chip-neg { @apply chip bg-norby-danger/15 text-norby-danger; }
-  .chip-neutral { @apply chip bg-white/[0.06] text-norby-ivory/60; }
+  .chip-pos { @apply chip bg-income/15 text-income; }
+  .chip-neg { @apply chip bg-expense/15 text-expense; }
+  .chip-neutral { @apply chip bg-line/[0.06] text-content-2; }
 
   /* Label micro em uppercase: padrão único de rótulo de dado */
   .microlabel {
-    @apply text-[11px] font-medium text-norby-ivory/40 uppercase tracking-widest;
+    @apply text-[11px] font-medium text-content-3 uppercase tracking-widest;
   }
+
 }
 
-@layer base {
-  /* Números monetários/tabela: figuras tabulares (precisão, sem layout shift) */
-  .tnum { font-variant-numeric: tabular-nums; }
+/* Os três utilitários abaixo ficam FORA de @layer components de propósito: o
+   Tailwind purga o que está na layer e não aparece em nenhum arquivo escaneado,
+   e estes são consumidos por outro agente, em outro arquivo, depois. Purgar em
+   silêncio custa mais do que os poucos bytes de mantê-los sempre. */
+
+/* Moldura iridescente de 1px com miolo transparente. Não sai de border-image,
+   que ignora border-radius; o caminho é pintar o retângulo inteiro num pseudo
+   e recortar o miolo com mask-composite.
+   Uso definido (DESIGN.md): item ativo da navegação, CTA secundário e o
+   primeiro insight da IA. Não é enfeite de card qualquer. */
+.stroke-iris { position: relative; }
+.stroke-iris::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: var(--iris);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+}
+.stroke-iris-glow { box-shadow: var(--iris-glow); }
+
+/* Tile da marca: o mesmo espectro, agora chapado. rounded-[28%] mantém o
+   squircle proporcional em qualquer tamanho, coisa que um raio fixo perde. */
+.brand-tile {
+  background: var(--iris-brand);
+  box-shadow: var(--iris-glow), inset 0 1px 0 rgb(255 255 255 / 0.25);
+  @apply rounded-[28%] grid place-items-center text-accent-contrast;
+}
+/* Variante redonda: a presença da IA. Classe própria porque .brand-tile é CSS
+   solto e venceria um rounded-full vindo das utilities do Tailwind. */
+.brand-tile-round { border-radius: 9999px; }
+
+.hero-card::before,
+.hero-card::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+}
+
+.hero-card::before {
+  inset: 0;
+  background: var(--hero-atmosphere);
+}
+
+.hero-card::after {
+  right: 2%;
+  bottom: -12%;
+  width: 82%;
+  height: 34%;
+  transform: rotate(-6deg) skewX(-22deg);
+  transform-origin: right center;
+  background: var(--hero-ribbon);
+  filter: blur(14px);
+}
+
+.hero-card__content {
+  position: relative;
+  z-index: 3;
+}
+
+.hero-card .hero-ring {
+  z-index: 2;
+}
+
+.hero-cta {
+  position: relative;
+  isolation: isolate;
+  border-radius: 9999px;
+  color: rgb(var(--accent-contrast));
+  background: var(--action-primary-fill);
+  box-shadow: var(--hero-cta-shadow);
+}
+
+.hero-cta::before {
+  content: "";
+  position: absolute;
+  inset: -4px -8px;
+  z-index: -1;
+  border-radius: inherit;
+  background:
+    radial-gradient(55% 145% at 0% 50%, rgb(var(--iris-1) / 0.66), transparent 48%),
+    radial-gradient(55% 145% at 100% 50%, rgb(var(--iris-4) / 0.64), transparent 48%);
+  filter: blur(7px);
+  opacity: var(--hero-cta-aura);
+  pointer-events: none;
+  /* O transition-all do Button não alcança pseudo-elemento: a aura precisa da
+     transição declarada aqui, senão ela pisca em vez de crescer. */
+  transition: opacity 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.hero-cta::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(100deg, rgb(255 255 255 / 0.72), rgb(255 255 255 / 0.16) 46%, rgb(255 255 255 / 0.56));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* Hover = mais luz EM VOLTA, nunca mais claro por dentro. Clarear o
+   preenchimento de um botão com texto branco sempre derruba o contraste: o
+   brightness(1.05) que estava aqui levava o CTA de 4,75:1 para 4,37:1 e
+   reprovava AA exatamente quando o ponteiro chegava. Crescendo a aura e a
+   sombra, a cor sob o rótulo não se mexe e o contraste fica intacto.
+   Sem translateY: o Button já traz active:scale-[0.98], e um transform aqui
+   apagaria o afundar do clique. */
+.hero-cta:hover,
+.hero-cta:focus-visible {
+  box-shadow: var(--hero-cta-shadow), var(--elev-glow);
+}
+
+.hero-cta:hover::before,
+.hero-cta:focus-visible::before {
+  opacity: calc(var(--hero-cta-aura) * 1.45);
+}
+
+.hero-cta__sep {
+  width: 1px;
+  height: 16px;
+  background: rgb(var(--accent-contrast) / 0.30);
+}
+
+/* Item ativo da navegação. NÃO é moldura: na referência é uma pílula elevada
+   por cima de uma forma iridescente um pouco mais larga, então só as fatias da
+   esquerda e da direita aparecem — topo e base ficam sem cor. */
+.nav-active {
+  position: relative;
+  isolation: isolate;
+  border: 1px solid transparent;
+  background: var(--nav-active-bg);
+  box-shadow: var(--nav-active-shadow);
+  @apply rounded-full;
+}
+.nav-active::before {
+  content: "";
+  position: absolute;
+  inset: -1px -4px;
+  border-radius: inherit;
+  background:
+    radial-gradient(60% 140% at 0% 50%, rgb(var(--iris-1) / 0.62), transparent 46%),
+    radial-gradient(60% 140% at 100% 50%, rgb(var(--iris-4) / 0.6), transparent 46%);
+  filter: blur(4px);
+  opacity: var(--nav-active-aura);
+  z-index: -1;
+  pointer-events: none;
+}
+.nav-active::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: var(--nav-active-border);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* Controle elevado sobre a página: chip de data e afins. Superfície sólida —
+   .glass traria backdrop-filter, que num chip de 28px não faz nada além de
+   custar composição. */
+.control-raised {
+  background: rgb(var(--surface));
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--elev-1), var(--rim);
+}
+
+/* Célula do heatmap: a referência mostra um azulejo com borda própria, não um
+   quadrado chapado. O gradiente diagonal é o que dá o volume.
+   A cor vem inline via backgroundColor — nunca pelo atalho background, que
+   apagaria este background-image. */
+.heat-cell {
+  @apply aspect-square rounded-lg border border-line/[0.07] transition-colors;
+  background-image: linear-gradient(135deg, rgb(255 255 255 / 0.06), transparent 60%);
+}
+
+/* Sem mask-composite o pseudo pintaria um retângulo cheio por cima do conteúdo
+   — pior que não ter o efeito. Aí a moldura vira uma borda sólida do acento. */
+@supports not ((mask-composite: exclude) or (-webkit-mask-composite: xor)) {
+  .stroke-iris::before { display: none; }
+  .stroke-iris { border: 1px solid rgb(var(--accent) / 0.45); }
+}
+
+/* Sem backdrop-filter (navegador antigo ou GPU desligada): superfície opaca
+   equivalente, para o vidro nunca virar um card ilegível. */
+@supports not (backdrop-filter: blur(1px)) {
+  .glass { background: rgb(var(--surface)); }
 }
 
 /* Estrela-norte pulsando: substituto de spinner genérico (assinatura da marca) */
@@ -45,6 +520,195 @@
   50% { opacity: 1; transform: scale(1); }
 }
 .star-loading { animation: star-pulse 1.4s ease-in-out infinite; }
+
+/* O anel da marca é UM só, e é o toro renderizado. O conic-gradient em CSS
+   (NorbyRing) foi removido: ao lado do asset ele lia como um segundo círculo,
+   chapado, com outra perspectiva. Onde ele marcava a presença da IA agora está
+   o tile redondo da marca; no login, o próprio toro. */
+.hero-ring {
+  position: absolute;
+  right: -2.375rem;
+  bottom: -2.625rem;
+  width: 20rem;
+  aspect-ratio: 1;
+  pointer-events: none;
+  isolation: isolate;
+}
+
+@media (max-width: 767px) {
+  .hero-card::after {
+    opacity: 0.28;
+  }
+}
+
+/* Fora do card do herói (login) o anel não é sangria de canto: ocupa o próprio
+   espaço. Duas classes para vencer .hero-ring independente da ordem. */
+.hero-ring.hero-ring--inline {
+  position: relative;
+  inset: auto;
+  width: 100%;
+}
+
+.hero-ring__asset {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+  animation: hero-ring-float 11s ease-in-out infinite;
+}
+
+.hero-ring__asset--light {
+  display: none;
+}
+
+[data-theme="light"] .hero-ring__asset--dark {
+  display: none;
+}
+
+[data-theme="light"] .hero-ring__asset--light {
+  display: block;
+}
+
+/* Painel fantasma: os cards de dashboard que a referência deixa desfocados ao
+   fundo. São decoração — o conteúdo fica em aria-hidden no JSX, para que um
+   leitor de tela nunca anuncie os valores de exemplo como saldo do usuário. */
+.ghost-panel {
+  border: 1px solid var(--glass-border);
+  /* --surface-inset, não --surface-2: esse token nunca existiu, e um var()
+     indefinido invalida o linear-gradient inteiro — o background caía para
+     transparente e o painel ficava só com borda e sombra. */
+  background:
+    linear-gradient(145deg, rgb(var(--surface) / 0.72), rgb(var(--surface-inset) / 0.54));
+  box-shadow: var(--elev-1), var(--rim);
+  border-radius: 1.25rem;
+}
+
+.auth-mode-active {
+  color: rgb(var(--accent-contrast));
+  background: var(--action-primary-fill);
+  box-shadow: var(--elev-1), var(--rim);
+}
+
+.auth-layout {
+  transform-origin: center;
+}
+
+@media (min-width: 1920px) and (min-height: 1000px) {
+  .auth-layout {
+    transform: scale(1.08);
+  }
+}
+
+@media (min-width: 2300px) and (min-height: 1200px) {
+  .auth-layout {
+    transform: scale(1.18);
+  }
+
+  /* Só a escala cresce aqui. O `justify-content: space-between` numa coluna
+     esticada à altura do card (788px em 2560×1440) abria um vão de 299px entre
+     o parágrafo e a lista, contra os 43px de 1920 — lê como quebrado, não como
+     ritmo. E o translateX(-12rem) empurrava só a coluna de texto, deixando a
+     composição com 157px de margem à esquerda e 383px à direita. */
+}
+
+.auth-ring-stage {
+  isolation: isolate;
+}
+
+.auth-ring-stage::before {
+  position: absolute;
+  z-index: 0;
+  right: 4%;
+  bottom: -2%;
+  width: 82%;
+  height: 21%;
+  content: "";
+  border: 1px solid var(--glass-border);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 58% 38%, rgb(var(--surface) / 0.88) 0 24%, transparent 56%),
+    linear-gradient(
+      100deg,
+      rgb(var(--iris-1) / 0.26),
+      rgb(var(--iris-3) / 0.22) 56%,
+      rgb(var(--iris-4) / 0.2)
+    );
+  box-shadow: var(--elev-1), var(--rim);
+  transform: perspective(22rem) rotateX(67deg);
+}
+
+.auth-ring-stage::after {
+  position: absolute;
+  z-index: -1;
+  right: -18%;
+  bottom: -20%;
+  width: 126%;
+  height: 52%;
+  content: "";
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse, rgb(var(--iris-1) / 0.15), transparent 58%),
+    radial-gradient(ellipse at 72% 50%, rgb(var(--iris-3) / 0.14), transparent 52%);
+  filter: blur(18px);
+}
+
+.auth-ring-stage .hero-ring {
+  position: relative;
+  z-index: 2;
+}
+
+.hero-ring__caustic {
+  position: absolute;
+  z-index: 1;
+  left: -42%;
+  right: -1%;
+  bottom: 12%;
+  height: 27%;
+  transform: rotate(-8deg) skewX(-24deg);
+  transform-origin: right center;
+  background:
+    linear-gradient(90deg, transparent 0 14%, rgb(var(--iris-2) / 0.08) 38%, rgb(var(--iris-1) / 0.38) 72%, transparent 100%),
+    linear-gradient(96deg, transparent 12%, rgb(var(--iris-3) / 0.18) 48%, rgb(var(--iris-4) / 0.34) 78%, transparent 100%);
+  filter: blur(13px);
+  opacity: 0.9;
+}
+
+.hero-ring__caustic::before,
+.hero-ring__caustic::after {
+  content: "";
+  position: absolute;
+  right: 4%;
+  width: 82%;
+  height: 16%;
+  border-radius: 999px;
+  transform-origin: right center;
+  filter: blur(2px);
+}
+
+.hero-ring__caustic::before {
+  bottom: 43%;
+  transform: rotate(5deg);
+  background: linear-gradient(90deg, transparent, rgb(var(--iris-1) / 0.48), rgb(var(--iris-2) / 0.1));
+}
+
+.hero-ring__caustic::after {
+  bottom: 22%;
+  transform: rotate(-4deg);
+  background: linear-gradient(90deg, transparent, rgb(var(--iris-3) / 0.4), rgb(var(--iris-4) / 0.12));
+}
+
+[data-theme="light"] .hero-ring__caustic {
+  opacity: 0.58;
+  filter: blur(15px);
+}
+
+@keyframes hero-ring-float {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, -4px, 0); }
+}
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

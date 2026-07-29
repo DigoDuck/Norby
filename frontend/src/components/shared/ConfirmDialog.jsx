@@ -59,7 +59,7 @@ export function ConfirmDialog({
           {description && <DialogDescription>{description}</DialogDescription>}
         </DialogHeader>
 
-        {error && <p className="text-norby-danger text-xs">{error}</p>}
+        {error && <p className="text-danger text-xs">{error}</p>}
 
         <DialogFooter>
           <DialogClose render={<Button variant="outline" />}>{cancelLabel}</DialogClose>
@@ -67,7 +67,7 @@ export function ConfirmDialog({
             type="button"
             onClick={handleConfirm}
             disabled={loading}
-            className="bg-norby-danger hover:bg-norby-danger/80 text-norby-ivory disabled:opacity-40"
+            className="bg-danger hover:bg-danger/80 text-accent-contrast disabled:opacity-40"
           >
             {loading ? "..." : confirmLabel}
           </Button>
