@@ -321,9 +321,33 @@
    4,85 / 4,75 / 5,22. Iridescência é matiz, não claridade.
    Fixo nos dois temas, como o tile da marca: é superfície de marca. */
 .cta-primary {
+  position: relative;
+  isolation: isolate;
   background-image: linear-gradient(115deg, #1E6FD9 0%, #4F66EA 45%, #7A4FE0 100%);
-  box-shadow: var(--elev-glow), var(--rim);
+  /* Mesma gramática de vidro do item ativo da navegação: rim de luz no topo e
+     um retorno mais escuro na base, que é o que dá espessura à pílula. */
+  box-shadow:
+    var(--elev-glow),
+    inset 0 1px 0 rgb(255 255 255 / 0.34),
+    inset 0 -1px 0 rgb(12 18 48 / 0.28);
   @apply rounded-full text-accent-contrast;
+}
+/* A moldura vai num pseudo mascarado, não em border-box: o Button já traz
+   border-transparent, e trocar o border por gradiente mexeria na caixa. */
+.cta-primary::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(100deg,
+    rgb(255 255 255 / 0.62) 0%, rgb(255 255 255 / 0.16) 46%,
+    rgb(255 255 255 / 0.5) 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
 }
 .cta-primary:hover { filter: brightness(1.06); }
 /* Divisor antes da estrela — existe na referência e custa um span. */
