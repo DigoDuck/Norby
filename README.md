@@ -4,7 +4,7 @@ Um organizador financeiro pessoal com um analista de IA junto. Você registra ca
 
 **Demo:** [norby-finance.vercel.app](https://norby-finance.vercel.app) · **API (Swagger):** [norby-production.up.railway.app/docs](https://norby-production.up.railway.app/docs)
 
-![Dashboard do Norby: saldo consolidado, score financeiro determinístico e a leitura da IA sobre os lançamentos do mês](assets/dashboard.png)
+![Dashboard do Norby no tema escuro: saldo consolidado, score financeiro determinístico e a leitura da IA sobre os lançamentos do mês](assets/dashboard.webp)
 
 *Conta de demonstração, populada por [seed_demo.py](backend/scripts/seed_demo.py) — nenhum dado financeiro real.*
 
