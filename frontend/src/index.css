@@ -6,6 +6,13 @@
    rgb(var(--x) / <alpha-value>), então bg-surface/70 continua funcionando.
    Valores de superfície amostrados dos PNGs de referência — a calibração
    canônica acontece na Task 19 do plano. */
+/* :root junto de [data-theme="dark"] de propósito: o escuro é o default do
+   CSS, não só do JavaScript. Sem isso, um <html> sem data-theme deixa TODO
+   token indefinido, cada rgb(var(--x) / a) vira inválido e a página inteira
+   perde superfície, cor de gráfico e fundo. Foi o que aconteceu em produção
+   quando a CSP bloqueou o script inline. Mesma especificidade de
+   [data-theme="light"], que vem depois e por isso continua vencendo. */
+:root,
 [data-theme="dark"] {
   /* Amostrados dos PNGs de referência na Task 19 (média/decil/moda de regiões
      do arquivo, não a olho). O fundo da referência é azul-escuro, não cinza. */
@@ -125,6 +132,7 @@
 /* Tokens de composição: carregam alpha e blur próprios, então NÃO passam pelo
    Tailwind. No escuro o vidro é branco a 3,5% sobre quase preto; no claro é
    branco a 72% sobre lavanda. Não é a mesma cor com outra opacidade. */
+:root,
 [data-theme="dark"] {
   /* Tinta azul, não branco puro: o card composto da referência mede 8 12 24
      sobre um fundo 3 5 14, ou seja o vidro ESFRIA a superfície em vez de só
