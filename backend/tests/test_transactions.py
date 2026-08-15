@@ -185,3 +185,35 @@ async def test_rejects_oversized_category(make_auth_client):
     w = await make_wallet(ac, balance=100)
     res = await ac.post("/transactions/", json=tx_payload(w["id"], category="c" * 300))
     assert res.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_list_rejects_out_of_range_year(make_auth_client):
+    # date(99999, 1, 1) levanta ValueError e virava 500: o month tinha faixa,
+    # o year não.
+    ac = await make_auth_client("Alice")
+    res = await ac.get("/transactions/?month=1&year=99999")
+    assert res.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_list_rejects_month_without_year(make_auth_client):
+    # Antes devolvia 200 IGNORANDO o filtro em silêncio, que é pior que recusar.
+    ac = await make_auth_client("Alice")
+    w = await make_wallet(ac)
+    await ac.post("/transactions/", json=tx_payload(w["id"], date="2026-06-10"))
+
+    res = await ac.get("/transactions/?month=6")
+    assert res.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_list_still_filters_with_both(make_auth_client):
+    ac = await make_auth_client("Alice")
+    w = await make_wallet(ac)
+    await ac.post("/transactions/", json=tx_payload(w["id"], date="2026-06-10"))
+    await ac.post("/transactions/", json=tx_payload(w["id"], date="2026-07-10"))
+
+    res = await ac.get("/transactions/?month=6&year=2026")
+    assert res.status_code == 200
+    assert [t["date"] for t in res.json()] == ["2026-06-10"]

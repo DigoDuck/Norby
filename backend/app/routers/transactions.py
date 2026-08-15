@@ -73,7 +73,9 @@ async def list_transactions(
     category: Optional[str] = Query(None),
     type: Optional[TransactionType] = Query(None),
     month: Optional[int] = Query(None, ge=1, le=12),
-    year: Optional[int] = Query(None),
+    # Faixa obrigatória: sem ela, date(year, month, 1) levanta ValueError para
+    # ano fora do suportado e o erro vira 500 no handler global.
+    year: Optional[int] = Query(None, ge=1900, le=2100),
     limit: int = Query(200, ge=1, le=500),
     offset: int = Query(0, ge=0),
     current_user: User = Depends(get_current_user),
@@ -85,6 +87,13 @@ async def list_transactions(
         filters.append(Transaction.category.ilike(f"%{category}%"))
     if type:
         filters.append(Transaction.type == type)
+    # month e year andam juntos. Aceitar um sozinho devolvia 200 com o filtro
+    # silenciosamente ignorado: o cliente pedia junho e recebia o histórico
+    # inteiro achando que era junho.
+    if (month is None) != (year is None):
+        raise HTTPException(
+            status_code=422, detail="Informe month e year juntos, ou nenhum dos dois"
+        )
     if month and year:
         # Intervalo [início do mês, início do mês seguinte) — helper único, correto p/ dezembro
         start, end = current_month_range(date(year, month, 1))
