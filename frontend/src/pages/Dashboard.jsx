@@ -584,7 +584,7 @@ export default function Dashboard() {
             </span>
             <span className="flex items-center gap-1 text-[11px] text-content-3">
               Menos
-              {[0, 1, 2, 3, 4].map((level) => (
+              {[0, 2, 3, 4].map((level) => (
                 <span
                   key={level}
                   className="heat-cell w-2.5 h-2.5 shrink-0"
@@ -921,7 +921,7 @@ export default function Dashboard() {
                 return (
                   <div
                     key={t.id}
-                    className="flex items-center justify-between py-2.5 border-b border-white/5 last:border-0"
+                    className="flex items-center justify-between py-2.5 border-b border-line/5 last:border-0"
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="w-9 h-9 rounded-[10px] bg-surface-inset flex items-center justify-center shrink-0 text-base">
