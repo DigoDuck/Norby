@@ -42,11 +42,15 @@ class User(Base):
         DateTime(timezone=True), nullable=True
     )
 
-    wallets: Mapped[List["Wallet"]] = relationship("Wallet", back_populates="user", cascade="all, delete-orphan")
-    transactions: Mapped[List["Transaction"]] = relationship("Transaction", back_populates="user", cascade="all, delete-orphan")
-    recurring_transactions: Mapped[List["RecurringTransaction"]] = relationship("RecurringTransaction", back_populates="user", cascade="all, delete-orphan")
-    goals: Mapped[List["Goal"]] = relationship("Goal", back_populates="user", cascade="all, delete-orphan")
-    refresh_tokens: Mapped[List["RefreshToken"]] = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan")
+    # passive_deletes=True: as FKs já têm ondelete="CASCADE", mas sem isto o
+    # SQLAlchemy ignora o banco, CARREGA todos os filhos na sessão e emite um
+    # DELETE por linha. A conta de demo tem ~170 transações, então DELETE
+    # /auth/me virava quase 200 statements onde bastava um.
+    wallets: Mapped[List["Wallet"]] = relationship("Wallet", back_populates="user", cascade="all, delete-orphan", passive_deletes=True)
+    transactions: Mapped[List["Transaction"]] = relationship("Transaction", back_populates="user", cascade="all, delete-orphan", passive_deletes=True)
+    recurring_transactions: Mapped[List["RecurringTransaction"]] = relationship("RecurringTransaction", back_populates="user", cascade="all, delete-orphan", passive_deletes=True)
+    goals: Mapped[List["Goal"]] = relationship("Goal", back_populates="user", cascade="all, delete-orphan", passive_deletes=True)
+    refresh_tokens: Mapped[List["RefreshToken"]] = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan", passive_deletes=True)
 
 class RefreshToken(Base):
     __tablename__ = "refresh_tokens"
@@ -70,8 +74,8 @@ class Wallet(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     
     user: Mapped["User"] = relationship("User", back_populates="wallets")
-    transactions: Mapped[List["Transaction"]] = relationship("Transaction", back_populates="wallet", cascade="all, delete-orphan")
-    recurring_transactions: Mapped[List["RecurringTransaction"]] = relationship("RecurringTransaction", back_populates="wallet", cascade="all, delete-orphan")
+    transactions: Mapped[List["Transaction"]] = relationship("Transaction", back_populates="wallet", cascade="all, delete-orphan", passive_deletes=True)
+    recurring_transactions: Mapped[List["RecurringTransaction"]] = relationship("RecurringTransaction", back_populates="wallet", cascade="all, delete-orphan", passive_deletes=True)
 
 class Transaction(Base):
     __tablename__ = "transactions"
