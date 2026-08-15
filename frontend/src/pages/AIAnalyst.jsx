@@ -254,6 +254,7 @@ export default function AIAnalyst() {
           <div className="max-w-[760px] mx-auto">
             <div className="inset-panel flex items-center gap-2 py-2 pl-4 pr-2 transition-colors focus-within:border-focus/60">
               <Input
+                aria-label="Mensagem para a Norby"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && sendMessage()}

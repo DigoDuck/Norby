@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { Plus, Pencil, Trash2, Wallet } from "lucide-react";
 import { walletsApi } from "@/api/wallets";
 import { apiErrorMessage, formatBRL } from "@/lib/utils";
@@ -25,6 +25,8 @@ export default function Wallets() {
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ name: "", balance: "" });
+  const nomeId = useId();
+  const saldoId = useId();
 
   async function load() {
     const res = await walletsApi.list();
@@ -139,10 +141,11 @@ export default function Wallets() {
 
           <div className="space-y-4 mt-1">
             <div>
-              <label className="block text-xs font-medium text-content-2 mb-2">
+              <label htmlFor={nomeId} className="block text-xs font-medium text-content-2 mb-2">
                 Nome da carteira
               </label>
               <Input
+                id={nomeId}
                 placeholder="Ex.: Nubank, Caixa, Carteira…"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -151,7 +154,7 @@ export default function Wallets() {
             </div>
             {!editing && (
               <div>
-                <label className="block text-xs font-medium text-content-2 mb-2">
+                <label htmlFor={saldoId} className="block text-xs font-medium text-content-2 mb-2">
                   Saldo inicial
                 </label>
                 <div className="relative">
@@ -159,6 +162,7 @@ export default function Wallets() {
                     R$
                   </span>
                   <Input
+                    id={saldoId}
                     type="number"
                     step="0.01"
                     placeholder="0,00"

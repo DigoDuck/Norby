@@ -374,6 +374,7 @@ export default function Transactions() {
           <div className="relative flex-1 sm:max-w-xs">
             <Search size={16} className="absolute left-3 top-2.5 text-content-3" />
             <Input
+              aria-label="Buscar transações"
               placeholder="Buscar..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
