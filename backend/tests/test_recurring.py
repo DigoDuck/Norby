@@ -1,7 +1,9 @@
-import pytest
+import asyncio
 import uuid
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
+
+import pytest
 
 from app.models.sql_models import (
     User, Wallet, RecurringTransaction, RecurrenceFrequency, TransactionType, Transaction
@@ -226,3 +228,53 @@ async def test_list_scoped_to_user(make_auth_client):
     })
     assert len((await alice.get("/recurring/")).json()) == 1
     assert len((await bob.get("/recurring/")).json()) == 0
+
+
+@pytest.mark.asyncio
+async def test_concurrent_run_and_transaction_keep_balance_consistent(client, db_session):
+    # Sem lock na carteira, /recurring/run e POST /transactions/ podem ler o
+    # mesmo saldo antigo e uma atualização sobrescrever a outra (lost update).
+    reg = await client.post("/auth/register", json={
+        "name": "Carol", "email": "carol@test.com",
+        "password": "secret123", "accept_privacy": True,
+    })
+    token = reg.json()["access_token"]
+    auth = {"Authorization": f"Bearer {token}"}
+
+    wallet = (await client.post(
+        "/wallets/", json={"name": "Conta", "balance": "0.00"}, headers=auth
+    )).json()
+
+    # A API agenda a primeira execução futura. Inserimos o template vencido
+    # diretamente para garantir que /recurring/run materialize uma transação.
+    db_session.add(RecurringTransaction(
+        user_id=uuid.UUID(reg.json()["user"]["id"]),
+        wallet_id=uuid.UUID(wallet["id"]),
+        type=TransactionType.INCOME,
+        amount=Decimal("100.00"),
+        category="Salário",
+        frequency=RecurrenceFrequency.MONTHLY,
+        day_of_month=1,
+        next_run_date=datetime.now(timezone.utc) - timedelta(days=1),
+        active=True,
+    ))
+    await db_session.commit()
+
+    recurring_res, transaction_res = await asyncio.gather(
+        client.post("/recurring/run", headers=auth),
+        client.post("/transactions/", json={
+            "wallet_id": wallet["id"], "type": "INCOME", "amount": "50.00",
+            "category": "Salário", "date": "2026-08-15",
+        }, headers=auth),
+    )
+    assert recurring_res.status_code == 200, recurring_res.text
+    assert recurring_res.json()["generated"] == 1
+    assert transaction_res.status_code == 201, transaction_res.text
+
+    final = (await client.get("/wallets/", headers=auth)).json()[0]
+    txs = (await client.get("/transactions/", headers=auth)).json()
+    esperado = sum(
+        Decimal(t["amount"]) if t["type"] == "INCOME" else -Decimal(t["amount"])
+        for t in txs
+    )
+    assert Decimal(final["balance"]) == esperado
