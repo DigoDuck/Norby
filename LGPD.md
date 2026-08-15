@@ -11,13 +11,19 @@ Controlador: **Norby** · Contato do titular: `privacidade@norby.app`
 | Dado | Onde fica | Finalidade | Base legal (LGPD art. 7º) |
 |------|-----------|------------|---------------------------|
 | Nome, e-mail | PostgreSQL `users` | Identificação e contato | Execução de contrato (V) |
-| Senha (hash bcrypt) | PostgreSQL `users.password_hash` | Autenticação | Execução de contrato (V) |
+| Senha (hash `bcrypt_sha256`; hashes `bcrypt` antigos migram no próximo login) | PostgreSQL `users.password_hash` | Autenticação | Execução de contrato (V) |
+| Aceite dos termos (timestamp) | PostgreSQL `users.privacy_accepted_at` | Prova do consentimento | Cumprimento de obrigação legal (II) |
 | Refresh tokens (hash) | PostgreSQL `refresh_tokens` | Manter sessão / segurança | Execução de contrato (V) + legítimo interesse na segurança (IX) |
 | Carteiras, transações, recorrentes, metas | PostgreSQL | Funcionalidade do organizador | Execução de contrato (V) |
 | Mensagens do chat e insights de IA | MongoDB `chat_history`, `ai_insights` | Gerar análises e responder no assistente | **Consentimento** (I) |
 
 Nenhum dado sensível (art. 5º, II) é tratado intencionalmente. O usuário não deve
 inserir dados de saúde, biometria etc. nos campos livres.
+
+O aceite dos Termos e da Política é **validado no servidor** e persistido no
+cadastro (`UserRegister.accept_privacy` → `users.privacy_accepted_at`, migration
+`b2c3d4e5f6a7`). Contas criadas antes dessa migration têm o campo nulo, e **nulo
+significa "aceite não registrado", nunca "aceitou"**.
 
 ## 2. Compartilhamento com terceiros (operadores)
 
@@ -50,7 +56,5 @@ recuperação no escopo atual do projeto.
 
 ## 5. Pendências conhecidas (futuro)
 
-- Registro de consentimento com timestamp/versão dos termos no banco (hoje o
-  aceite é validado no front no cadastro, mas não persistido).
 - Política formal de retenção de logs.
 - DPO/encarregado nomeado (art. 41) — não aplicável a um projeto de portfólio.

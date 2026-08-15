@@ -31,6 +31,8 @@ export const recurringSchema = z
     type: z.enum(["INCOME", "EXPENSE"]),
     amount: z.coerce.number().positive("O valor deve ser maior que zero"),
     category: z.string().min(1, "Selecione uma categoria"),
+    // Espelha o LongText do backend (String(500) da coluna description).
+    description: z.string().max(500, "Máximo de 500 caracteres").optional(),
     frequency: z.enum(["MONTHLY", "WEEKLY"]),
     day_of_month: z.coerce.number().int().min(1).max(28).optional(),
     weekday: z.coerce.number().int().min(0).max(6).optional(),

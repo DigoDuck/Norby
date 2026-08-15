@@ -55,7 +55,7 @@ async def materialize_due_recurring(db: AsyncSession, user: User) -> int:
         wallet = (await db.execute(
             select(Wallet).where(
                 Wallet.id == tpl.wallet_id, Wallet.user_id == user.id
-            )
+            ).with_for_update()
         )).scalar_one_or_none()
 
         while tpl.next_run_date <= now:

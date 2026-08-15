@@ -68,6 +68,29 @@ async def test_logout_is_idempotent_for_unknown_token(client):
 
 
 @pytest.mark.asyncio
+async def test_logout_is_rate_limited(client):
+    # O logout derruba TODAS as sessões quando recebe um token já rotacionado
+    # (ver test_logout_with_rotated_token_revokes_successor), então precisa do
+    # mesmo teto do /auth/refresh. Sem limite, quem tivesse um refresh antigo da
+    # vítima poderia derrubar as sessões dela em loop, para sempre.
+    # Token desconhecido serve: o que se mede aqui é o balde, não a revogação.
+    from app.limiter import limiter
+
+    # A fixture global desliga o limiter; religamos só para este teste.
+    limiter.reset()
+    limiter.enabled = True
+    try:
+        for _ in range(20):
+            res = await client.post("/auth/logout", json={"refresh_token": "nao-existe"})
+            assert res.status_code == 204
+        estourou = await client.post("/auth/logout", json={"refresh_token": "nao-existe"})
+        assert estourou.status_code == 429
+    finally:
+        limiter.enabled = False
+        limiter.reset()
+
+
+@pytest.mark.asyncio
 async def test_refresh_with_invalid_token_401(client):
     res = await client.post("/auth/refresh", json={"refresh_token": "nao-existe"})
     assert res.status_code == 401
@@ -100,3 +123,24 @@ async def test_reusing_rotated_token_revokes_all_sessions(client):
     assert (await client.post("/auth/refresh", json={"refresh_token": r1})).status_code == 401
     # O sucessor legítimo também morre: a sessão inteira foi invalidada.
     assert (await client.post("/auth/refresh", json={"refresh_token": r2})).status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_logout_with_rotated_token_revokes_successor(client):
+    # SEC-01: atacante rouba R0 e rotaciona para R1. A vítima desloga com R0.
+    # O logout precisa tratar isso como reuso e derrubar R1 também, senão o
+    # atacante mantém sessão viva por 7 dias depois do logout da vítima.
+    body = await _register(client)
+    r0 = body["refresh_token"]
+
+    r1 = (await client.post("/auth/refresh", json={"refresh_token": r0})).json()[
+        "refresh_token"
+    ]
+    assert r1
+
+    res = await client.post("/auth/logout", json={"refresh_token": r0})
+    assert res.status_code == 204
+
+    # O sucessor do atacante tem que estar morto.
+    after = await client.post("/auth/refresh", json={"refresh_token": r1})
+    assert after.status_code == 401

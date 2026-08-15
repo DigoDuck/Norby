@@ -6,7 +6,6 @@ export const authApi = {
   login: (data) => api.post("/auth/login", data),
   me: () => api.get("/auth/me"),
   updateProfile: (data) => api.put("/auth/me", data),
-  refresh: (refreshToken) => api.post("/auth/refresh", { refresh_token: refreshToken }),
   // Logout best-effort: revoga o refresh no backend e limpa o estado local.
   // Falha de rede não impede o logout local.
   logout: async () => {

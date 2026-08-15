@@ -8,7 +8,6 @@ annotated-types==0.7.0
     # via pydantic
 anyio==4.14.2
     # via
-    #   httpx
     #   starlette
     #   watchfiles
 asyncpg==0.30.0
@@ -18,10 +17,7 @@ bcrypt==3.2.2
     #   -r requirements.txt
     #   passlib
 certifi==2026.6.17
-    # via
-    #   httpcore
-    #   httpx
-    #   requests
+    # via requests
 cffi==2.1.0
     # via
     #   bcrypt
@@ -35,8 +31,9 @@ colorama==0.4.6 ; sys_platform == 'win32'
     #   click
     #   tqdm
     #   uvicorn
-cryptography==49.0.0
+cryptography==50.0.0
     # via
+    #   -r requirements.txt
     #   google-auth
     #   python-jose
 deprecated==1.3.1
@@ -89,24 +86,17 @@ grpcio==1.82.1
 grpcio-status==1.71.2
     # via google-api-core
 h11==0.16.0
-    # via
-    #   httpcore
-    #   uvicorn
-httpcore==1.0.9
-    # via httpx
+    # via uvicorn
 httplib2==0.32.0
     # via
     #   google-api-python-client
     #   google-auth-httplib2
 httptools==0.8.0
     # via uvicorn
-httpx==0.27.2
-    # via -r requirements.txt
 idna==3.18
     # via
     #   anyio
     #   email-validator
-    #   httpx
     #   requests
 limits==5.8.0
     # via slowapi
@@ -161,8 +151,6 @@ python-dotenv==1.2.2
     #   uvicorn
 python-jose==3.5.0
     # via -r requirements.txt
-python-multipart==0.0.32
-    # via -r requirements.txt
 pyyaml==6.0.3
     # via uvicorn
 requests==2.34.2
@@ -173,8 +161,6 @@ six==1.17.0
     # via ecdsa
 slowapi==0.1.9
     # via -r requirements.txt
-sniffio==1.3.1
-    # via httpx
 sqlalchemy==2.0.36
     # via
     #   -r requirements.txt

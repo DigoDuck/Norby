@@ -20,5 +20,11 @@ MoneyOrZero = Annotated[Decimal, Field(ge=0, le=MAX_MONEY, decimal_places=2)]
 # Espelha String(100) das colunas name/category.
 ShortText = Annotated[str, Field(min_length=1, max_length=100)]
 
+# Nome de pessoa: mesma coluna de 100, mas piso de 2 caracteres. Tipo próprio
+# em vez de ShortText porque cadastro e atualização precisam concordar — com
+# ShortText no update, um nome de 1 caractere entrava por lá e contornava a
+# regra que o cadastro aplica.
+PersonName = Annotated[str, Field(min_length=2, max_length=100)]
+
 # Espelha String(500) da coluna description.
 LongText = Annotated[str, Field(max_length=500)]

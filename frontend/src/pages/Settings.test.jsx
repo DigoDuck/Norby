@@ -82,4 +82,17 @@ describe("Settings", () => {
 
     expect(await screen.findByText("Senha incorreta.")).toBeInTheDocument();
   });
+
+  it("dá nome acessível a todos os campos da tela", () => {
+    // Clicar no rótulo tem que focar o campo, e o leitor de tela precisa
+    // anunciar o nome — placeholder some ao digitar e não serve como rótulo.
+    renderSettings();
+
+    expect(screen.getByLabelText("Nome completo")).toBeInTheDocument();
+    expect(screen.getByLabelText("E-mail")).toBeInTheDocument();
+    expect(
+      screen.getByLabelText("Digite EXCLUIR para confirmar"),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Sua senha atual")).toBeInTheDocument();
+  });
 });

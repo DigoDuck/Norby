@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   User,
@@ -13,7 +13,7 @@ import {
 import { useAuthStore } from "@/store/authStore";
 import { authApi } from "@/api/auth";
 import { accountApi } from "@/api/account";
-import { apiErrorMessage } from "@/lib/utils";
+import { apiErrorMessage, shadcnInputCls } from "@/lib/utils";
 import ThemeToggle from "@/components/shared/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,8 +38,13 @@ function SectionHead({ icon, children, danger }) {
 }
 
 export default function Settings() {
-  const { user, updateUser } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
+  const updateUser = useAuthStore((s) => s.updateUser);
   const navigate = useNavigate();
+  // useId em vez de string fixa: o componente pode aparecer mais de uma vez na
+  // árvore sem duplicar id, que quebraria a associação label/campo.
+  const nomeId = useId();
+  const emailId = useId();
   const [form, setForm] = useState({
     name: user?.name || "",
     email: user?.email || "",
@@ -107,8 +112,6 @@ export default function Settings() {
     }
   }
 
-  const inputCls =
-    "bg-surface-inset border-line/10 text-content placeholder:text-content-3";
 
   const memberSince = user?.created_at
     ? new Date(user.created_at).toLocaleDateString("pt-BR", {
@@ -155,24 +158,26 @@ export default function Settings() {
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label className="block text-xs font-medium text-content-2 mb-2">
+            <label htmlFor={nomeId} className="block text-xs font-medium text-content-2 mb-2">
               Nome completo
             </label>
             <Input
+              id={nomeId}
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
-              className={inputCls}
+              className={shadcnInputCls}
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-content-2 mb-2">
+            <label htmlFor={emailId} className="block text-xs font-medium text-content-2 mb-2">
               E-mail
             </label>
             <Input
+              id={emailId}
               type="email"
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
-              className={inputCls}
+              className={shadcnInputCls}
             />
           </div>
         </div>
@@ -245,17 +250,19 @@ export default function Settings() {
           <strong className="text-content">EXCLUIR</strong> e a sua senha.
         </p>
         <Input
+          aria-label="Digite EXCLUIR para confirmar"
           placeholder="Digite EXCLUIR para confirmar"
           value={confirmText}
           onChange={(e) => setConfirmText(e.target.value)}
-          className={`${inputCls} mt-4`}
+          className={`${shadcnInputCls} mt-4`}
         />
         <Input
           type="password"
+          aria-label="Sua senha atual"
           placeholder="Sua senha atual"
           value={deletePassword}
           onChange={(e) => setDeletePassword(e.target.value)}
-          className={`${inputCls} mt-3`}
+          className={`${shadcnInputCls} mt-3`}
         />
         {dangerError && <p className="text-danger text-xs mt-2">{dangerError}</p>}
         <Button

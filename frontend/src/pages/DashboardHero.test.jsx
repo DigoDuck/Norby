@@ -42,8 +42,6 @@ describe("Dashboard hero", () => {
       data: {
         month_income: 0,
         month_expenses: 0,
-        prev_month_income: 0,
-        prev_month_expenses: 0,
         cash_flow: [],
         top_categories: [],
       },

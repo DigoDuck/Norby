@@ -14,11 +14,10 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 async def get_db(): # Dependency
     # Sessão assíncrona do PostgreSQL
-    async with AsyncSessionLocal() as session: # Cria sessão com banco
-        try:
-            yield session
-        finally:
-            await session.close()
+    # O `async with` já fecha a sessão na saída — o try/finally anterior
+    # sugeria um cuidado extra que não existia.
+    async with AsyncSessionLocal() as session:
+        yield session
             
 async def get_current_user( # Autenticação
     token: str = Depends(oauth2_scheme), # Pega o token do header

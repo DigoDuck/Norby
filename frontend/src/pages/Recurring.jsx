@@ -5,7 +5,7 @@ import { Plus, Trash2, Repeat, Pause, Play } from "lucide-react";
 
 import { recurringApi } from "@/api/recurring";
 import { walletsApi } from "@/api/wallets";
-import { categoriesFor, reconcileCategory } from "@/lib/categories";
+import { categoriesFor, reconcileCategory, TRANSACTION_TYPE_OPTIONS } from "@/lib/categories";
 import { recurringSchema } from "@/lib/schemas";
 import { apiErrorMessage, formatDateBR, formatBRL, inputCls } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
@@ -40,18 +40,6 @@ const FREQUENCY_OPTIONS = [
   { value: "WEEKLY", label: "Semanal" },
 ];
 
-const TYPE_OPTIONS = [
-  {
-    value: "EXPENSE",
-    label: "Despesa",
-    activeClass: "bg-expense/[0.15] text-expense ring-1 ring-inset ring-expense/30",
-  },
-  {
-    value: "INCOME",
-    label: "Receita",
-    activeClass: "bg-income/[0.15] text-income ring-1 ring-inset ring-income/30",
-  },
-];
 
 // Valores iniciais do formulário de recorrência.
 const emptyForm = () => ({
@@ -59,6 +47,7 @@ const emptyForm = () => ({
   type: "EXPENSE",
   amount: "",
   category: categoriesFor("EXPENSE")[0],
+  description: "",
   frequency: "MONTHLY",
   day_of_month: 1,
   weekday: undefined,
@@ -129,6 +118,7 @@ export default function Recurring() {
       type: data.type,
       amount: data.amount,
       category: data.category,
+      description: data.description || undefined,
       frequency: data.frequency,
       ...(data.frequency === "MONTHLY"
         ? { day_of_month: Number(data.day_of_month) }
@@ -198,7 +188,8 @@ export default function Recurring() {
                         field.onChange(v);
                         setValue("category", reconcileCategory(v, getValues("category")));
                       }}
-                      options={TYPE_OPTIONS}
+                      options={TRANSACTION_TYPE_OPTIONS}
+                      ariaLabel="Tipo"
                     />
                   )}
                 />
@@ -260,6 +251,21 @@ export default function Recurring() {
                   placeholder="0,00"
                   className={inputCls}
                   {...register("amount")}
+                />
+              </Field>
+
+              {/* Descrição: o backend sempre aceitou, mas o form não enviava,
+                  então toda linha da lista saía como "Recorrência automática". */}
+              <Field
+                label="Descrição (opcional)"
+                htmlFor="description"
+                error={errors.description?.message}
+              >
+                <Input
+                  id="description"
+                  placeholder="Ex.: Aluguel, Netflix, Internet…"
+                  className={inputCls}
+                  {...register("description")}
                 />
               </Field>
 

@@ -230,7 +230,13 @@ marimo/_lsp/
 __marimo__/
 
 # Specs/brainstorming docs ficam no Second Brain (Obsidian), nao no repo
-docs/
+# docs/* (nao docs/) porque git nao desce em diretorio excluido:
+# com "docs/" as excecoes abaixo nunca seriam avaliadas
+docs/*
+
+# Excecoes: config das engineering skills e ADRs sao do repo, nao do vault
+!docs/agents/
+!docs/adr/
 
 # Workspace de orquestracao do subagent-driven-development (scratch)
 .superpowers/

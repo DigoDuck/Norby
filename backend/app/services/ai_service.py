@@ -4,6 +4,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import ai_insights_collection
 from app.models.sql_models import Transaction, TransactionType
+from app.services.dashboard_service import _income_expense, top_expense_categories
 from app.services.goal_service import current_month_range
 from app.services.score_service import compute_financial_score
 from app.config import get_settings
@@ -22,47 +23,21 @@ genai.configure(api_key=settings.gemini_api_key)
 model = genai.GenerativeModel("models/gemini-3.5-flash-lite")
 
 async def _get_user_financial_summary(db: AsyncSession, user_id: str) -> dict:
+    """Resumo do mês corrente, reusando os agregados do dashboard.
+
+    Antes isto tinha implementação própria: duas queries separadas para receita
+    e despesa (o dashboard faz numa só, com `case()`) e uma cópia literal do
+    group_by do top-5. Além da query a mais, a regra do que conta como gasto do
+    mês morava em dois arquivos e podia divergir em silêncio.
+    """
     now = datetime.now(timezone.utc)
-    # Range [início do mês, mês seguinte) como date — mesmo helper de goals,
-    # indexável e sem cast de timezone (antes usava func.extract mês/ano).
     start, end = current_month_range(now)
 
-    # Total de receitas no mês
-    income_result = await db.execute(
-        select(func.sum(Transaction.amount)).where(
-            Transaction.user_id == user_id,
-            Transaction.type == TransactionType.INCOME,
-            Transaction.date >= start,
-            Transaction.date < end,
-        )
-    )
-    total_income = float(income_result.scalar() or 0)
-
-    # Total de gastos no mês
-    expense_result = await db.execute(
-        select(func.sum(Transaction.amount)).where(
-            Transaction.user_id == user_id,
-            Transaction.type == TransactionType.EXPENSE,
-            Transaction.date >= start,
-            Transaction.date < end,
-        )
-    )
-    total_expenses = float(expense_result.scalar() or 0)
-
-    # Top 5 categorias de despesas
-    category_result = await db.execute(
-        select(Transaction.category, func.sum(Transaction.amount).label("total"))
-        .where(
-            Transaction.user_id == user_id,
-            Transaction.type == TransactionType.EXPENSE,
-            Transaction.date >= start,
-            Transaction.date < end,
-        )
-        .group_by(Transaction.category)
-        .order_by(func.sum(Transaction.amount).desc())
-        .limit(5)
-    )
-    categories = [{"category": r.category, "total": float(r.total)} for r in category_result]
+    total_income, total_expenses = await _income_expense(db, user_id, start, end)
+    categories = [
+        {"category": categoria, "total": total}
+        for categoria, total in await top_expense_categories(db, user_id, start, end)
+    ]
 
     return {
         "month": now.strftime("%B %Y"),
@@ -71,7 +46,8 @@ async def _get_user_financial_summary(db: AsyncSession, user_id: str) -> dict:
         "balance": total_income - total_expenses,
         "top_categories": categories,
     }
-    
+
+
 def _summary_fingerprint(summary: dict) -> str:
     """Impressão digital dos dados que embasam o texto da IA.
 
@@ -91,8 +67,17 @@ def _summary_fingerprint(summary: dict) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
-async def get_or_generate_insight(db: AsyncSession, user_id: str, month: int, year: int) -> dict:
-    reference = f"{year}-{month:02d}"
+async def get_or_generate_insight(db: AsyncSession, user_id: str) -> dict:
+    """Leitura da IA do mês corrente, com o texto cacheado por fingerprint.
+
+    Sem parâmetros de mês: eles só montavam a chave do cache, enquanto o resumo
+    era SEMPRE do mês corrente. Chamar com (6, 2026) em julho gravaria dados de
+    julho sob a chave de junho. A assinatura prometia uma capacidade que não
+    existia, e derivar a referência do mesmo `now` do resumo elimina a chance de
+    as duas fontes de "mês" divergirem.
+    """
+    now = datetime.now(timezone.utc)
+    reference = f"{now.year}-{now.month:02d}"
 
     # Score é sempre recalculado (determinístico) — nunca servido do cache,
     # para não congelar quando as transações do mês mudam.

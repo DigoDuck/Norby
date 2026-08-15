@@ -36,7 +36,11 @@ const registerSchema = loginSchema
       .string()
       .min(8, "Mínimo de 8 caracteres")
       .regex(/[A-Za-z]/, "Inclua ao menos uma letra")
-      .regex(/\d/, "Inclua ao menos um número"),
+      .regex(/\d/, "Inclua ao menos um número")
+      .refine(
+        (value) => new TextEncoder().encode(value).length <= 72,
+        "A senha deve ter no máximo 72 bytes (acentos contam 2)",
+      ),
     confirmPassword: z.string(),
     acceptedTerms: z.boolean().refine((v) => v === true, {
       message: "Você precisa aceitar os Termos e a Política de Privacidade",
@@ -47,7 +51,9 @@ const registerSchema = loginSchema
     path: ["confirmPassword"],
   });
 
-const inputCls =
+// Visual próprio da tela de entrada (mais alto e arredondado que o dos
+// formulários internos), por isso não usa o shadcnInputCls compartilhado.
+const authInputCls =
   "h-14 rounded-2xl pl-12 bg-surface/60 border-line/10 text-content placeholder:text-content-3 focus-visible:ring-focus";
 
 const benefits = [
@@ -111,7 +117,7 @@ export default function Auth() {
   const [showPass, setShowPass] = useState(false);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
-  const { login } = useAuthStore();
+  const login = useAuthStore((s) => s.login);
   const navigate = useNavigate();
 
   const schema = mode === "login" ? loginSchema : registerSchema;
@@ -302,7 +308,7 @@ export default function Auth() {
                   icon={User}
                   error={errors.name?.message}
                 >
-                  <Input placeholder="Seu nome" {...register("name")} className={inputCls} />
+                  <Input placeholder="Seu nome" {...register("name")} className={authInputCls} />
                 </Field>
               )}
 
@@ -317,7 +323,7 @@ export default function Auth() {
                   placeholder="Email"
                   autoComplete="email"
                   {...register("email")}
-                  className={inputCls}
+                  className={authInputCls}
                 />
               </Field>
 
@@ -332,7 +338,7 @@ export default function Auth() {
                   placeholder="Senha"
                   autoComplete={mode === "login" ? "current-password" : "new-password"}
                   {...register("password")}
-                  className={`${inputCls} pr-12`}
+                  className={`${authInputCls} pr-12`}
                 />
                 <button
                   type="button"
@@ -359,7 +365,7 @@ export default function Auth() {
                     placeholder="Confirmar senha"
                     autoComplete="new-password"
                     {...register("confirmPassword")}
-                    className={inputCls}
+                    className={authInputCls}
                   />
                 </Field>
               )}
