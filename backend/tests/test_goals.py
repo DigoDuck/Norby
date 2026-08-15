@@ -242,3 +242,38 @@ async def test_contribute_still_clamps_at_zero(make_auth_client):
     res = await ac.post(f"/goals/{meta['id']}/contribute", json={"amount": "-500.00"})
     assert res.status_code == 200
     assert res.json()["current_amount"] == "0.00"
+
+
+@pytest.mark.asyncio
+async def test_list_goals_does_not_scale_queries_with_budget_count(make_auth_client):
+    # Antes, cada meta BUDGET disparava seu próprio month_spent (N+1). O teste
+    # conta SELECTs de transação: tem que ser 1, independente do nº de metas.
+    from sqlalchemy import event
+    from tests.conftest import test_engine
+
+    ac = await make_auth_client("Alice")
+    for categoria in ("Alimentação", "Moradia", "Transporte", "Lazer", "Saúde"):
+        res = await ac.post("/goals/", json={
+            "name": f"Orçamento {categoria}", "type": "BUDGET",
+            "target_amount": "500.00", "category": categoria,
+        })
+        assert res.status_code == 201, res.text
+
+    selects_de_transacao = []
+
+    def espiao(conn, cursor, statement, params, context, executemany):
+        normalizado = " ".join(statement.split()).lower()
+        if normalizado.startswith("select") and "from transactions" in normalizado:
+            selects_de_transacao.append(normalizado)
+
+    event.listen(test_engine.sync_engine, "before_cursor_execute", espiao)
+    try:
+        res = await ac.get("/goals/")
+        assert res.status_code == 200
+        assert len(res.json()) == 5
+    finally:
+        event.remove(test_engine.sync_engine, "before_cursor_execute", espiao)
+
+    assert len(selects_de_transacao) == 1, (
+        f"esperava 1 agregado, veio {len(selects_de_transacao)}: {selects_de_transacao}"
+    )

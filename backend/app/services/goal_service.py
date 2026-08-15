@@ -38,9 +38,45 @@ async def month_spent(db: AsyncSession, user_id, category: str) -> Decimal:
     return Decimal(str(total))
 
 
-async def build_goal_response(db: AsyncSession, goal: Goal) -> GoalResponse:
+async def month_spent_by_category(db: AsyncSession, user_id, categories) -> dict[str, Decimal]:
+    """Gasto do mês por categoria, em UMA query, para uma lista de categorias.
+
+    Existe para a listagem de metas: chamar `month_spent` por meta fazia um
+    round-trip por orçamento (N+1). Com 15 metas BUDGET eram 16 idas ao banco em
+    sequência, o que num Postgres serverless em outra região é a diferença entre
+    dezenas e centenas de milissegundos.
+    """
+    categorias = [c for c in set(categories) if c]
+    if not categorias:
+        return {}
+    start, end = current_month_range()
+    linhas = (await db.execute(
+        select(Transaction.category, func.coalesce(func.sum(Transaction.amount), 0))
+        .where(
+            Transaction.user_id == user_id,
+            Transaction.type == TransactionType.EXPENSE,
+            Transaction.category.in_(categorias),
+            Transaction.date >= start,
+            Transaction.date < end,
+        )
+        .group_by(Transaction.category)
+    )).all()
+    return {categoria: Decimal(str(total)) for categoria, total in linhas}
+
+
+async def build_goal_response(
+    db: AsyncSession, goal: Goal, *, gasto_do_mes: Decimal | None = None
+) -> GoalResponse:
+    """Monta a resposta de uma meta.
+
+    `gasto_do_mes` permite ao chamador entregar o total já calculado em lote
+    (ver `month_spent_by_category`); sem ele, a meta de orçamento consulta
+    sozinha, que é o caminho das rotas de item único.
+    """
     if goal.type == GoalType.SAVINGS:
         current = goal.current_amount
+    elif gasto_do_mes is not None:
+        current = gasto_do_mes
     else:
         current = await month_spent(db, goal.user_id, goal.category)
 

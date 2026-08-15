@@ -8,7 +8,7 @@ from app.dependencies import get_db, get_current_user
 from app.models.sql_models import User, Goal, GoalType
 from app.schemas.common import MAX_MONEY
 from app.schemas.goal import GoalCreate, GoalUpdate, GoalContribute, GoalResponse
-from app.services.goal_service import build_goal_response
+from app.services.goal_service import build_goal_response, month_spent_by_category
 
 router = APIRouter(prefix="/goals", tags=["Goals"])
 
@@ -37,7 +37,17 @@ async def list_goals(
         .limit(limit)
         .offset(offset)
     )).scalars().all()
-    return [await build_goal_response(db, g) for g in goals]
+    # Um agregado para a página toda, em vez de um por meta de orçamento.
+    gastos = await month_spent_by_category(
+        db, current_user.id, [g.category for g in goals if g.type == GoalType.BUDGET]
+    )
+    return [
+        await build_goal_response(
+            db, g, gasto_do_mes=gastos.get(g.category, Decimal("0"))
+            if g.type == GoalType.BUDGET else None
+        )
+        for g in goals
+    ]
 
 
 @router.post("/", response_model=GoalResponse, status_code=status.HTTP_201_CREATED)
