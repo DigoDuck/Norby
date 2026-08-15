@@ -146,6 +146,11 @@ export default function Goals() {
         </div>
         <Dialog open={open} onOpenChange={handleOpenChange}>
           <DialogTrigger
+            // Sem registrar este gatilho, a ref guardava o card tracejado de uma
+            // abertura anterior e o foco voltava para o elemento errado.
+            onClick={(e) => {
+              ultimoGatilho.current = e.currentTarget;
+            }}
             render={
               <Button className="bg-accent-fill text-accent-contrast hover:bg-accent-fill/90 font-medium" />
             }

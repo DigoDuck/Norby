@@ -2,7 +2,6 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useAuthStore } from "./store/authStore";
 import { authApi } from "./api/auth";
-import { recurringApi } from "./api/recurring";
 import AppLayout from "./components/layout/AppLayout";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
@@ -33,10 +32,7 @@ export default function App() {
     }
     authApi
       .me()
-      .then((res) => {
-        useAuthStore.getState().updateUser(res.data);
-        return recurringApi.run().catch(() => {});
-      })
+      .then((res) => useAuthStore.getState().updateUser(res.data))
       .catch(() => useAuthStore.getState().logout())
       .finally(() => setBooting(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps

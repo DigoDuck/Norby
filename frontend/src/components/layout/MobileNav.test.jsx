@@ -37,6 +37,21 @@ describe("MobileNav", () => {
     );
   });
 
+  it("devolve o foco ao hambúrguer ao fechar", async () => {
+    // Como div condicional, fechar jogava o foco no início do documento.
+    renderNav();
+    const hamburguer = screen.getByRole("button", { name: "Abrir menu" });
+    fireEvent.click(hamburguer);
+    const dialog = await screen.findByRole("dialog");
+
+    fireEvent.keyDown(dialog, { key: "Escape" });
+
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
+    await waitFor(() => expect(hamburguer).toHaveFocus());
+  });
+
   it("mantém as rotas e o logout alcançáveis", async () => {
     renderNav();
     fireEvent.click(screen.getByRole("button", { name: "Abrir menu" }));

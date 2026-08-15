@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -74,8 +74,18 @@ export default function Transactions() {
     defaultValues: emptyForm(),
   });
 
+  // Contador de sequência: o filtro dispara load() direto no clique, e sem isso
+  // dois cliques rápidos podem ter a resposta ANTIGA chegando por último e
+  // sobrescrevendo a lista, com o botão do filtro novo aparecendo selecionado.
+  // O debounce anterior mascarava isso via clearTimeout; agora é explícito.
+  // ponytail: contador em vez de AbortController — não precisamos abortar a
+  // request, só ignorar a resposta obsoleta. Trocar se o custo da chamada pesar.
+  const requisicaoAtual = useRef(0);
+
   async function load(params = {}) {
+    const seq = ++requisicaoAtual.current;
     const res = await transactionsApi.list(params);
+    if (seq !== requisicaoAtual.current) return; // resposta obsoleta
     setTransactions(res.data);
   }
 
