@@ -175,6 +175,7 @@ export default function Goals() {
                       value={field.value}
                       onChange={field.onChange}
                       options={TYPE_OPTIONS}
+                      ariaLabel="Tipo"
                     />
                   )}
                 />

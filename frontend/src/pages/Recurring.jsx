@@ -199,6 +199,7 @@ export default function Recurring() {
                         setValue("category", reconcileCategory(v, getValues("category")));
                       }}
                       options={TYPE_OPTIONS}
+                      ariaLabel="Tipo"
                     />
                   )}
                 />
