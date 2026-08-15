@@ -38,6 +38,30 @@ async def _income_expense(db: AsyncSession, user_id, start: date, end: date) -> 
     return Decimal(str(row.income)), Decimal(str(row.expenses))
 
 
+async def top_expense_categories(
+    db: AsyncSession, user_id, start: date, end: date, limite: int = TOP_CATEGORIES
+) -> list[tuple[str, Decimal]]:
+    """Maiores categorias de despesa do intervalo, em ordem decrescente.
+
+    Compartilhado com o ai_service: a regra de "o que conta como gasto do mês"
+    precisa existir num lugar só, senão alguém exclui transferências aqui e o
+    prompt da IA continua contando — divergindo do dashboard na mesma tela.
+    """
+    linhas = (await db.execute(
+        select(Transaction.category, func.sum(Transaction.amount).label("total"))
+        .where(
+            Transaction.user_id == user_id,
+            Transaction.type == TransactionType.EXPENSE,
+            Transaction.date >= start,
+            Transaction.date < end,
+        )
+        .group_by(Transaction.category)
+        .order_by(func.sum(Transaction.amount).desc())
+        .limit(limite)
+    )).all()
+    return [(linha.category, Decimal(str(linha.total))) for linha in linhas]
+
+
 async def get_dashboard_summary(db: AsyncSession, user_id) -> DashboardSummary:
     start, end = current_month_range()
 
@@ -62,20 +86,10 @@ async def get_dashboard_summary(db: AsyncSession, user_id) -> DashboardSummary:
         for r in reversed(cash_rows)
     ]
 
-    # Top categorias de despesa do mês atual.
-    cat_rows = (await db.execute(
-        select(Transaction.category, func.sum(Transaction.amount).label("total"))
-        .where(
-            Transaction.user_id == user_id,
-            Transaction.type == TransactionType.EXPENSE,
-            Transaction.date >= start,
-            Transaction.date < end,
-        )
-        .group_by(Transaction.category)
-        .order_by(func.sum(Transaction.amount).desc())
-        .limit(TOP_CATEGORIES)
-    )).all()
-    top_categories = [CategorySlice(category=r.category, total=r.total) for r in cat_rows]
+    top_categories = [
+        CategorySlice(category=c, total=t)
+        for c, t in await top_expense_categories(db, user_id, start, end)
+    ]
 
     return DashboardSummary(
         month_income=month_income,

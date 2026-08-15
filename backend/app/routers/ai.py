@@ -40,8 +40,7 @@ async def get_dashboard_insight(
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        now = datetime.now(timezone.utc)
-        insight = await get_or_generate_insight(db, str(current_user.id), now.month, now.year)
+        insight = await get_or_generate_insight(db, str(current_user.id))
         return insight
     except Exception:
         # Widget opcional do dashboard: degrada com elegância em vez de derrubar a tela.
