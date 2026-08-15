@@ -5,12 +5,15 @@ asyncpg==0.30.0
 alembic==1.13.3
 motor==3.6.0
 python-jose[cryptography]==3.5.0
+# Pin de transitiva por seguranca: o python-jose puxa cryptography, e a 49.0.0
+# tem PYSEC-2026-3552 (oraculo em decrypt PKCS7). O Norby nao usa PKCS7 e o JWT
+# e so HS256, entao nao ha caminho alcancavel, mas o gate de release do
+# AGENTS.md exige o pip-audit limpo.
+cryptography==50.0.0
 passlib[bcrypt]==1.7.4
 python-dotenv==1.2.2
 pydantic-settings==2.6.1
 google-generativeai==0.8.3
-httpx==0.27.2
-python-multipart==0.0.32
 email-validator==2.1.1
 bcrypt==3.2.2
 slowapi==0.1.9
