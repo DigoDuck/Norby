@@ -59,6 +59,7 @@ const emptyForm = () => ({
   type: "EXPENSE",
   amount: "",
   category: categoriesFor("EXPENSE")[0],
+  description: "",
   frequency: "MONTHLY",
   day_of_month: 1,
   weekday: undefined,
@@ -129,6 +130,7 @@ export default function Recurring() {
       type: data.type,
       amount: data.amount,
       category: data.category,
+      description: data.description || undefined,
       frequency: data.frequency,
       ...(data.frequency === "MONTHLY"
         ? { day_of_month: Number(data.day_of_month) }
@@ -261,6 +263,21 @@ export default function Recurring() {
                   placeholder="0,00"
                   className={inputCls}
                   {...register("amount")}
+                />
+              </Field>
+
+              {/* Descrição: o backend sempre aceitou, mas o form não enviava,
+                  então toda linha da lista saía como "Recorrência automática". */}
+              <Field
+                label="Descrição (opcional)"
+                htmlFor="description"
+                error={errors.description?.message}
+              >
+                <Input
+                  id="description"
+                  placeholder="Ex.: Aluguel, Netflix, Internet…"
+                  className={inputCls}
+                  {...register("description")}
                 />
               </Field>
 

@@ -88,14 +88,6 @@ export default function Transactions() {
     load();
   }, []);
 
-  useEffect(() => {
-    const timer = setTimeout(
-      () => load(filterType ? { type: filterType } : {}),
-      400,
-    );
-    return () => clearTimeout(timer);
-  }, [filterType]);
-
   // Auto-seleciona a única carteira, sem sobrescrever uma escolha já feita nem
   // atrapalhar a edição.
   useEffect(() => {
@@ -189,6 +181,11 @@ export default function Transactions() {
     await transactionsApi.delete(id);
     reload();
   }
+
+  // Teto que o backend aplica na listagem (Query(200, le=500)). A busca é
+  // client-side sobre o que veio, então precisamos saber se batemos no teto
+  // para não afirmar que nada existe quando só não foi carregado.
+  const LISTAGEM_MAX = 200;
 
   const filtered = transactions.filter(
     (t) =>
@@ -371,7 +368,10 @@ export default function Transactions() {
                 key={t}
                 type="button"
                 aria-pressed={filterType === t}
-                onClick={() => setFilterType(t)}
+                onClick={() => {
+                  setFilterType(t);
+                  load(t ? { type: t } : {});
+                }}
                 className={`rounded-xl px-3 py-2 text-sm transition-colors ${
                   filterType === t
                     ? "bg-accent-fill text-accent-contrast font-medium"
@@ -527,7 +527,9 @@ export default function Transactions() {
 
         {filtered.length === 0 && (
           <div className="text-center py-12 text-content-3 text-sm">
-            Nenhuma transação encontrada.
+            {search && transactions.length >= LISTAGEM_MAX
+              ? "Nenhuma transação encontrada entre as mais recentes. A busca cobre só as transações já carregadas."
+              : "Nenhuma transação encontrada."}
           </div>
         )}
       </div>
