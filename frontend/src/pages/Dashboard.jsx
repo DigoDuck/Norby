@@ -26,7 +26,6 @@ import { transactionsApi } from "@/api/transactions";
 import { walletsApi } from "@/api/wallets";
 import { aiApi } from "@/api/ai";
 import { goalsApi } from "@/api/goals";
-import { recurringApi } from "@/api/recurring";
 import { dashboardApi } from "@/api/dashboard";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
@@ -48,8 +47,6 @@ const monthLabel = (ym) => {
 const EMPTY_SUMMARY = {
   month_income: 0,
   month_expenses: 0,
-  prev_month_income: 0,
-  prev_month_expenses: 0,
   cash_flow: [],
   top_categories: [],
 };
@@ -155,13 +152,12 @@ export default function Dashboard() {
 
   useEffect(() => {
     async function loadData() {
-      await recurringApi.run().catch(() => {}); // materializa recorrências vencidas
       const streakMonths = monthsForWindow(STREAK_DAYS);
       // allSettled: falha de um painel (ex.: IA) não derruba os demais
       const [wRes, tRes, sRes, iRes, gRes, ...streakRes] =
         await Promise.allSettled([
           walletsApi.list(),
-          transactionsApi.list(),
+          transactionsApi.list({ limit: 5 }),
           dashboardApi.summary(),
           aiApi.getInsight(),
           goalsApi.list(),

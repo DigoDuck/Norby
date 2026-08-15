@@ -49,9 +49,9 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 # (senão o navegador mascara o erro real como falha de CORS).
 @app.middleware("http")
 async def request_context(request: Request, call_next):
-    rid = getattr(request.state, "request_id", None)
-    if rid is None:
-        rid = request.headers.get("X-Request-ID") or uuid.uuid4().hex
+    # response_headers foi registrado depois e fica por fora, então já gravou
+    # o id antes desta camada rodar — o fallback anterior era inalcançável.
+    rid = request.state.request_id
     token = request_id_ctx.set(rid)
     request.state.request_id = rid
     try:

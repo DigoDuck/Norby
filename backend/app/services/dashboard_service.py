@@ -5,7 +5,7 @@ das 200 transações mais recentes que a listagem devolvia — para usuário ati
 números ficavam errados sem aviso. Aqui a agregação é feita no banco, sobre todas
 as transações do usuário.
 """
-from datetime import date, timedelta
+from datetime import date
 from decimal import Decimal
 
 from sqlalchemy import select, func, case
@@ -40,10 +40,8 @@ async def _income_expense(db: AsyncSession, user_id, start: date, end: date) -> 
 
 async def get_dashboard_summary(db: AsyncSession, user_id) -> DashboardSummary:
     start, end = current_month_range()
-    prev_start, _ = current_month_range(start - timedelta(days=1))
 
     month_income, month_expenses = await _income_expense(db, user_id, start, end)
-    prev_month_income, prev_month_expenses = await _income_expense(db, user_id, prev_start, start)
 
     # Fluxo de caixa: agrupa por mês sobre TODAS as transações, pega os 6 últimos
     # meses com dados (desc + limit) e devolve em ordem cronológica.
@@ -82,8 +80,6 @@ async def get_dashboard_summary(db: AsyncSession, user_id) -> DashboardSummary:
     return DashboardSummary(
         month_income=month_income,
         month_expenses=month_expenses,
-        prev_month_income=prev_month_income,
-        prev_month_expenses=prev_month_expenses,
         cash_flow=cash_flow,
         top_categories=top_categories,
     )

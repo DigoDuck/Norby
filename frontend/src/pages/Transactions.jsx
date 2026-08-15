@@ -6,7 +6,6 @@ import { Plus, Search, Trash2, Pencil } from "lucide-react";
 
 import { transactionsApi } from "@/api/transactions";
 import { walletsApi } from "@/api/wallets";
-import { recurringApi } from "@/api/recurring";
 import { categoriesFor, emojiForCategory, reconcileCategory } from "@/lib/categories";
 import { transactionSchema } from "@/lib/schemas";
 import { apiErrorMessage, formatDateBR, formatBRL, inputCls, toDateInput, todayInput } from "@/lib/utils";
@@ -76,7 +75,6 @@ export default function Transactions() {
   });
 
   async function load(params = {}) {
-    await recurringApi.run().catch(() => {});
     const res = await transactionsApi.list(params);
     setTransactions(res.data);
   }
