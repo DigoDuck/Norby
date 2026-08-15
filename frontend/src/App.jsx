@@ -15,7 +15,7 @@ import Privacidade from "./pages/Privacidade";
 import Termos from "./pages/Termos";
 
 function ProtectedRoute({ children }) {
-  const { isAuthenticated } = useAuthStore();
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   return isAuthenticated ? children : <Navigate to="/" replace />;
 }
 
@@ -32,10 +32,7 @@ export default function App() {
     }
     authApi
       .me()
-      .then((res) => {
-        useAuthStore.getState().updateUser(res.data);
-        return import("./api/recurring").then((m) => m.recurringApi.run().catch(() => {}));
-      })
+      .then((res) => useAuthStore.getState().updateUser(res.data))
       .catch(() => useAuthStore.getState().logout())
       .finally(() => setBooting(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps

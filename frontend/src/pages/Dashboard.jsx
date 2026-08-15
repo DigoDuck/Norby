@@ -26,17 +26,21 @@ import { transactionsApi } from "@/api/transactions";
 import { walletsApi } from "@/api/wallets";
 import { aiApi } from "@/api/ai";
 import { goalsApi } from "@/api/goals";
-import { recurringApi } from "@/api/recurring";
 import { dashboardApi } from "@/api/dashboard";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import NorthStar from "@/components/shared/NorthStar";
 import AiOrb from "@/components/shared/AiOrb";
+import InsightCard from "@/components/dashboard/InsightCard";
+import CategoryDonut from "@/components/dashboard/CategoryDonut";
+import ChartTooltip from "@/components/dashboard/ChartTooltip";
+import RitmoCard from "@/components/dashboard/RitmoCard";
+import Money from "@/components/shared/Money";
 import HeroRing from "@/components/shared/HeroRing";
 import { useAuthStore } from "@/store/authStore";
 import { formatDateBR, formatBRL, parseDateOnly } from "@/lib/utils";
-import { colorForCategory } from "@/lib/palette";
-import { computeRitmo, headroom } from "@/lib/ritmo";
+import { emojiForCategory } from "@/lib/categories";
+import { computeRitmo } from "@/lib/ritmo";
 
 // Rótulo curto pt-BR de uma chave ano-mês ("2026-07" → "jul"), em horário local.
 const monthLabel = (ym) => {
@@ -47,8 +51,6 @@ const monthLabel = (ym) => {
 const EMPTY_SUMMARY = {
   month_income: 0,
   month_expenses: 0,
-  prev_month_income: 0,
-  prev_month_expenses: 0,
   cash_flow: [],
   top_categories: [],
 };
@@ -57,25 +59,6 @@ const INCOME_COLOR = "rgb(var(--income))";
 const EXPENSE_COLOR = "rgb(var(--expense))";
 
 const axisTick = { fill: "rgb(var(--axis))", fontSize: 11 };
-
-// Emoji por categoria (rascunho aprovado): chip visual das movimentações.
-const CATEGORY_EMOJI = {
-  "Alimentação": "🍔",
-  "Moradia": "🏠",
-  "Transporte": "🚇",
-  "Saúde": "💊",
-  "Educação": "📚",
-  "Lazer": "🎬",
-  "Compras": "🛍️",
-  "Contas & Serviços": "🧾",
-  "Salário": "💼",
-  "Freelance/Extra": "💰",
-  "Investimentos": "📈",
-  "Reembolso": "↩️",
-  "Presente": "🎁",
-};
-const emojiFor = (t) =>
-  CATEGORY_EMOJI[t.category] ?? (t.type === "INCOME" ? "🪙" : "💸");
 
 // "Hoje" / "Ontem" / "N dias atrás" / dd/mm/aaaa — para as movimentações.
 function relativeDay(value) {
@@ -88,16 +71,6 @@ function relativeDay(value) {
   if (diff === 1) return "Ontem";
   if (diff < 7) return `${diff} dias atrás`;
   return formatDateBR(value);
-}
-
-// Ícone contextual dos insights da IA (heurística simples em pt-BR).
-function insightIcon(text) {
-  const t = text.toLowerCase();
-  if (/(caminho certo|parab|bom |ótimo|no azul|guarda|econom|caíram|caiu|reduz)/.test(t))
-    return Check;
-  if (/(crítico|urgente|déficit|acima|estour|exced|negativ|cuidado|risco|falta|imped|ausência|não )/.test(t))
-    return AlertTriangle;
-  return Sparkles;
 }
 
 // Janela do heatmap "Ritmo financeiro" (dias, terminando hoje)
@@ -116,48 +89,7 @@ function monthsForWindow(days) {
   return months;
 }
 
-// Tooltip escuro reutilizável, formatado em R$
-function ChartTooltip({ active, payload, label }) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="rounded-xl bg-surface-inset border border-line/10 px-3 py-2 shadow-xl">
-      {label && (
-        <p className="text-[11px] font-medium text-content-2 mb-1 capitalize">
-          {label}
-        </p>
-      )}
-      {payload.map((p) => (
-        <div key={p.name} className="flex items-center gap-2 text-xs">
-          <span
-            className="w-2 h-2 rounded-full"
-            style={{ background: p.color || p.payload?.fill }}
-          />
-          <span className="text-content-2">{p.name}</span>
-          <span className="ml-auto font-semibold text-content tnum">
-            {formatBRL(p.value)}
-          </span>
-        </div>
-      ))}
-    </div>
-  );
-}
 
-// Valor monetário grande com os centavos rebaixados ("R$ 8.240" + ",50").
-// Mesmo tratamento do Money.jsx: centavos são informação secundária, não acento.
-function MoneyHero({ value }) {
-  const formatted = formatBRL(value);
-  const idx = formatted.lastIndexOf(",");
-  return (
-    <span className="tnum tracking-tight">
-      <span className="text-4xl font-semibold text-content">
-        {formatted.slice(0, idx)}
-      </span>
-      <span className="text-2xl font-semibold text-content-2">
-        {formatted.slice(idx)}
-      </span>
-    </span>
-  );
-}
 
 export default function Dashboard() {
   const [wallets, setWallets] = useState([]);
@@ -169,17 +101,16 @@ export default function Dashboard() {
   const [selectedWallet, setSelectedWallet] = useState("all");
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
 
   useEffect(() => {
     async function loadData() {
-      await recurringApi.run().catch(() => {}); // materializa recorrências vencidas
       const streakMonths = monthsForWindow(STREAK_DAYS);
       // allSettled: falha de um painel (ex.: IA) não derruba os demais
       const [wRes, tRes, sRes, iRes, gRes, ...streakRes] =
         await Promise.allSettled([
           walletsApi.list(),
-          transactionsApi.list(),
+          transactionsApi.list({ limit: 5 }),
           dashboardApi.summary(),
           aiApi.getInsight(),
           goalsApi.list(),
@@ -238,9 +169,6 @@ export default function Dashboard() {
   }));
   const categoryTotal = categoryData.reduce((sum, c) => sum + c.value, 0);
   const categoryMax = Math.max(1, ...categoryData.map((c) => c.value));
-  const topCategoryPct = categoryTotal
-    ? Math.round((categoryData[0]?.value / categoryTotal) * 100)
-    : 0;
 
   // Ponto de fim de linha do fluxo de caixa (detalhe do rascunho aprovado)
   const endDot = (color) =>
@@ -266,24 +194,6 @@ export default function Dashboard() {
     [streakTx],
   );
 
-  // Intensidade do heatmap: escala sequencial própria (--heat-*), nunca a
-  // paleta categórica do donut — reusá-la aqui faria o painel parecer que
-  // codifica categoria, quando codifica intensidade. 4 = folga total,
-  // 2 = raspou a cota, over = estourou, 0 = dia sem lançamento.
-  function heatLevel(cell) {
-    if (!cell.active) return 0;
-    if (!cell.onPace) return "over";
-    const folga = headroom(cell, ritmo.dailyPace);
-    if (folga > 0.66) return 4;
-    if (folga > 0.33) return 3;
-    return 2;
-  }
-  const heatColor = (level) =>
-    level === "over" ? "rgb(var(--heat-over))" : `rgb(var(--heat-${level}))`;
-  const heatGlow = (level) =>
-    level === "over" || level >= 3
-      ? { boxShadow: `0 0 12px -2px ${heatColor(level)}` }
-      : undefined;
 
   // ── Meta em destaque: a SAVINGS mais próxima de concluir ──
   const featuredGoal = goals
@@ -312,8 +222,6 @@ export default function Dashboard() {
       </div>
     );
   }
-
-  const insightItems = insight?.summary_text?.split("|") || [];
 
   const walletOptions = [
     { value: "all", label: "Todas as carteiras" },
@@ -377,7 +285,11 @@ export default function Dashboard() {
 
           <div className="relative">
             <div className="flex items-baseline gap-2">
-              <MoneyHero value={shownBalance} />
+              <Money
+                value={shownBalance}
+                className="tracking-tight text-4xl font-semibold text-content"
+                centsClassName="text-2xl font-semibold text-content-2"
+              />
               <span className="text-xs font-medium text-content-3">BRL</span>
             </div>
             {balanceChange !== undefined && (
@@ -440,152 +352,9 @@ export default function Dashboard() {
 
       {/* ── Linha 2: categorias + ritmo + meta ──────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        {/* Onde vai seu dinheiro */}
-        <div className="lg:col-span-4 glass p-6">
-          <div>
-            <h2 className="font-semibold text-content">
-              Onde vai seu dinheiro
-            </h2>
-            <p className="text-xs text-content-2 mt-0.5">
-              <span className="capitalize">
-                {new Date().toLocaleDateString("pt-BR", { month: "long" })}
-              </span>
-              {categoryTotal > 0 && (
-                <span className="tnum"> · {formatBRL(categoryTotal)} no total</span>
-              )}
-            </p>
-          </div>
+        <CategoryDonut data={categoryData} total={categoryTotal} />
 
-          {categoryData.length === 0 ? (
-            <div className="flex items-center justify-center h-[150px] text-content-3 text-xs text-center px-4">
-              Registre despesas para ver a distribuição por categoria
-            </div>
-          ) : (
-            <div className="flex items-center gap-5 mt-4">
-              <div className="relative w-[128px] h-[128px] shrink-0">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={categoryData}
-                      dataKey="value"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={46}
-                      outerRadius={62}
-                      paddingAngle={categoryData.length > 1 ? 3 : 0}
-                      cornerRadius={6}
-                      startAngle={90}
-                      endAngle={-270}
-                      stroke="none"
-                    >
-                      {categoryData.map((c) => (
-                        <Cell key={c.name} fill={colorForCategory(c.name)} />
-                      ))}
-                    </Pie>
-                    <Tooltip content={<ChartTooltip />} cursor={false} />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                  <span className="text-[10px] text-content-3 uppercase tracking-widest">
-                    Maior
-                  </span>
-                  <span className="text-[15px] font-semibold text-accent tnum mt-0.5">
-                    {topCategoryPct}%
-                  </span>
-                </div>
-              </div>
-
-              {/* Legenda: quadradinho de cor + categoria + % (valor no tooltip) */}
-              <div className="flex-1 flex flex-col gap-2 min-w-0">
-                {categoryData.map((c) => {
-                  const pct = categoryTotal
-                    ? Math.round((c.value / categoryTotal) * 100)
-                    : 0;
-                  return (
-                    <div key={c.name} className="flex items-center gap-2 text-xs">
-                      <span
-                        className="w-2 h-2 rounded-[3px] shrink-0"
-                        style={{ background: colorForCategory(c.name) }}
-                      />
-                      <span className="text-content-2 flex-1 truncate">
-                        {c.name}
-                      </span>
-                      <span className="text-content-2 tnum">{pct}%</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Ritmo financeiro: dias dentro da cota diária + streak como bônus */}
-        <div className="lg:col-span-5 glass p-6 flex flex-col">
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <h2 className="font-semibold text-content">Ritmo financeiro</h2>
-              <p className="text-xs text-content-2 mt-0.5">
-                {!ritmo.hasActivity
-                  ? "Registre lançamentos para acompanhar seu ritmo"
-                  : !ritmo.hasPace
-                    ? "Registre uma receita para calcular seu ritmo"
-                    : `${ritmo.onPaceCount} dos últimos ${STREAK_DAYS} dias no seu ritmo`}
-              </p>
-            </div>
-            {/* Só a partir de 3 dias: sequência curta vira cobrança, não prêmio */}
-            {ritmo.hasPace && ritmo.streak >= 3 && (
-              <span className="chip bg-accent/15 text-accent">
-                🔥 {ritmo.streak}
-              </span>
-            )}
-          </div>
-
-          <div
-            className="grid gap-1 mt-4"
-            style={{ gridTemplateColumns: "repeat(14, minmax(0, 1fr))" }}
-          >
-            {ritmo.cells.map((cell, i) => {
-              const level = heatLevel(cell);
-              return (
-                <div
-                  key={cell.key}
-                  title={`${formatDateBR(cell.key)} · ${
-                    cell.active
-                      ? `${formatBRL(cell.spent)} de ${formatBRL(ritmo.dailyPace)}`
-                      : "sem lançamentos"
-                  }`}
-                  style={{
-                    backgroundColor: heatColor(level),
-                    ...heatGlow(level),
-                  }}
-                  className={`heat-cell ${
-                    i === ritmo.cells.length - 1
-                      ? "ring-1 ring-accent ring-offset-1 ring-offset-surface"
-                      : ""
-                  }`}
-                />
-              );
-            })}
-          </div>
-
-          <div className="flex items-center justify-between mt-auto pt-4">
-            <span className="text-[11px] text-content-3">
-              Últimos {STREAK_DAYS} dias
-            </span>
-            <span className="flex items-center gap-1 text-[11px] text-content-3">
-              Menos
-              {[0, 1, 2, 3, 4].map((level) => (
-                <span
-                  key={level}
-                  className="heat-cell w-2.5 h-2.5 shrink-0"
-                  style={{ backgroundColor: heatColor(level) }}
-                />
-              ))}
-              Mais
-            </span>
-          </div>
-        </div>
+        <RitmoCard ritmo={ritmo} dias={STREAK_DAYS} />
 
         {/* Meta em destaque */}
         <div className="lg:col-span-3 relative overflow-hidden glass border-income/25 p-6 flex flex-col">
@@ -621,6 +390,7 @@ export default function Dashboard() {
                 </p>
                 <div
                   role="progressbar"
+                  aria-label={`Progresso da meta ${featuredGoal.name}`}
                   aria-valuenow={goalPct}
                   aria-valuemin={0}
                   aria-valuemax={100}
@@ -757,76 +527,7 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Leitura da IA */}
-        <div className="lg:col-span-4 relative overflow-hidden glass border-accent/20 p-6 flex flex-col gap-3">
-          {/* Segundo e último glow do dashboard: presença da IA (ver DESIGN.md) */}
-          <div
-            className="absolute inset-0 pointer-events-none"
-            style={{ background: "var(--glow-accent)" }}
-          />
-          <div className="relative flex items-center gap-3">
-            <AiOrb size={34} />
-            <div>
-              <h2 className="font-semibold text-content">Leitura da IA</h2>
-              <p className="text-[11px] text-accent tracking-wide">
-                resumo do seu comportamento
-              </p>
-            </div>
-          </div>
-          {insightItems.length === 0 ? (
-            <div className="flex-1 flex items-center justify-center text-content-3 text-xs text-center">
-              Adicione transações para gerar sua análise de IA
-            </div>
-          ) : (
-            <div className="flex flex-col gap-2 flex-1">
-              {insightItems.map((item, i) => {
-                const text = item.trim();
-                // 1º insight = destaque; demais ganham chip de ícone contextual
-                if (i === 0) {
-                  return (
-                    <div
-                      key={i}
-                      className="stroke-iris p-3.5 rounded-xl text-[13px] font-semibold text-content leading-relaxed"
-                    >
-                      {text}
-                    </div>
-                  );
-                }
-                const Icon = insightIcon(text);
-                return (
-                  <div
-                    key={i}
-                    className="inset-panel flex items-start gap-3 p-3 text-xs text-content-2 leading-relaxed"
-                  >
-                    <span className="shrink-0 w-9 h-9 rounded-xl bg-accent/[0.12] border border-accent/25 grid place-items-center text-accent">
-                      <Icon size={16} />
-                    </span>
-                    {text}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {insight?.suggested_action && (
-            <div className="p-3 rounded-xl bg-accent/10 border border-accent/20">
-              <p className="text-[11px] font-semibold text-accent mb-1 uppercase tracking-wider">
-                Sugestão prática
-              </p>
-              <p className="text-xs text-content-2">
-                {insight.suggested_action}
-              </p>
-            </div>
-          )}
-
-          <Button
-            onClick={() => navigate("/ai")}
-            variant="ghost"
-            className="w-full stroke-iris bg-transparent text-accent font-semibold hover:bg-accent/[0.06]"
-          >
-            Conversar com a Norby <ArrowRight size={14} />
-          </Button>
-        </div>
+        <InsightCard insight={insight} />
       </div>
 
       {/* ── Linha 4: gastos por categoria + movimentações recentes ──── */}
@@ -911,11 +612,11 @@ export default function Dashboard() {
                 return (
                   <div
                     key={t.id}
-                    className="flex items-center justify-between py-2.5 border-b border-white/5 last:border-0"
+                    className="flex items-center justify-between py-2.5 border-b border-line/5 last:border-0"
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="w-9 h-9 rounded-[10px] bg-surface-inset flex items-center justify-center shrink-0 text-base">
-                        {emojiFor(t)}
+                        {emojiForCategory(t.category, t.type)}
                       </div>
                       <div className="min-w-0">
                         <p className="text-[13px] font-medium text-content truncate">

@@ -104,13 +104,13 @@ async def test_login_runs_bcrypt_even_for_unknown_email(client, monkeypatch):
     import app.routers.auth as auth_router
 
     calls = []
-    real = auth_router.verify_password
+    real = auth_router.verify_and_upgrade
 
     def spy(plain, hashed):
         calls.append(hashed)
         return real(plain, hashed)
 
-    monkeypatch.setattr(auth_router, "verify_password", spy)
+    monkeypatch.setattr(auth_router, "verify_and_upgrade", spy)
 
     res = await client.post(
         "/auth/login", json={"email": "ninguem@test.com", "password": "secret123"}
@@ -165,3 +165,162 @@ async def test_register_persists_consent_timestamp(client, db_session):
         await db_session.execute(select(User).where(User.email == "carol@test.com"))
     ).scalar_one()
     assert user.privacy_accepted_at is not None
+
+
+@pytest.mark.asyncio
+async def test_register_rejects_password_over_72_bytes(client):
+    # bcrypt trunca em 72 bytes. Sem o teto, o sufixo seria ignorado e a senha
+    # longa se comportaria como uma senha de 72 bytes disfarçada.
+    res = await client.post("/auth/register", json={
+        "name": "Dave", "email": "dave@test.com",
+        "password": "A" * 72 + "1", "accept_privacy": True,
+    })
+    assert res.status_code == 422
+    assert any("72 bytes" in error["msg"] for error in res.json()["detail"])
+
+
+@pytest.mark.asyncio
+async def test_register_counts_password_bytes_not_characters(client):
+    # 36 caracteres acentuados mais A1 ocupam 74 bytes e ultrapassam o limite
+    # real do bcrypt apesar de passarem no max_length=128 do Pydantic.
+    res = await client.post("/auth/register", json={
+        "name": "Erin", "email": "erin@test.com",
+        "password": "á" * 36 + "A1", "accept_privacy": True,
+    })
+    assert res.status_code == 422
+    assert any("72 bytes" in error["msg"] for error in res.json()["detail"])
+
+
+@pytest.mark.asyncio
+async def test_new_passwords_use_bcrypt_sha256(client, db_session):
+    from sqlalchemy import select
+    from app.models.sql_models import User
+
+    await client.post("/auth/register", json={
+        "name": "Fay", "email": "fay@test.com",
+        "password": "secret123", "accept_privacy": True,
+    })
+    user = (await db_session.execute(
+        select(User).where(User.email == "fay@test.com")
+    )).scalar_one()
+    assert user.password_hash.startswith("$bcrypt-sha256$")
+
+
+def test_verify_and_upgrade_rehashes_legacy_bcrypt():
+    from passlib.hash import bcrypt
+    from app.services.auth_service import verify_and_upgrade
+
+    legacy = bcrypt.using(rounds=12).hash("secret123")
+    ok, upgraded = verify_and_upgrade("secret123", legacy)
+    assert ok is True
+    assert upgraded is not None and upgraded.startswith("$bcrypt-sha256$")
+
+    ok, upgraded = verify_and_upgrade("senha-errada", legacy)
+    assert ok is False
+    assert upgraded is None
+
+
+@pytest.mark.asyncio
+async def test_login_persists_upgraded_legacy_bcrypt_hash(client, db_session):
+    from passlib.hash import bcrypt
+    from app.models.sql_models import User
+
+    user = User(
+        name="Gus",
+        email="gus@test.com",
+        password_hash=bcrypt.using(rounds=12).hash("secret123"),
+    )
+    db_session.add(user)
+    await db_session.commit()
+
+    response = await client.post(
+        "/auth/login", json={"email": "gus@test.com", "password": "secret123"}
+    )
+    assert response.status_code == 200
+
+    await db_session.refresh(user)
+    assert user.password_hash.startswith("$bcrypt-sha256$")
+
+
+@pytest.mark.asyncio
+async def test_delete_account_rate_limit_is_per_user(client, mongo):
+    from app.limiter import limiter
+
+    async def register(name, email):
+        response = await client.post("/auth/register", json={
+            "name": name, "email": email,
+            "password": "secret123", "accept_privacy": True,
+        })
+        assert response.status_code == 201, response.text
+        return {"Authorization": f"Bearer {response.json()['access_token']}"}
+
+    attacker = await register("Mal", "mal@test.com")
+    victim = await register("Vic", "vic@test.com")
+
+    # A fixture global desliga o limiter. Religamos só depois do cadastro para
+    # medir exclusivamente o balde do DELETE /auth/me.
+    limiter.reset()
+    limiter.enabled = True
+    try:
+        for _ in range(3):
+            response = await client.request(
+                "DELETE", "/auth/me", headers=attacker,
+                json={"confirm": True, "password": "errada"},
+            )
+            assert response.status_code == 401
+
+        response = await client.request(
+            "DELETE", "/auth/me", headers=victim,
+            json={"confirm": True, "password": "secret123"},
+        )
+        assert response.status_code == 204
+    finally:
+        limiter.enabled = False
+        limiter.reset()
+
+@pytest.mark.asyncio
+async def test_update_me_ignores_explicit_null(make_auth_client):
+    ac = await make_auth_client("Alice")
+    antes = (await ac.get("/auth/me")).json()
+
+    res = await ac.put("/auth/me", json={"name": None})
+    assert res.status_code == 200
+    assert res.json()["name"] == antes["name"]
+
+
+@pytest.mark.asyncio
+async def test_update_me_rejects_long_name(make_auth_client):
+    # UserRegister limita o nome a 100 chars, UserUpdate não limitava nada:
+    # o valor batia no String(100) da coluna e virava 500.
+    ac = await make_auth_client("Alice")
+    res = await ac.put("/auth/me", json={"name": "x" * 300})
+    assert res.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_update_me_rejects_empty_name(make_auth_client):
+    ac = await make_auth_client("Alice")
+    res = await ac.put("/auth/me", json={"name": ""})
+    assert res.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_update_me_changes_name(make_auth_client):
+    # Caminho feliz: a rota não tinha nenhum teste antes desta fase.
+    ac = await make_auth_client("Alice")
+    res = await ac.put("/auth/me", json={"name": "Nome Novo"})
+    assert res.status_code == 200
+    assert res.json()["name"] == "Nome Novo"
+
+
+@pytest.mark.asyncio
+async def test_update_me_enforces_the_same_floor_as_register(make_auth_client):
+    # O cadastro exige 2 caracteres. Se o update aceitasse 1, ele viraria uma
+    # porta dos fundos para um nome que o cadastro recusaria.
+    ac = await make_auth_client("Alice")
+    res = await ac.put("/auth/me", json={"name": "A"})
+    assert res.status_code == 422
+
+    ok = await ac.put("/auth/me", json={"name": "Al"})
+    assert ok.status_code == 200
+

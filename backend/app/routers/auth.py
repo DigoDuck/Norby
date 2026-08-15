@@ -7,14 +7,14 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.dependencies import get_db, get_current_user
-from app.limiter import limiter
+from app.limiter import limiter, user_key
 from app.models.sql_models import User
 from app.schemas.user import (
     UserRegister, UserLogin, UserUpdate, Token, TokenPair, RefreshRequest,
     DeleteAccountRequest, UserResponse,
 )
 from app.services.auth_service import (
-    hash_password, verify_password, create_access_token,
+    hash_password, verify_password, verify_and_upgrade, create_access_token,
     create_refresh_token, rotate_refresh_token, revoke_refresh_token,
     _DUMMY_HASH,
 )
@@ -55,12 +55,19 @@ async def login(request: Request, payload: UserLogin, db: AsyncSession = Depends
 
     # bcrypt roda SEMPRE — contra o hash real ou contra o dummy. Sem isso, o
     # e-mail inexistente retorna ~200ms mais rápido e vira oráculo de enumeração.
-    # verify_password é bloqueante → offload para thread.
-    password_ok = await asyncio.to_thread(
-        verify_password, payload.password, user.password_hash if user else _DUMMY_HASH
+    # verify_and_upgrade é bloqueante e também produz o hash novo quando o
+    # usuário ainda está no bcrypt legado.
+    password_ok, upgraded_hash = await asyncio.to_thread(
+        verify_and_upgrade,
+        payload.password,
+        user.password_hash if user else _DUMMY_HASH,
     )
     if not user or not password_ok:
         raise HTTPException(status_code=401, detail="Credenciais inválidas")
+
+    if upgraded_hash:
+        user.password_hash = upgraded_hash
+        await db.commit()
 
     access = create_access_token(str(user.id))
     refresh = await create_refresh_token(str(user.id), db)
@@ -76,7 +83,18 @@ async def refresh_token(request: Request, payload: RefreshRequest, db: AsyncSess
     return TokenPair(access_token=access, refresh_token=new_refresh)
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
-async def logout(payload: RefreshRequest, db: AsyncSession = Depends(get_db)):
+# Desde que o logout passou a derrubar TODAS as sessões ao receber um token já
+# rotacionado, ele carrega o mesmo poder do /auth/refresh e ganha o mesmo teto.
+# Sem isso, quem tivesse um refresh antigo da vítima poderia derrubar as sessões
+# dela em loop, sem limite, mesmo depois de ela logar de novo.
+# A chave é o IP (balde compartilhado atrás do proxy, ver "Rate limit atrás do
+# proxy" no AGENTS.md): o logout é anônimo, então não há id de usuário para usar.
+@limiter.limit("20/minute")
+async def logout(
+    request: Request,
+    payload: RefreshRequest,
+    db: AsyncSession = Depends(get_db),
+):
     # Revoga o refresh recebido. Idempotente: token inexistente também retorna 204.
     await revoke_refresh_token(payload.refresh_token, db)
 
@@ -90,7 +108,8 @@ async def update_me(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    data = payload.model_dump(exclude_unset=True)
+    # exclude_none: `null` explícito no corpo gravaria NULL em coluna NOT NULL.
+    data = payload.model_dump(exclude_none=True)
 
     # Se o email mudar, garante que não está em uso por outro usuário
     new_email = data.get("email")
@@ -117,7 +136,9 @@ async def export_my_data(
     return JSONResponse(content=jsonable_encoder(data), headers=headers)
 
 @router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
-@limiter.limit("3/minute")
+# Atrás do proxy do Railway, limitar por IP criaria um único balde para todos
+# os usuários. A chave autenticada impede que uma conta bloqueie as demais.
+@limiter.limit("3/minute", key_func=user_key)
 async def delete_my_account(
     request: Request,
     payload: DeleteAccountRequest,

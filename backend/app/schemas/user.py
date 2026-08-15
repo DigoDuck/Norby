@@ -4,8 +4,10 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 from uuid import UUID
 from datetime import datetime
 
+from app.schemas.common import PersonName
+
 class UserRegister(BaseModel):
-    name: str = Field(min_length=2, max_length=100)
+    name: PersonName
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
     # LGPD: aceite explícito, registrado no servidor. O frontend já pedia o
@@ -20,6 +22,15 @@ class UserRegister(BaseModel):
             raise ValueError("A senha deve ter ao menos 8 caracteres, incluindo uma letra e um número")
         return v
 
+    @field_validator("password")
+    @classmethod
+    def cabe_no_bcrypt(cls, v: str) -> str:
+        # O bcrypt trunca em 72 bytes e ignora o resto sem avisar. O max_length
+        # do Field conta caracteres, enquanto um acento ocupa mais de um byte.
+        if len(v.encode("utf-8")) > 72:
+            raise ValueError("A senha deve ter no máximo 72 bytes (acentos contam 2)")
+        return v
+
     @field_validator("accept_privacy")
     @classmethod
     def deve_aceitar(cls, v: bool) -> bool:
@@ -32,7 +43,10 @@ class UserLogin(BaseModel):
     password: str
 
 class UserUpdate(BaseModel):
-    name: str | None = None
+    # Mesmo tipo do cadastro: sem limite, um nome de 300 chars estourava o
+    # String(100) da coluna (500), e o update não pode ser uma porta dos fundos
+    # para um nome que o cadastro recusaria.
+    name: PersonName | None = None
     email: EmailStr | None = None
     
 class UserResponse(BaseModel):

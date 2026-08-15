@@ -8,6 +8,17 @@ from app.schemas.wallet import WalletCreate, WalletUpdate, WalletResponse
 
 router = APIRouter(prefix="/wallets", tags=["Wallets"])
 
+
+async def _get_owned_wallet(wallet_id: UUID, user: User, db: AsyncSession) -> Wallet:
+    """Carteira do usuário, ou 404. Mesmo molde de `_get_owned_goal` em goals.py."""
+    wallet = (await db.execute(
+        select(Wallet).where(Wallet.id == wallet_id, Wallet.user_id == user.id)
+    )).scalar_one_or_none()
+    if not wallet:
+        raise HTTPException(status_code=404, detail="Carteira não encontrada")
+    return wallet
+
+
 @router.get("/", response_model=list[WalletResponse]) 
 async def list_wallets( # Retorna a lista de carteiras do usuário
     limit: int = Query(100, ge=1, le=500),
@@ -43,12 +54,7 @@ async def update_wallet(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    result = await db.execute(
-        select(Wallet).where(Wallet.id == wallet_id, Wallet.user_id == current_user.id)
-    )
-    wallet = result.scalar_one_or_none()
-    if not wallet:
-        raise HTTPException(status_code=404, detail="Carteira não encontrada")
+    wallet = await _get_owned_wallet(wallet_id, current_user, db)
 
     for field, value in payload.model_dump(exclude_none=True).items():
         setattr(wallet, field, value)
@@ -63,12 +69,7 @@ async def delete_wallet(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(
-        select(Wallet).where(Wallet.id == wallet_id, Wallet.user_id == current_user.id)
-    )
-    wallet = result.scalar_one_or_none()
-    if not wallet:
-        raise HTTPException(status_code=404, detail="Carteira não encontrada")
+    wallet = await _get_owned_wallet(wallet_id, current_user, db)
 
     await db.delete(wallet)
     await db.commit()

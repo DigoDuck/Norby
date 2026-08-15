@@ -16,7 +16,12 @@ router = APIRouter(prefix="/transactions", tags=["Transactions"])
 # ponytail: locks são adquiridos na ordem transação → carteira antiga → carteira
 # nova. Duas transações DIFERENTES trocando as mesmas duas carteiras em sentidos
 # opostos ainda podem deadlockar (o Postgres detecta e aborta uma, virando 500).
-# Se isso aparecer em produção, ordenar os locks de carteira por UUID.
+# O mesmo ciclo alcança `materialize_due_recurring` (services/recurring_service.py),
+# que desde 2026-08-15 também trava carteiras, na ordem em que os templates saem
+# do SELECT: um /recurring/run segurando a carteira A e querendo a B fecha o ciclo
+# com um update movendo transação de B para A.
+# Se isso aparecer em produção, ordenar os locks de carteira por UUID nos DOIS
+# caminhos — ordenar só aqui não desfaz o ciclo.
 async def _get_owned_wallet(
     wallet_id: UUID,
     user: User,
@@ -68,7 +73,9 @@ async def list_transactions(
     category: Optional[str] = Query(None),
     type: Optional[TransactionType] = Query(None),
     month: Optional[int] = Query(None, ge=1, le=12),
-    year: Optional[int] = Query(None),
+    # Faixa obrigatória: sem ela, date(year, month, 1) levanta ValueError para
+    # ano fora do suportado e o erro vira 500 no handler global.
+    year: Optional[int] = Query(None, ge=1900, le=2100),
     limit: int = Query(200, ge=1, le=500),
     offset: int = Query(0, ge=0),
     current_user: User = Depends(get_current_user),
@@ -80,6 +87,13 @@ async def list_transactions(
         filters.append(Transaction.category.ilike(f"%{category}%"))
     if type:
         filters.append(Transaction.type == type)
+    # month e year andam juntos. Aceitar um sozinho devolvia 200 com o filtro
+    # silenciosamente ignorado: o cliente pedia junho e recebia o histórico
+    # inteiro achando que era junho.
+    if (month is None) != (year is None):
+        raise HTTPException(
+            status_code=422, detail="Informe month e year juntos, ou nenhum dos dois"
+        )
     if month and year:
         # Intervalo [início do mês, início do mês seguinte) — helper único, correto p/ dezembro
         start, end = current_month_range(date(year, month, 1))
@@ -120,7 +134,11 @@ async def update_transaction(
 ):
     transaction = await _get_owned_transaction(transaction_id, current_user, db)
 
-    data = payload.model_dump(exclude_unset=True)
+    # exclude_none, não exclude_unset: um `null` explícito no corpo conta como
+    # "set", então passava pelo filtro e era gravado numa coluna NOT NULL,
+    # virando IntegrityError e 500. O único campo legitimamente anulável é
+    # description, e string vazia continua limpando ele.
+    data = payload.model_dump(exclude_none=True)
 
     # Valores finais: o que veio no payload sobrescreve o atual
     new_wallet_id = data.get("wallet_id", transaction.wallet_id)

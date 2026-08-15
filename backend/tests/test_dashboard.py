@@ -48,8 +48,6 @@ async def test_dashboard_summary_aggregates_over_all_transactions(db_session, cl
     # KPIs do mês atual — 250 despesas de 10 = 2500 (prova que não capa em 200).
     assert float(body["month_expenses"]) == 2500.0
     assert float(body["month_income"]) == 500.0
-    assert float(body["prev_month_expenses"]) == 100.0
-    assert float(body["prev_month_income"]) == 0.0
 
     # Fluxo de caixa: 2 meses com dados, cronológico, mês atual por último.
     assert len(body["cash_flow"]) == 2

@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel, Field
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,6 +7,7 @@ from app.limiter import limiter, user_key
 from app.models.sql_models import User
 from app.services.ai_service import get_or_generate_insight, chat_with_ai
 from app.schemas.ai import (
+    ChatMessage,
     InsightResponse,
     ChatResponse,
     ChatSessionSummary,
@@ -23,15 +23,6 @@ router = APIRouter(prefix="/ai", tags=["AI"])
 CHAT_SESSIONS_LIMIT = 20  # nº de sessões de chat recentes listadas
 
 
-class ChatMessage(BaseModel):
-    # Teto de tamanho: sem ele, uma mensagem enorme queima quota do Gemini,
-    # CPU e espaço no Mongo. 4000 chars cobrem qualquer pergunta real.
-    message: str = Field(min_length=1, max_length=4000)
-    # UUID em vez de str: o tipo nativo já valida formato e tamanho, e o código
-    # sempre gerou str(uuid4()) — o formato no Mongo não muda.
-    session_id: UUID | None = None
-
-
 @router.get("/insight", response_model=InsightResponse)
 @limiter.limit("30/minute", key_func=user_key)
 async def get_dashboard_insight(
@@ -40,8 +31,7 @@ async def get_dashboard_insight(
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        now = datetime.now(timezone.utc)
-        insight = await get_or_generate_insight(db, str(current_user.id), now.month, now.year)
+        insight = await get_or_generate_insight(db, str(current_user.id))
         return insight
     except Exception:
         # Widget opcional do dashboard: degrada com elegância em vez de derrubar a tela.

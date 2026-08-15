@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Plus, Pencil, Trash2, Wallet } from "lucide-react";
 import { walletsApi } from "@/api/wallets";
-import { apiErrorMessage, formatBRL } from "@/lib/utils";
+import { apiErrorMessage, formatBRL, shadcnInputCls } from "@/lib/utils";
 import { CHART_SERIES, hashIndex } from "@/lib/palette";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import Money from "@/components/shared/Money";
@@ -25,6 +25,12 @@ export default function Wallets() {
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ name: "", balance: "" });
+  const nomeId = useId();
+  const saldoId = useId();
+  // Qual botão abriu o diálogo. O Dialog é controlado por estado, sem
+  // DialogTrigger, então o Base UI não tem para onde devolver o foco ao fechar
+  // e o usuário de teclado caía no body.
+  const ultimoGatilho = useRef(null);
 
   async function load() {
     const res = await walletsApi.list();
@@ -65,14 +71,16 @@ export default function Wallets() {
     load();
   }
 
-  function openNew() {
+  function openNew(e) {
+    ultimoGatilho.current = e?.currentTarget ?? null;
     setEditing(null);
     setError(null);
     setForm({ name: "", balance: "" });
     setOpen(true);
   }
 
-  function openEdit(wallet) {
+  function openEdit(wallet, e) {
+    ultimoGatilho.current = e?.currentTarget ?? null;
     setEditing(wallet);
     setForm({ name: wallet.name, balance: wallet.balance });
     setError(null);
@@ -87,8 +95,6 @@ export default function Wallets() {
     }
   }
 
-  const inputCls =
-    "bg-surface-inset border-line/10 text-content placeholder:text-content-3";
 
   const totalBalance = wallets.reduce((s, w) => s + parseFloat(w.balance), 0);
 
@@ -118,7 +124,10 @@ export default function Wallets() {
 
       {/* Dialog compartilhado por criar/editar */}
       <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent className="bg-surface border-line/10 text-content">
+        <DialogContent
+          finalFocus={ultimoGatilho}
+          className="bg-surface border-line/10 text-content"
+        >
           <DialogHeader>
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-accent-fill flex items-center justify-center shrink-0">
@@ -139,19 +148,20 @@ export default function Wallets() {
 
           <div className="space-y-4 mt-1">
             <div>
-              <label className="block text-xs font-medium text-content-2 mb-2">
+              <label htmlFor={nomeId} className="block text-xs font-medium text-content-2 mb-2">
                 Nome da carteira
               </label>
               <Input
+                id={nomeId}
                 placeholder="Ex.: Nubank, Caixa, Carteira…"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className={inputCls}
+                className={shadcnInputCls}
               />
             </div>
             {!editing && (
               <div>
-                <label className="block text-xs font-medium text-content-2 mb-2">
+                <label htmlFor={saldoId} className="block text-xs font-medium text-content-2 mb-2">
                   Saldo inicial
                 </label>
                 <div className="relative">
@@ -159,6 +169,7 @@ export default function Wallets() {
                     R$
                   </span>
                   <Input
+                    id={saldoId}
                     type="number"
                     step="0.01"
                     placeholder="0,00"
@@ -166,7 +177,7 @@ export default function Wallets() {
                     onChange={(e) =>
                       setForm({ ...form, balance: e.target.value })
                     }
-                    className={`${inputCls} pl-10`}
+                    className={`${shadcnInputCls} pl-10`}
                   />
                 </div>
               </div>
@@ -248,7 +259,7 @@ export default function Wallets() {
                 <div className="flex items-center gap-1.5 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 focus-within:opacity-100">
                   <button
                     type="button"
-                    onClick={() => openEdit(w)}
+                    onClick={(e) => openEdit(w, e)}
                     title="Editar"
                     className="w-8 h-8 flex items-center justify-center rounded-lg border border-line/10 text-content-3 hover:text-content hover:border-line/20 transition-colors"
                   >

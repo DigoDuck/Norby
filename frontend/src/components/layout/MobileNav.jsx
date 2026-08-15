@@ -1,14 +1,19 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { Menu, X, LogOut } from "lucide-react";
 import { authApi } from "../../api/auth";
 import NorbyMark from "../shared/Logo";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { mainItems, prefItems } from "./navItems";
 
 // Abaixo de lg a sidebar vira gaveta. Todas as rotas e o logout continuam
 // acessíveis — nada é escondido, só recolhido.
 export default function MobileNav() {
   const [open, setOpen] = useState(false);
+  // finalFocus explícito em vez de depender do "quem estava focado antes" do
+  // Base UI: se a gaveta for aberta por qualquer caminho que não tenha focado
+  // o hambúrguer, o foco ainda volta para ele em vez de cair no body.
+  const hamburguer = useRef(null);
   const navigate = useNavigate();
   const items = [...mainItems, ...prefItems];
 
@@ -21,6 +26,7 @@ export default function MobileNav() {
     <>
       <header className="lg:hidden fixed top-0 inset-x-0 z-30 glass rounded-none flex items-center gap-3 px-4 h-14">
         <button
+          ref={hamburguer}
           type="button"
           onClick={() => setOpen(true)}
           aria-label="Abrir menu"
@@ -35,15 +41,18 @@ export default function MobileNav() {
         <p className="font-bold text-content">Norby</p>
       </header>
 
-      {open && (
-        <div className="lg:hidden fixed inset-0 z-40 flex">
-          <button
-            type="button"
-            aria-label="Fechar menu"
-            onClick={() => setOpen(false)}
-            className="absolute inset-0 bg-overlay/70"
-          />
-          <nav className="relative w-72 max-w-[85vw] h-full glass rounded-none flex flex-col px-4 py-6 gap-1">
+      {/* Dialog em vez de `{open && <div>}`: traz trap de foco, fechar no Esc e
+          devolução do foco ao gatilho sem código próprio. Como div solto, a
+          página de trás continuava navegável por Tab e o foco se perdia no
+          fechamento. O backdrop clicável também vem do primitivo. */}
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent
+          finalFocus={hamburguer}
+          showCloseButton={false}
+          aria-label="Menu de navegação"
+          className="lg:hidden inset-y-0 left-0 top-0 w-72 max-w-[85vw] translate-x-0 translate-y-0 gap-0 rounded-none bg-transparent p-0 ring-0"
+        >
+          <nav className="relative h-full w-full glass rounded-none flex flex-col px-4 py-6 gap-1">
             <button
               type="button"
               onClick={() => setOpen(false)}
@@ -82,8 +91,8 @@ export default function MobileNav() {
               <LogOut size={18} /> Sair
             </button>
           </nav>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

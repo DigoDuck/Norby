@@ -78,3 +78,12 @@ export function apiErrorMessage(err, fallback) {
  */
 export const inputCls =
   "w-full h-10 px-3 rounded-xl bg-line/5 border border-line/10 text-content text-sm placeholder:text-content-3 focus:outline-none focus:ring-2 focus:ring-focus/50 transition";
+
+/**
+ * Classe do `<Input>` do shadcn nos formulários. Diferente do `inputCls` acima,
+ * que é do input NATIVO: eram três definições locais com o mesmo nome e valores
+ * diferentes, o que obrigava a caçar qual era qual antes de mexer no estilo.
+ */
+export const shadcnInputCls =
+  "bg-surface-inset border-line/10 text-content placeholder:text-content-3";
+

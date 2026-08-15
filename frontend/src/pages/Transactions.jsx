@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -6,8 +6,7 @@ import { Plus, Search, Trash2, Pencil } from "lucide-react";
 
 import { transactionsApi } from "@/api/transactions";
 import { walletsApi } from "@/api/wallets";
-import { recurringApi } from "@/api/recurring";
-import { categoriesFor, reconcileCategory } from "@/lib/categories";
+import { categoriesFor, emojiForCategory, reconcileCategory, TRANSACTION_TYPE_OPTIONS } from "@/lib/categories";
 import { transactionSchema } from "@/lib/schemas";
 import { apiErrorMessage, formatDateBR, formatBRL, inputCls, toDateInput, todayInput } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
@@ -26,35 +25,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 
-const TYPE_OPTIONS = [
-  {
-    value: "EXPENSE",
-    label: "Despesa",
-    activeClass: "bg-expense/[0.15] text-expense ring-1 ring-inset ring-expense/30",
-  },
-  {
-    value: "INCOME",
-    label: "Receita",
-    activeClass: "bg-income/[0.15] text-income ring-1 ring-inset ring-income/30",
-  },
-];
 
-const CATEGORY_EMOJI = {
-  Alimentação: "🍽️",
-  Moradia: "🏠",
-  Transporte: "🚗",
-  Saúde: "🩺",
-  Educação: "📚",
-  Lazer: "🎬",
-  Compras: "🛍️",
-  "Contas & Serviços": "🧾",
-  Salário: "💼",
-  "Freelance/Extra": "✨",
-  Investimentos: "📈",
-  Reembolso: "↩️",
-  Presente: "🎁",
-  Outros: "🏷️",
-};
 
 // Valores iniciais do formulário (date sempre fresca → função).
 const emptyForm = () => ({
@@ -91,9 +62,18 @@ export default function Transactions() {
     defaultValues: emptyForm(),
   });
 
+  // Contador de sequência: o filtro dispara load() direto no clique, e sem isso
+  // dois cliques rápidos podem ter a resposta ANTIGA chegando por último e
+  // sobrescrevendo a lista, com o botão do filtro novo aparecendo selecionado.
+  // O debounce anterior mascarava isso via clearTimeout; agora é explícito.
+  // ponytail: contador em vez de AbortController — não precisamos abortar a
+  // request, só ignorar a resposta obsoleta. Trocar se o custo da chamada pesar.
+  const requisicaoAtual = useRef(0);
+
   async function load(params = {}) {
-    await recurringApi.run().catch(() => {});
+    const seq = ++requisicaoAtual.current;
     const res = await transactionsApi.list(params);
+    if (seq !== requisicaoAtual.current) return; // resposta obsoleta
     setTransactions(res.data);
   }
 
@@ -103,14 +83,6 @@ export default function Transactions() {
     });
     load();
   }, []);
-
-  useEffect(() => {
-    const timer = setTimeout(
-      () => load(filterType ? { type: filterType } : {}),
-      400,
-    );
-    return () => clearTimeout(timer);
-  }, [filterType]);
 
   // Auto-seleciona a única carteira, sem sobrescrever uma escolha já feita nem
   // atrapalhar a edição.
@@ -206,6 +178,11 @@ export default function Transactions() {
     reload();
   }
 
+  // Teto que o backend aplica na listagem (Query(200, le=500)). A busca é
+  // client-side sobre o que veio, então precisamos saber se batemos no teto
+  // para não afirmar que nada existe quando só não foi carregado.
+  const LISTAGEM_MAX = 200;
+
   const filtered = transactions.filter(
     (t) =>
       t.category.toLowerCase().includes(search.toLowerCase()) ||
@@ -254,7 +231,8 @@ export default function Transactions() {
                         field.onChange(v);
                         setValue("category", reconcileCategory(v, getValues("category")));
                       }}
-                      options={TYPE_OPTIONS}
+                      options={TRANSACTION_TYPE_OPTIONS}
+                      ariaLabel="Tipo"
                     />
                   )}
                 />
@@ -373,6 +351,7 @@ export default function Transactions() {
           <div className="relative flex-1 sm:max-w-xs">
             <Search size={16} className="absolute left-3 top-2.5 text-content-3" />
             <Input
+              aria-label="Buscar transações"
               placeholder="Buscar..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -385,7 +364,10 @@ export default function Transactions() {
                 key={t}
                 type="button"
                 aria-pressed={filterType === t}
-                onClick={() => setFilterType(t)}
+                onClick={() => {
+                  setFilterType(t);
+                  load(t ? { type: t } : {});
+                }}
                 className={`rounded-xl px-3 py-2 text-sm transition-colors ${
                   filterType === t
                     ? "bg-accent-fill text-accent-contrast font-medium"
@@ -483,7 +465,7 @@ export default function Transactions() {
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="flex items-center gap-2 text-sm font-medium text-content">
-                    <span aria-hidden="true">{CATEGORY_EMOJI[t.category] ?? "🏷️"}</span>
+                    <span aria-hidden="true">{emojiForCategory(t.category, t.type)}</span>
                     <span className="truncate">{t.category}</span>
                   </p>
                   <p className="mt-1 truncate text-xs text-content-2">
@@ -541,7 +523,9 @@ export default function Transactions() {
 
         {filtered.length === 0 && (
           <div className="text-center py-12 text-content-3 text-sm">
-            Nenhuma transação encontrada.
+            {search && transactions.length >= LISTAGEM_MAX
+              ? "Nenhuma transação encontrada entre as mais recentes. A busca cobre só as transações já carregadas."
+              : "Nenhuma transação encontrada."}
           </div>
         )}
       </div>

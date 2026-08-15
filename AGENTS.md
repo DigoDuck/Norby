@@ -7,7 +7,8 @@
 
 - **Backend:** FastAPI 0.139 + SQLAlchemy 2.0 async + Alembic · PostgreSQL 16
   (relacional) + MongoDB 7 via Motor (blocos de texto da IA) · Auth JWT
-  (python-jose) · IA Gemini 1.5 Flash · gerenciador de pacotes **uv**.
+  (python-jose) · IA **Gemini 3.5 Flash Lite** (`models/gemini-3.5-flash-lite`,
+  ver `services/ai_service.py`) · gerenciador de pacotes **uv**.
 - **Frontend:** React 19 + Vite 8 · TailwindCSS + shadcn/ui · Zustand ·
   React Router v7 · React Hook Form + Zod · axios.
 
@@ -97,11 +98,29 @@ Roteamento geral em `~/.claude/SKILLS.md`. Aqui só o que é específico do Norb
   antes de varrer arquivo.
 - **Verificação visual** usa a skill de projeto `run-app` (sobe a stack e
   dirige o Edge via Playwright). Frame branco é falha de launch, não sucesso.
-- **Fluxos de tracker do mattpocock não se aplicam** (`triage`, `to-spec`,
-  `to-tickets`, `wayfinder`): specs vivem no Obsidian e `docs/` é gitignored,
-  então não há tracker configurado. Usar `grilling` e `writing-plans`.
+- **Fluxos de tracker do mattpocock** (`triage`, `to-spec`, `to-tickets`,
+  `wayfinder`) estão configurados desde 2026-08-15: ver "## Agent skills"
+  abaixo. As specs de produto seguem no Obsidian; o que vive no repo é o
+  ticket acionável e a decisão de arquitetura.
 - **`pytest` e `alembic` rodam dentro do container** `norby_backend`; o host não
   conecta no Postgres do Docker.
+
+## Agent skills
+
+### Issue tracker
+
+Issues e specs vivem nas GitHub Issues de `DigoDuck/Norby`, via `gh` CLI.
+Ver `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Os cinco papéis canônicos, cada rótulo igual ao próprio nome.
+Ver `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: um `CONTEXT.md` na raiz mais `docs/adr/`.
+Ver `docs/agents/domain.md`.
 
 ## NÃO faça
 
@@ -111,10 +130,16 @@ Roteamento geral em `~/.claude/SKILLS.md`. Aqui só o que é específico do Norb
 - **Nunca** commitar segredos. Variáveis de API, autenticação e banco ficam fora
   do git, apenas em `.env` (gitignored).
 
-## Git commits
+## Git commits e PRs
 
 - **Mensagens de commit em inglês** (comentários de código e docs do vault podem ser PT).
+- **Título e corpo de PR também em inglês.** Vale para descrição de issue e
+  qualquer texto que fique no GitHub. O que continua em PT: UI, comentários de
+  código, e os docs deste repo (`AGENTS.md`, `DESIGN.md`, `LGPD.md`, `README.md`).
 - **NUNCA** adicione "Co-authored-by: Claude" ou qualquer trailer de coautoria em mensagens de commit. Comandos `git commit` devem conter apenas a mensagem solicitada, sem assinatura ou atribuição ao Claude.
+- **NUNCA** adicione assinatura, atribuição ou selo de IA em corpo de PR,
+  descrição de issue ou qualquer texto gerado — nada de "Generated with", link
+  para claude.com ou similar.
 
 ## Deploy (produção)
 
@@ -137,6 +162,24 @@ dias com rotação e detecção de reuso. O logout revoga só o refresh — um a
 token roubado vale até 15 min. Revogação imediata exigiria denylist de `jti`
 (consulta extra em toda request); adiada por custo/benefício.
 
+**Logout apresentando token já rotacionado = reuso (2026-08-15):** o
+`/auth/logout` trata isso igual ao `/auth/refresh` e revoga **todas** as sessões
+do usuário. Antes ele respondia 204 sem revogar nada: quem roubasse `R0`,
+rotacionasse para `R1` e deixasse a vítima deslogar com `R0` mantinha `R1` vivo
+por 7 dias. Como o logout passou a ter o mesmo poder do refresh, ganhou o mesmo
+teto (20/min); sem ele, um refresh antigo viraria um botão de derrubar sessão
+replicável para sempre.
+
+**Hash de senha — migração em andamento (2026-08-15):** `bcrypt_sha256` para
+hashes novos, `bcrypt` mantido no `CryptContext` só para verificar os antigos,
+que são regravados no próximo login de cada usuário (`verify_and_upgrade`).
+Motivo: o bcrypt cru trunca em 72 **bytes** em silêncio, então qualquer sufixo
+depois disso autenticava igual. O cadastro agora recusa senha acima de 72 bytes.
+⚠️ **Esta mudança não é revertível sozinha.** Depois que um usuário loga, o hash
+dele vira `$bcrypt-sha256$`, formato que o código anterior (`schemes=["bcrypt"]`)
+não sabe verificar — reverter o commit tranca esses usuários para fora com a
+senha correta. Em rollback, manter `bcrypt_sha256` na lista de schemes.
+
 **Tokens no navegador — decisão consciente (2026-07-21):** access e refresh
 ficam no `localStorage` (Zustand persist). A correção canônica seria refresh em
 cookie `HttpOnly` + access só em memória, mas o frontend (`vercel.app`) e a API
@@ -154,10 +197,21 @@ não existe naquele ambiente, então `request.client.host` devolve o IP do proxy
 para todo mundo. **Não** ligar `--forwarded-allow-ips="*"`: nessa versão do
 uvicorn o `always_trust` faz o middleware usar o *primeiro* item do
 `X-Forwarded-For`, que é o que o cliente controla, e o rate limit de login
-viraria spoofável. Em vez disso, as rotas autenticadas (`/ai/*`) usam `user_key`
-em `app/limiter.py`, chaveando pelo id do usuário. Login e cadastro são anônimos
-e seguem por IP, com o balde compartilhado como dívida aceita: a proteção contra
-força bruta continua valendo, o custo é colateral.
+viraria spoofável. Em vez disso, as rotas **autenticadas** usam `user_key` em
+`app/limiter.py`, chaveando pelo id do usuário: `/ai/*` e, desde 2026-08-15,
+`DELETE /auth/me` (antes um atacante podia encher o balde por IP e impedir
+qualquer usuário de excluir a própria conta).
+
+Login e cadastro são anônimos e seguem por IP, com o balde compartilhado como
+dívida aceita. **Revisado em 2026-08-15, e o custo é maior do que "colateral"
+como este texto dizia antes:** como o `get_remote_address` devolve o mesmo proxy
+para todo mundo e os limites são pequenos (10/min e 5/min), um atacante mantém
+os dois baldes cheios a custo quase zero e produz negação **global** de
+autenticação. A defesa contra força bruta vira um interruptor público de
+disponibilidade. Continua aceito porque a alternativa é desenho novo, não
+correção: limite por identificador de conta protegido por HMAC no login, mais
+teto global, e verificação de e-mail ou desafio antiabuso no cadastro. Se o
+cadastro for divulgado, isso deixa de ser dívida e vira bloqueante.
 
 **Outras dívidas assumidas** (decisões, não pendências esquecidas):
 - `POST /auth/register` responde "Email já cadastrado" (enumeração por essa via

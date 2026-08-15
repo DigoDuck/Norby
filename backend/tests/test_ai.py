@@ -65,7 +65,7 @@ async def test_insight_score_is_deterministic_not_from_llm(db_session, monkeypat
 
     monkeypatch.setattr(ai.model, "generate_content", lambda _p, **_kw: _Resp())
 
-    result = await ai.get_or_generate_insight(db_session, "user-1", 7, 2026)
+    result = await ai.get_or_generate_insight(db_session, "user-1")
     assert result["score"] == 90
     assert result["summary_text"] == "a|b|c"
     assert result["suggested_action"] == "faça X"
@@ -94,7 +94,7 @@ async def test_insight_returns_score_when_llm_text_fails(db_session, monkeypatch
 
     monkeypatch.setattr(ai.model, "generate_content", lambda _p, **_kw: _BadResp())
 
-    result = await ai.get_or_generate_insight(db_session, "user-1", 7, 2026)
+    result = await ai.get_or_generate_insight(db_session, "user-1")
     assert result["score"] == 90
     assert result["summary_text"] == ""
     assert result.get("error")
@@ -123,7 +123,7 @@ async def test_insight_returns_score_when_llm_call_raises(db_session, monkeypatc
 
     monkeypatch.setattr(ai.model, "generate_content", _boom)
 
-    result = await ai.get_or_generate_insight(db_session, "user-1", 7, 2026)
+    result = await ai.get_or_generate_insight(db_session, "user-1")
     assert result["score"] == 90
     assert result["summary_text"] == ""
     assert result.get("error")
@@ -170,7 +170,7 @@ async def test_insight_recomputes_score_on_cache_hit(db_session, monkeypatch):
 
     monkeypatch.setattr(ai.model, "generate_content", _boom)
 
-    result = await ai.get_or_generate_insight(db_session, "user-1", 7, 2026)
+    result = await ai.get_or_generate_insight(db_session, "user-1")
     assert result["score"] == 90
     assert result["summary_text"] == "cached text"
 
@@ -219,7 +219,7 @@ async def test_insight_regenerates_text_when_data_changes(db_session, monkeypatc
 
     monkeypatch.setattr(ai.model, "generate_content", lambda _p, **_kw: _Resp())
 
-    result = await ai.get_or_generate_insight(db_session, "user-1", 7, 2026)
+    result = await ai.get_or_generate_insight(db_session, "user-1")
     assert result["score"] == 100
     assert result["summary_text"] == "novo|texto|fresco"  # regenerado, não o velho
     assert result["suggested_action"] == "nova ação"

@@ -6,13 +6,17 @@ from decimal import Decimal
 
 from app.dependencies import get_db, get_current_user
 from app.models.sql_models import User, Goal, GoalType
+from app.schemas.common import MAX_MONEY
 from app.schemas.goal import GoalCreate, GoalUpdate, GoalContribute, GoalResponse
-from app.services.goal_service import build_goal_response
+from app.services.goal_service import build_goal_response, month_spent_by_category
 
 router = APIRouter(prefix="/goals", tags=["Goals"])
 
 
-async def _get_owned_goal(goal_id: UUID, user: User, db: AsyncSession, for_update: bool = False) -> Goal:
+async def _get_owned_goal(
+    goal_id: UUID, user: User, db: AsyncSession, *, for_update: bool = False
+) -> Goal:
+    """Meta do usuário, ou 404. keyword-only para não virar `(..., db, True)`."""
     stmt = select(Goal).where(Goal.id == goal_id, Goal.user_id == user.id)
     if for_update:
         stmt = stmt.with_for_update()
@@ -36,7 +40,17 @@ async def list_goals(
         .limit(limit)
         .offset(offset)
     )).scalars().all()
-    return [await build_goal_response(db, g) for g in goals]
+    # Um agregado para a página toda, em vez de um por meta de orçamento.
+    gastos = await month_spent_by_category(
+        db, current_user.id, [g.category for g in goals if g.type == GoalType.BUDGET]
+    )
+    return [
+        await build_goal_response(
+            db, g, gasto_do_mes=gastos.get(g.category, Decimal("0"))
+            if g.type == GoalType.BUDGET else None
+        )
+        for g in goals
+    ]
 
 
 @router.post("/", response_model=GoalResponse, status_code=status.HTTP_201_CREATED)
@@ -60,7 +74,8 @@ async def update_goal(
     db: AsyncSession = Depends(get_db),
 ):
     goal = await _get_owned_goal(goal_id, current_user, db)
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    # exclude_none: `null` explícito no corpo gravaria NULL em coluna NOT NULL.
+    for field, value in payload.model_dump(exclude_none=True).items():
         setattr(goal, field, value)
     await db.commit()
     await db.refresh(goal)
@@ -89,8 +104,9 @@ async def contribute(
     if goal.type != GoalType.SAVINGS:
         raise HTTPException(status_code=400, detail="Aportes só em metas do tipo SAVINGS")
     goal.current_amount += payload.amount
-    if goal.current_amount < 0:
-        goal.current_amount = Decimal("0")
+    # Clamp nos dois sentidos. O piso já existia; sem o teto, dois aportes no
+    # valor máximo estouravam Numeric(15,2) e o commit virava 500.
+    goal.current_amount = min(max(goal.current_amount, Decimal("0")), MAX_MONEY)
     await db.commit()
     await db.refresh(goal)
     return await build_goal_response(db, goal)

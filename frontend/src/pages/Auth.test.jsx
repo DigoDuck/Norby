@@ -1,7 +1,8 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 
+import { authApi } from "@/api/auth";
 import { useAuthStore } from "@/store/authStore";
 import Auth from "./Auth";
 
@@ -55,5 +56,36 @@ describe("Auth", () => {
     expect(registerMode).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByLabelText("Seu nome")).toBeInTheDocument();
     expect(screen.getByLabelText("Confirmar senha")).toBeInTheDocument();
+  });
+
+  it("rejeita no cadastro uma senha acima de 72 bytes", async () => {
+    const registerSpy = vi.spyOn(authApi, "register").mockRejectedValue({
+      response: { status: 400, data: { detail: "não deveria enviar" } },
+    });
+    renderAuth();
+    fireEvent.click(screen.getByRole("button", { name: "Cadastrar" }));
+
+    const senhaLonga = `${"A".repeat(72)}1`;
+    fireEvent.change(screen.getByLabelText("Seu nome"), {
+      target: { value: "Alice" },
+    });
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "alice@test.com" },
+    });
+    fireEvent.change(screen.getByLabelText("Senha"), {
+      target: { value: senhaLonga },
+    });
+    fireEvent.change(screen.getByLabelText("Confirmar senha"), {
+      target: { value: senhaLonga },
+    });
+    fireEvent.click(screen.getByLabelText(/Li e aceito os/));
+    fireEvent.click(screen.getByRole("button", { name: "Criar conta" }));
+
+    expect(
+      await screen.findByText(
+        "A senha deve ter no máximo 72 bytes (acentos contam 2)",
+      ),
+    ).toBeInTheDocument();
+    expect(registerSpy).not.toHaveBeenCalled();
   });
 });
