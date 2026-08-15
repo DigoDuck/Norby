@@ -257,3 +257,69 @@ async def test_list_rejects_year_without_month(make_auth_client):
     res = await ac.get("/transactions/?year=2026")
     assert res.status_code == 422
 
+
+
+@pytest.mark.asyncio
+async def test_moving_transaction_between_wallets_moves_the_money(make_auth_client):
+    # O trecho mais intrincado do backend: reverte o efeito na carteira antiga e
+    # aplica na nova, com dois locks e ordem documentada por causa de deadlock.
+    # O front manda wallet_id no PUT, então é caminho real e não tinha teste.
+    ac = await make_auth_client("Alice")
+    origem = await make_wallet(ac, name="Origem", balance=100)
+    destino = await make_wallet(ac, name="Destino", balance=100)
+
+    tx = (await ac.post(
+        "/transactions/", json=tx_payload(origem["id"], amount="30.00")
+    )).json()
+
+    saldos = {w["name"]: float(w["balance"]) for w in (await ac.get("/wallets/")).json()}
+    assert saldos == {"Origem": 70.0, "Destino": 100.0}
+
+    res = await ac.put(f"/transactions/{tx['id']}", json={"wallet_id": destino["id"]})
+    assert res.status_code == 200, res.text
+    assert res.json()["wallet_id"] == destino["id"]
+
+    # A despesa sai da origem e passa a pesar no destino, sem sumir nem duplicar.
+    saldos = {w["name"]: float(w["balance"]) for w in (await ac.get("/wallets/")).json()}
+    assert saldos == {"Origem": 100.0, "Destino": 70.0}
+
+
+@pytest.mark.asyncio
+async def test_flipping_type_inverts_the_sign_twice(make_auth_client):
+    # Mesma função do teste acima, invertendo o sinal duas vezes: reverte a
+    # despesa antiga (soma de volta) e aplica a receita nova (soma outra vez).
+    ac = await make_auth_client("Alice")
+    w = await make_wallet(ac, balance=100)
+    tx = (await ac.post(
+        "/transactions/", json=tx_payload(w["id"], type="EXPENSE", amount="30.00")
+    )).json()
+
+    wallets = (await ac.get("/wallets/")).json()
+    assert float(wallets[0]["balance"]) == 70.0
+
+    res = await ac.put(f"/transactions/{tx['id']}", json={"type": "INCOME"})
+    assert res.status_code == 200
+
+    # 70 + 30 (desfaz a despesa) + 30 (aplica a receita) = 130.
+    wallets = (await ac.get("/wallets/")).json()
+    assert float(wallets[0]["balance"]) == 130.0
+
+
+@pytest.mark.asyncio
+async def test_moving_to_someone_elses_wallet_is_404(make_auth_client):
+    # Ownership no caminho indireto: o wallet_id vem do CORPO do PUT.
+    alice = await make_auth_client("Alice")
+    bob = await make_auth_client("Bob")
+    da_alice = await make_wallet(alice, balance=100)
+    do_bob = await make_wallet(bob, balance=100)
+
+    tx = (await alice.post(
+        "/transactions/", json=tx_payload(da_alice["id"], amount="30.00")
+    )).json()
+
+    res = await alice.put(f"/transactions/{tx['id']}", json={"wallet_id": do_bob["id"]})
+    assert res.status_code == 404
+
+    # E o saldo do Bob não foi tocado.
+    wallets_bob = (await bob.get("/wallets/")).json()
+    assert float(wallets_bob[0]["balance"]) == 100.0
