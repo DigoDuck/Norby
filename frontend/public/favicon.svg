@@ -1,5 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <rect width="32" height="32" rx="8" fill="#2DB5A3"/>
-  <path d="M9 23 L9 11 L21 23 L21 13" stroke="#07100F" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-  <path d="M21 3 L22 7 L24.5 8 L22 9 L21 13 L20 9 L17.5 8 L20 7 Z" fill="#07100F"/>
+  <defs>
+    <linearGradient id="norby-brand" x1="4" y1="2" x2="28" y2="30" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#22D3EE"/>
+      <stop offset=".45" stop-color="#4F7BFA"/>
+      <stop offset=".72" stop-color="#8B5CF6"/>
+      <stop offset="1" stop-color="#D946EF"/>
+    </linearGradient>
+  </defs>
+  <rect width="32" height="32" rx="9" fill="url(#norby-brand)"/>
+  <path d="M9 23 L9 11 L21 23 L21 13" stroke="#fff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <path d="M21 3 L22 7 L24.5 8 L22 9 L21 13 L20 9 L17.5 8 L20 7 Z" fill="#fff"/>
 </svg>
