@@ -20,6 +20,15 @@ class UserRegister(BaseModel):
             raise ValueError("A senha deve ter ao menos 8 caracteres, incluindo uma letra e um número")
         return v
 
+    @field_validator("password")
+    @classmethod
+    def cabe_no_bcrypt(cls, v: str) -> str:
+        # O bcrypt trunca em 72 bytes e ignora o resto sem avisar. O max_length
+        # do Field conta caracteres, enquanto um acento ocupa mais de um byte.
+        if len(v.encode("utf-8")) > 72:
+            raise ValueError("A senha deve ter no máximo 72 bytes (acentos contam 2)")
+        return v
+
     @field_validator("accept_privacy")
     @classmethod
     def deve_aceitar(cls, v: bool) -> bool:

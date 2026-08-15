@@ -36,7 +36,11 @@ const registerSchema = loginSchema
       .string()
       .min(8, "Mínimo de 8 caracteres")
       .regex(/[A-Za-z]/, "Inclua ao menos uma letra")
-      .regex(/\d/, "Inclua ao menos um número"),
+      .regex(/\d/, "Inclua ao menos um número")
+      .refine(
+        (value) => new TextEncoder().encode(value).length <= 72,
+        "A senha deve ter no máximo 72 bytes (acentos contam 2)",
+      ),
     confirmPassword: z.string(),
     acceptedTerms: z.boolean().refine((v) => v === true, {
       message: "Você precisa aceitar os Termos e a Política de Privacidade",

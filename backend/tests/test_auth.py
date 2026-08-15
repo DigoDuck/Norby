@@ -165,3 +165,27 @@ async def test_register_persists_consent_timestamp(client, db_session):
         await db_session.execute(select(User).where(User.email == "carol@test.com"))
     ).scalar_one()
     assert user.privacy_accepted_at is not None
+
+
+@pytest.mark.asyncio
+async def test_register_rejects_password_over_72_bytes(client):
+    # bcrypt trunca em 72 bytes. Sem o teto, o sufixo seria ignorado e a senha
+    # longa se comportaria como uma senha de 72 bytes disfarçada.
+    res = await client.post("/auth/register", json={
+        "name": "Dave", "email": "dave@test.com",
+        "password": "A" * 72 + "1", "accept_privacy": True,
+    })
+    assert res.status_code == 422
+    assert any("72 bytes" in error["msg"] for error in res.json()["detail"])
+
+
+@pytest.mark.asyncio
+async def test_register_counts_password_bytes_not_characters(client):
+    # 36 caracteres acentuados mais A1 ocupam 74 bytes e ultrapassam o limite
+    # real do bcrypt apesar de passarem no max_length=128 do Pydantic.
+    res = await client.post("/auth/register", json={
+        "name": "Erin", "email": "erin@test.com",
+        "password": "á" * 36 + "A1", "accept_privacy": True,
+    })
+    assert res.status_code == 422
+    assert any("72 bytes" in error["msg"] for error in res.json()["detail"])
