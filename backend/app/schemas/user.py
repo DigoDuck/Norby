@@ -4,10 +4,10 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 from uuid import UUID
 from datetime import datetime
 
-from app.schemas.common import ShortText
+from app.schemas.common import PersonName
 
 class UserRegister(BaseModel):
-    name: str = Field(min_length=2, max_length=100)
+    name: PersonName
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
     # LGPD: aceite explícito, registrado no servidor. O frontend já pedia o
@@ -43,9 +43,10 @@ class UserLogin(BaseModel):
     password: str
 
 class UserUpdate(BaseModel):
-    # ShortText espelha o String(100) da coluna: sem ele, um nome de 300 chars
-    # passava na validação e estourava no banco (500), e string vazia era aceita.
-    name: ShortText | None = None
+    # Mesmo tipo do cadastro: sem limite, um nome de 300 chars estourava o
+    # String(100) da coluna (500), e o update não pode ser uma porta dos fundos
+    # para um nome que o cadastro recusaria.
+    name: PersonName | None = None
     email: EmailStr | None = None
     
 class UserResponse(BaseModel):

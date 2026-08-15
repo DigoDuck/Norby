@@ -311,3 +311,16 @@ async def test_update_me_changes_name(make_auth_client):
     res = await ac.put("/auth/me", json={"name": "Nome Novo"})
     assert res.status_code == 200
     assert res.json()["name"] == "Nome Novo"
+
+
+@pytest.mark.asyncio
+async def test_update_me_enforces_the_same_floor_as_register(make_auth_client):
+    # O cadastro exige 2 caracteres. Se o update aceitasse 1, ele viraria uma
+    # porta dos fundos para um nome que o cadastro recusaria.
+    ac = await make_auth_client("Alice")
+    res = await ac.put("/auth/me", json={"name": "A"})
+    assert res.status_code == 422
+
+    ok = await ac.put("/auth/me", json={"name": "Al"})
+    assert ok.status_code == 200
+

@@ -278,3 +278,36 @@ async def test_concurrent_run_and_transaction_keep_balance_consistent(client, db
         for t in txs
     )
     assert Decimal(final["balance"]) == esperado
+
+
+@pytest.mark.asyncio
+async def test_recurring_update_ignores_explicit_null(make_auth_client):
+    # A troca para exclude_none também tocou o update de recorrência, que não
+    # tinha teste nenhum de update.
+    ac = await make_auth_client("Alice")
+    w = (await ac.post("/wallets/", json={"name": "Main", "balance": 0})).json()
+    rec = (await ac.post("/recurring/", json={
+        "wallet_id": w["id"], "type": "EXPENSE", "amount": "50.00",
+        "category": "Moradia", "frequency": "MONTHLY", "day_of_month": 5,
+    })).json()
+
+    res = await ac.put(f"/recurring/{rec['id']}", json={"amount": None})
+    assert res.status_code == 200
+    assert res.json()["amount"] == "50.00"
+
+
+@pytest.mark.asyncio
+async def test_recurring_update_can_still_deactivate(make_auth_client):
+    # active: false não pode ser filtrado pelo exclude_none (False não é None).
+    ac = await make_auth_client("Alice")
+    w = (await ac.post("/wallets/", json={"name": "Main", "balance": 0})).json()
+    rec = (await ac.post("/recurring/", json={
+        "wallet_id": w["id"], "type": "EXPENSE", "amount": "50.00",
+        "category": "Moradia", "frequency": "MONTHLY", "day_of_month": 5,
+    })).json()
+    assert rec["active"] is True
+
+    res = await ac.put(f"/recurring/{rec['id']}", json={"active": False})
+    assert res.status_code == 200
+    assert res.json()["active"] is False
+

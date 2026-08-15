@@ -248,3 +248,12 @@ async def test_update_can_still_clear_description(make_auth_client):
     res = await ac.put(f"/transactions/{tx['id']}", json={"description": ""})
     assert res.status_code == 200
     assert res.json()["description"] == ""
+
+
+@pytest.mark.asyncio
+async def test_list_rejects_year_without_month(make_auth_client):
+    # O guard cobre os dois sentidos; só o month-sem-year tinha regressão.
+    ac = await make_auth_client("Alice")
+    res = await ac.get("/transactions/?year=2026")
+    assert res.status_code == 422
+
