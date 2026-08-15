@@ -13,7 +13,10 @@ from app.services.goal_service import build_goal_response, month_spent_by_catego
 router = APIRouter(prefix="/goals", tags=["Goals"])
 
 
-async def _get_owned_goal(goal_id: UUID, user: User, db: AsyncSession, for_update: bool = False) -> Goal:
+async def _get_owned_goal(
+    goal_id: UUID, user: User, db: AsyncSession, *, for_update: bool = False
+) -> Goal:
+    """Meta do usuário, ou 404. keyword-only para não virar `(..., db, True)`."""
     stmt = select(Goal).where(Goal.id == goal_id, Goal.user_id == user.id)
     if for_update:
         stmt = stmt.with_for_update()
