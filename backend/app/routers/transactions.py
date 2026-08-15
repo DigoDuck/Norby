@@ -16,7 +16,12 @@ router = APIRouter(prefix="/transactions", tags=["Transactions"])
 # ponytail: locks são adquiridos na ordem transação → carteira antiga → carteira
 # nova. Duas transações DIFERENTES trocando as mesmas duas carteiras em sentidos
 # opostos ainda podem deadlockar (o Postgres detecta e aborta uma, virando 500).
-# Se isso aparecer em produção, ordenar os locks de carteira por UUID.
+# O mesmo ciclo alcança `materialize_due_recurring` (services/recurring_service.py),
+# que desde 2026-08-15 também trava carteiras, na ordem em que os templates saem
+# do SELECT: um /recurring/run segurando a carteira A e querendo a B fecha o ciclo
+# com um update movendo transação de B para A.
+# Se isso aparecer em produção, ordenar os locks de carteira por UUID nos DOIS
+# caminhos — ordenar só aqui não desfaz o ciclo.
 async def _get_owned_wallet(
     wallet_id: UUID,
     user: User,

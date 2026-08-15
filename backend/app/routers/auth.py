@@ -83,7 +83,18 @@ async def refresh_token(request: Request, payload: RefreshRequest, db: AsyncSess
     return TokenPair(access_token=access, refresh_token=new_refresh)
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
-async def logout(payload: RefreshRequest, db: AsyncSession = Depends(get_db)):
+# Desde que o logout passou a derrubar TODAS as sessões ao receber um token já
+# rotacionado, ele carrega o mesmo poder do /auth/refresh e ganha o mesmo teto.
+# Sem isso, quem tivesse um refresh antigo da vítima poderia derrubar as sessões
+# dela em loop, sem limite, mesmo depois de ela logar de novo.
+# A chave é o IP (balde compartilhado atrás do proxy, ver "Rate limit atrás do
+# proxy" no AGENTS.md): o logout é anônimo, então não há id de usuário para usar.
+@limiter.limit("20/minute")
+async def logout(
+    request: Request,
+    payload: RefreshRequest,
+    db: AsyncSession = Depends(get_db),
+):
     # Revoga o refresh recebido. Idempotente: token inexistente também retorna 204.
     await revoke_refresh_token(payload.refresh_token, db)
 

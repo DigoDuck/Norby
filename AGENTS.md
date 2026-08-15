@@ -7,7 +7,8 @@
 
 - **Backend:** FastAPI 0.139 + SQLAlchemy 2.0 async + Alembic · PostgreSQL 16
   (relacional) + MongoDB 7 via Motor (blocos de texto da IA) · Auth JWT
-  (python-jose) · IA Gemini 1.5 Flash · gerenciador de pacotes **uv**.
+  (python-jose) · IA **Gemini 3.5 Flash Lite** (`models/gemini-3.5-flash-lite`,
+  ver `services/ai_service.py`) · gerenciador de pacotes **uv**.
 - **Frontend:** React 19 + Vite 8 · TailwindCSS + shadcn/ui · Zustand ·
   React Router v7 · React Hook Form + Zod · axios.
 
@@ -154,6 +155,24 @@ dev sobrescreve com `--reload`).
 dias com rotação e detecção de reuso. O logout revoga só o refresh — um access
 token roubado vale até 15 min. Revogação imediata exigiria denylist de `jti`
 (consulta extra em toda request); adiada por custo/benefício.
+
+**Logout apresentando token já rotacionado = reuso (2026-08-15):** o
+`/auth/logout` trata isso igual ao `/auth/refresh` e revoga **todas** as sessões
+do usuário. Antes ele respondia 204 sem revogar nada: quem roubasse `R0`,
+rotacionasse para `R1` e deixasse a vítima deslogar com `R0` mantinha `R1` vivo
+por 7 dias. Como o logout passou a ter o mesmo poder do refresh, ganhou o mesmo
+teto (20/min); sem ele, um refresh antigo viraria um botão de derrubar sessão
+replicável para sempre.
+
+**Hash de senha — migração em andamento (2026-08-15):** `bcrypt_sha256` para
+hashes novos, `bcrypt` mantido no `CryptContext` só para verificar os antigos,
+que são regravados no próximo login de cada usuário (`verify_and_upgrade`).
+Motivo: o bcrypt cru trunca em 72 **bytes** em silêncio, então qualquer sufixo
+depois disso autenticava igual. O cadastro agora recusa senha acima de 72 bytes.
+⚠️ **Esta mudança não é revertível sozinha.** Depois que um usuário loga, o hash
+dele vira `$bcrypt-sha256$`, formato que o código anterior (`schemes=["bcrypt"]`)
+não sabe verificar — reverter o commit tranca esses usuários para fora com a
+senha correta. Em rollback, manter `bcrypt_sha256` na lista de schemes.
 
 **Tokens no navegador — decisão consciente (2026-07-21):** access e refresh
 ficam no `localStorage` (Zustand persist). A correção canônica seria refresh em
