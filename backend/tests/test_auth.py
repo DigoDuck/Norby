@@ -240,3 +240,40 @@ async def test_login_persists_upgraded_legacy_bcrypt_hash(client, db_session):
 
     await db_session.refresh(user)
     assert user.password_hash.startswith("$bcrypt-sha256$")
+
+
+@pytest.mark.asyncio
+async def test_delete_account_rate_limit_is_per_user(client, mongo):
+    from app.limiter import limiter
+
+    async def register(name, email):
+        response = await client.post("/auth/register", json={
+            "name": name, "email": email,
+            "password": "secret123", "accept_privacy": True,
+        })
+        assert response.status_code == 201, response.text
+        return {"Authorization": f"Bearer {response.json()['access_token']}"}
+
+    attacker = await register("Mal", "mal@test.com")
+    victim = await register("Vic", "vic@test.com")
+
+    # A fixture global desliga o limiter. Religamos só depois do cadastro para
+    # medir exclusivamente o balde do DELETE /auth/me.
+    limiter.reset()
+    limiter.enabled = True
+    try:
+        for _ in range(3):
+            response = await client.request(
+                "DELETE", "/auth/me", headers=attacker,
+                json={"confirm": True, "password": "errada"},
+            )
+            assert response.status_code == 401
+
+        response = await client.request(
+            "DELETE", "/auth/me", headers=victim,
+            json={"confirm": True, "password": "secret123"},
+        )
+        assert response.status_code == 204
+    finally:
+        limiter.enabled = False
+        limiter.reset()

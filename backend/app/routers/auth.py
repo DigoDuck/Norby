@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.dependencies import get_db, get_current_user
-from app.limiter import limiter
+from app.limiter import limiter, user_key
 from app.models.sql_models import User
 from app.schemas.user import (
     UserRegister, UserLogin, UserUpdate, Token, TokenPair, RefreshRequest,
@@ -124,7 +124,9 @@ async def export_my_data(
     return JSONResponse(content=jsonable_encoder(data), headers=headers)
 
 @router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
-@limiter.limit("3/minute")
+# Atrás do proxy do Railway, limitar por IP criaria um único balde para todos
+# os usuários. A chave autenticada impede que uma conta bloqueie as demais.
+@limiter.limit("3/minute", key_func=user_key)
 async def delete_my_account(
     request: Request,
     payload: DeleteAccountRequest,
