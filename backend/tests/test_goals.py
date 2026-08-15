@@ -210,3 +210,35 @@ async def test_goal_update_ignores_explicit_null(make_auth_client):
     res = await ac.put(f"/goals/{meta['id']}", json={"name": None})
     assert res.status_code == 200
     assert res.json()["name"] == "Reserva"
+
+
+@pytest.mark.asyncio
+async def test_contribute_clamps_at_max_money(make_auth_client):
+    # GoalContribute limita CADA aporte a MAX_MONEY, mas o acumulado não tinha
+    # teto: dois aportes no máximo estouravam Numeric(15,2) e viravam 500.
+    ac = await make_auth_client("Alice")
+    meta = (await ac.post("/goals/", json={
+        "name": "Teto", "type": "SAVINGS", "target_amount": "1000.00",
+    })).json()
+
+    teto = "9999999999999.99"
+    primeiro = await ac.post(f"/goals/{meta['id']}/contribute", json={"amount": teto})
+    assert primeiro.status_code == 200
+
+    segundo = await ac.post(f"/goals/{meta['id']}/contribute", json={"amount": teto})
+    assert segundo.status_code == 200
+    assert segundo.json()["current_amount"] == teto
+
+
+@pytest.mark.asyncio
+async def test_contribute_still_clamps_at_zero(make_auth_client):
+    # O clamp inferior já existia; a mudança para min(max(...)) não pode perdê-lo.
+    ac = await make_auth_client("Alice")
+    meta = (await ac.post("/goals/", json={
+        "name": "Piso", "type": "SAVINGS", "target_amount": "1000.00",
+        "current_amount": "50.00",
+    })).json()
+
+    res = await ac.post(f"/goals/{meta['id']}/contribute", json={"amount": "-500.00"})
+    assert res.status_code == 200
+    assert res.json()["current_amount"] == "0.00"

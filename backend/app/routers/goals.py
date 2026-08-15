@@ -6,6 +6,7 @@ from decimal import Decimal
 
 from app.dependencies import get_db, get_current_user
 from app.models.sql_models import User, Goal, GoalType
+from app.schemas.common import MAX_MONEY
 from app.schemas.goal import GoalCreate, GoalUpdate, GoalContribute, GoalResponse
 from app.services.goal_service import build_goal_response
 
@@ -90,8 +91,9 @@ async def contribute(
     if goal.type != GoalType.SAVINGS:
         raise HTTPException(status_code=400, detail="Aportes só em metas do tipo SAVINGS")
     goal.current_amount += payload.amount
-    if goal.current_amount < 0:
-        goal.current_amount = Decimal("0")
+    # Clamp nos dois sentidos. O piso já existia; sem o teto, dois aportes no
+    # valor máximo estouravam Numeric(15,2) e o commit virava 500.
+    goal.current_amount = min(max(goal.current_amount, Decimal("0")), MAX_MONEY)
     await db.commit()
     await db.refresh(goal)
     return await build_goal_response(db, goal)
