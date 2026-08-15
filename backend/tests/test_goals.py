@@ -198,3 +198,15 @@ def test_current_month_range_returns_date_not_datetime():
     assert type(start) is date and type(end) is date
     assert start == date(2026, 7, 1)
     assert end == date(2026, 8, 1)
+
+
+@pytest.mark.asyncio
+async def test_goal_update_ignores_explicit_null(make_auth_client):
+    ac = await make_auth_client("Alice")
+    meta = (await ac.post("/goals/", json={
+        "name": "Reserva", "type": "SAVINGS", "target_amount": "1000.00",
+    })).json()
+
+    res = await ac.put(f"/goals/{meta['id']}", json={"name": None})
+    assert res.status_code == 200
+    assert res.json()["name"] == "Reserva"

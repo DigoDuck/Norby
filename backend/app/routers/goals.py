@@ -60,7 +60,8 @@ async def update_goal(
     db: AsyncSession = Depends(get_db),
 ):
     goal = await _get_owned_goal(goal_id, current_user, db)
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    # exclude_none: `null` explícito no corpo gravaria NULL em coluna NOT NULL.
+    for field, value in payload.model_dump(exclude_none=True).items():
         setattr(goal, field, value)
     await db.commit()
     await db.refresh(goal)

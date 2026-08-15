@@ -108,7 +108,8 @@ async def update_me(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    data = payload.model_dump(exclude_unset=True)
+    # exclude_none: `null` explícito no corpo gravaria NULL em coluna NOT NULL.
+    data = payload.model_dump(exclude_none=True)
 
     # Se o email mudar, garante que não está em uso por outro usuário
     new_email = data.get("email")

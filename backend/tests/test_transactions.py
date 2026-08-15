@@ -217,3 +217,34 @@ async def test_list_still_filters_with_both(make_auth_client):
     res = await ac.get("/transactions/?month=6&year=2026")
     assert res.status_code == 200
     assert [t["date"] for t in res.json()] == ["2026-06-10"]
+
+
+@pytest.mark.asyncio
+async def test_update_ignores_explicit_null(make_auth_client):
+    # amount: null passa no Pydantic (Money | None) e, com exclude_unset, o None
+    # era gravado numa coluna NOT NULL -> IntegrityError -> 500.
+    ac = await make_auth_client("Alice")
+    w = await make_wallet(ac, balance=100)
+    tx = (await ac.post("/transactions/", json=tx_payload(w["id"], amount="30.00"))).json()
+
+    res = await ac.put(f"/transactions/{tx['id']}", json={"amount": None})
+    assert res.status_code == 200
+    assert res.json()["amount"] == "30.00"
+
+    # E o saldo não pode ter sido mexido por um update que não mudou nada.
+    wallets = (await ac.get("/wallets/")).json()
+    assert float(wallets[0]["balance"]) == 70.0
+
+
+@pytest.mark.asyncio
+async def test_update_can_still_clear_description(make_auth_client):
+    # description é o único campo legitimamente anulável; string vazia continua
+    # sendo o caminho para limpá-lo depois da troca para exclude_none.
+    ac = await make_auth_client("Alice")
+    w = await make_wallet(ac, balance=100)
+    tx = (await ac.post("/transactions/", json=tx_payload(w["id"]))).json()
+    assert tx["description"] == "Lunch"
+
+    res = await ac.put(f"/transactions/{tx['id']}", json={"description": ""})
+    assert res.status_code == 200
+    assert res.json()["description"] == ""

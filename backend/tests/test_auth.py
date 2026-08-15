@@ -277,3 +277,12 @@ async def test_delete_account_rate_limit_is_per_user(client, mongo):
     finally:
         limiter.enabled = False
         limiter.reset()
+
+@pytest.mark.asyncio
+async def test_update_me_ignores_explicit_null(make_auth_client):
+    ac = await make_auth_client("Alice")
+    antes = (await ac.get("/auth/me")).json()
+
+    res = await ac.put("/auth/me", json={"name": None})
+    assert res.status_code == 200
+    assert res.json()["name"] == antes["name"]

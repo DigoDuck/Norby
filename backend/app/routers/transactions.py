@@ -134,7 +134,11 @@ async def update_transaction(
 ):
     transaction = await _get_owned_transaction(transaction_id, current_user, db)
 
-    data = payload.model_dump(exclude_unset=True)
+    # exclude_none, não exclude_unset: um `null` explícito no corpo conta como
+    # "set", então passava pelo filtro e era gravado numa coluna NOT NULL,
+    # virando IntegrityError e 500. O único campo legitimamente anulável é
+    # description, e string vazia continua limpando ele.
+    data = payload.model_dump(exclude_none=True)
 
     # Valores finais: o que veio no payload sobrescreve o atual
     new_wallet_id = data.get("wallet_id", transaction.wallet_id)

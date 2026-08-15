@@ -68,7 +68,9 @@ async def update_recurring(
     if not rec:
         raise HTTPException(status_code=404, detail="Recorrência não encontrada")
 
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    # exclude_none: `null` explícito no corpo gravaria NULL em coluna NOT NULL.
+    # `active: false` continua passando, porque False não é None.
+    for field, value in payload.model_dump(exclude_none=True).items():
         setattr(rec, field, value)
     await db.commit()
     await db.refresh(rec)
