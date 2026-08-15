@@ -13,7 +13,7 @@ import {
 import { useAuthStore } from "@/store/authStore";
 import { authApi } from "@/api/auth";
 import { accountApi } from "@/api/account";
-import { apiErrorMessage } from "@/lib/utils";
+import { apiErrorMessage, shadcnInputCls } from "@/lib/utils";
 import ThemeToggle from "@/components/shared/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -112,8 +112,6 @@ export default function Settings() {
     }
   }
 
-  const inputCls =
-    "bg-surface-inset border-line/10 text-content placeholder:text-content-3";
 
   const memberSince = user?.created_at
     ? new Date(user.created_at).toLocaleDateString("pt-BR", {
@@ -167,7 +165,7 @@ export default function Settings() {
               id={nomeId}
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
-              className={inputCls}
+              className={shadcnInputCls}
             />
           </div>
           <div>
@@ -179,7 +177,7 @@ export default function Settings() {
               type="email"
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
-              className={inputCls}
+              className={shadcnInputCls}
             />
           </div>
         </div>
@@ -256,7 +254,7 @@ export default function Settings() {
           placeholder="Digite EXCLUIR para confirmar"
           value={confirmText}
           onChange={(e) => setConfirmText(e.target.value)}
-          className={`${inputCls} mt-4`}
+          className={`${shadcnInputCls} mt-4`}
         />
         <Input
           type="password"
@@ -264,7 +262,7 @@ export default function Settings() {
           placeholder="Sua senha atual"
           value={deletePassword}
           onChange={(e) => setDeletePassword(e.target.value)}
-          className={`${inputCls} mt-3`}
+          className={`${shadcnInputCls} mt-3`}
         />
         {dangerError && <p className="text-danger text-xs mt-2">{dangerError}</p>}
         <Button

@@ -32,12 +32,13 @@ import { Select } from "@/components/ui/select";
 import NorthStar from "@/components/shared/NorthStar";
 import AiOrb from "@/components/shared/AiOrb";
 import InsightCard from "@/components/dashboard/InsightCard";
+import CategoryDonut from "@/components/dashboard/CategoryDonut";
+import ChartTooltip from "@/components/dashboard/ChartTooltip";
 import RitmoCard from "@/components/dashboard/RitmoCard";
 import Money from "@/components/shared/Money";
 import HeroRing from "@/components/shared/HeroRing";
 import { useAuthStore } from "@/store/authStore";
 import { formatDateBR, formatBRL, parseDateOnly } from "@/lib/utils";
-import { colorForCategory } from "@/lib/palette";
 import { emojiForCategory } from "@/lib/categories";
 import { computeRitmo } from "@/lib/ritmo";
 
@@ -88,31 +89,6 @@ function monthsForWindow(days) {
   return months;
 }
 
-// Tooltip escuro reutilizável, formatado em R$
-function ChartTooltip({ active, payload, label }) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="rounded-xl bg-surface-inset border border-line/10 px-3 py-2 shadow-xl">
-      {label && (
-        <p className="text-[11px] font-medium text-content-2 mb-1 capitalize">
-          {label}
-        </p>
-      )}
-      {payload.map((p) => (
-        <div key={p.name} className="flex items-center gap-2 text-xs">
-          <span
-            className="w-2 h-2 rounded-full"
-            style={{ background: p.color || p.payload?.fill }}
-          />
-          <span className="text-content-2">{p.name}</span>
-          <span className="ml-auto font-semibold text-content tnum">
-            {formatBRL(p.value)}
-          </span>
-        </div>
-      ))}
-    </div>
-  );
-}
 
 
 export default function Dashboard() {
@@ -193,9 +169,6 @@ export default function Dashboard() {
   }));
   const categoryTotal = categoryData.reduce((sum, c) => sum + c.value, 0);
   const categoryMax = Math.max(1, ...categoryData.map((c) => c.value));
-  const topCategoryPct = categoryTotal
-    ? Math.round((categoryData[0]?.value / categoryTotal) * 100)
-    : 0;
 
   // Ponto de fim de linha do fluxo de caixa (detalhe do rascunho aprovado)
   const endDot = (color) =>
@@ -379,85 +352,7 @@ export default function Dashboard() {
 
       {/* ── Linha 2: categorias + ritmo + meta ──────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        {/* Onde vai seu dinheiro */}
-        <div className="lg:col-span-4 glass p-6">
-          <div>
-            <h2 className="font-semibold text-content">
-              Onde vai seu dinheiro
-            </h2>
-            <p className="text-xs text-content-2 mt-0.5">
-              <span className="capitalize">
-                {new Date().toLocaleDateString("pt-BR", { month: "long" })}
-              </span>
-              {categoryTotal > 0 && (
-                <span className="tnum"> · {formatBRL(categoryTotal)} no total</span>
-              )}
-            </p>
-          </div>
-
-          {categoryData.length === 0 ? (
-            <div className="flex items-center justify-center h-[150px] text-content-3 text-xs text-center px-4">
-              Registre despesas para ver a distribuição por categoria
-            </div>
-          ) : (
-            <div className="flex items-center gap-5 mt-4">
-              <div className="relative w-[128px] h-[128px] shrink-0">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={categoryData}
-                      dataKey="value"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={46}
-                      outerRadius={62}
-                      paddingAngle={categoryData.length > 1 ? 3 : 0}
-                      cornerRadius={6}
-                      startAngle={90}
-                      endAngle={-270}
-                      stroke="none"
-                    >
-                      {categoryData.map((c) => (
-                        <Cell key={c.name} fill={colorForCategory(c.name)} />
-                      ))}
-                    </Pie>
-                    <Tooltip content={<ChartTooltip />} cursor={false} />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                  <span className="text-[10px] text-content-3 uppercase tracking-widest">
-                    Maior
-                  </span>
-                  <span className="text-[15px] font-semibold text-accent tnum mt-0.5">
-                    {topCategoryPct}%
-                  </span>
-                </div>
-              </div>
-
-              {/* Legenda: quadradinho de cor + categoria + % (valor no tooltip) */}
-              <div className="flex-1 flex flex-col gap-2 min-w-0">
-                {categoryData.map((c) => {
-                  const pct = categoryTotal
-                    ? Math.round((c.value / categoryTotal) * 100)
-                    : 0;
-                  return (
-                    <div key={c.name} className="flex items-center gap-2 text-xs">
-                      <span
-                        className="w-2 h-2 rounded-[3px] shrink-0"
-                        style={{ background: colorForCategory(c.name) }}
-                      />
-                      <span className="text-content-2 flex-1 truncate">
-                        {c.name}
-                      </span>
-                      <span className="text-content-2 tnum">{pct}%</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
+        <CategoryDonut data={categoryData} total={categoryTotal} />
 
         <RitmoCard ritmo={ritmo} dias={STREAK_DAYS} />
 

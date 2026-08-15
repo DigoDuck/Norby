@@ -1,6 +1,8 @@
 from datetime import datetime
 
-from pydantic import BaseModel
+from uuid import UUID
+
+from pydantic import BaseModel, Field
 
 
 class InsightResponse(BaseModel):
@@ -32,3 +34,12 @@ class ChatMessageOut(BaseModel):
 class ChatSessionDetail(BaseModel):
     session_id: str
     messages: list[ChatMessageOut]
+
+
+class ChatMessage(BaseModel):
+    # Teto de tamanho: sem ele, uma mensagem enorme queima quota do Gemini,
+    # CPU e espaço no Mongo. 4000 chars cobrem qualquer pergunta real.
+    message: str = Field(min_length=1, max_length=4000)
+    # UUID em vez de str: o tipo nativo já valida formato e tamanho, e o código
+    # sempre gerou str(uuid4()) — o formato no Mongo não muda.
+    session_id: UUID | None = None

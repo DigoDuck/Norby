@@ -191,10 +191,21 @@ não existe naquele ambiente, então `request.client.host` devolve o IP do proxy
 para todo mundo. **Não** ligar `--forwarded-allow-ips="*"`: nessa versão do
 uvicorn o `always_trust` faz o middleware usar o *primeiro* item do
 `X-Forwarded-For`, que é o que o cliente controla, e o rate limit de login
-viraria spoofável. Em vez disso, as rotas autenticadas (`/ai/*`) usam `user_key`
-em `app/limiter.py`, chaveando pelo id do usuário. Login e cadastro são anônimos
-e seguem por IP, com o balde compartilhado como dívida aceita: a proteção contra
-força bruta continua valendo, o custo é colateral.
+viraria spoofável. Em vez disso, as rotas **autenticadas** usam `user_key` em
+`app/limiter.py`, chaveando pelo id do usuário: `/ai/*` e, desde 2026-08-15,
+`DELETE /auth/me` (antes um atacante podia encher o balde por IP e impedir
+qualquer usuário de excluir a própria conta).
+
+Login e cadastro são anônimos e seguem por IP, com o balde compartilhado como
+dívida aceita. **Revisado em 2026-08-15, e o custo é maior do que "colateral"
+como este texto dizia antes:** como o `get_remote_address` devolve o mesmo proxy
+para todo mundo e os limites são pequenos (10/min e 5/min), um atacante mantém
+os dois baldes cheios a custo quase zero e produz negação **global** de
+autenticação. A defesa contra força bruta vira um interruptor público de
+disponibilidade. Continua aceito porque a alternativa é desenho novo, não
+correção: limite por identificador de conta protegido por HMAC no login, mais
+teto global, e verificação de e-mail ou desafio antiabuso no cadastro. Se o
+cadastro for divulgado, isso deixa de ser dívida e vira bloqueante.
 
 **Outras dívidas assumidas** (decisões, não pendências esquecidas):
 - `POST /auth/register` responde "Email já cadastrado" (enumeração por essa via

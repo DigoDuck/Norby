@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Plus, Pencil, Trash2, Wallet } from "lucide-react";
 import { walletsApi } from "@/api/wallets";
-import { apiErrorMessage, formatBRL } from "@/lib/utils";
+import { apiErrorMessage, formatBRL, shadcnInputCls } from "@/lib/utils";
 import { CHART_SERIES, hashIndex } from "@/lib/palette";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import Money from "@/components/shared/Money";
@@ -95,8 +95,6 @@ export default function Wallets() {
     }
   }
 
-  const inputCls =
-    "bg-surface-inset border-line/10 text-content placeholder:text-content-3";
 
   const totalBalance = wallets.reduce((s, w) => s + parseFloat(w.balance), 0);
 
@@ -158,7 +156,7 @@ export default function Wallets() {
                 placeholder="Ex.: Nubank, Caixa, Carteira…"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className={inputCls}
+                className={shadcnInputCls}
               />
             </div>
             {!editing && (
@@ -179,7 +177,7 @@ export default function Wallets() {
                     onChange={(e) =>
                       setForm({ ...form, balance: e.target.value })
                     }
-                    className={`${inputCls} pl-10`}
+                    className={`${shadcnInputCls} pl-10`}
                   />
                 </div>
               </div>

@@ -51,7 +51,9 @@ const registerSchema = loginSchema
     path: ["confirmPassword"],
   });
 
-const inputCls =
+// Visual próprio da tela de entrada (mais alto e arredondado que o dos
+// formulários internos), por isso não usa o shadcnInputCls compartilhado.
+const authInputCls =
   "h-14 rounded-2xl pl-12 bg-surface/60 border-line/10 text-content placeholder:text-content-3 focus-visible:ring-focus";
 
 const benefits = [
@@ -306,7 +308,7 @@ export default function Auth() {
                   icon={User}
                   error={errors.name?.message}
                 >
-                  <Input placeholder="Seu nome" {...register("name")} className={inputCls} />
+                  <Input placeholder="Seu nome" {...register("name")} className={authInputCls} />
                 </Field>
               )}
 
@@ -321,7 +323,7 @@ export default function Auth() {
                   placeholder="Email"
                   autoComplete="email"
                   {...register("email")}
-                  className={inputCls}
+                  className={authInputCls}
                 />
               </Field>
 
@@ -336,7 +338,7 @@ export default function Auth() {
                   placeholder="Senha"
                   autoComplete={mode === "login" ? "current-password" : "new-password"}
                   {...register("password")}
-                  className={`${inputCls} pr-12`}
+                  className={`${authInputCls} pr-12`}
                 />
                 <button
                   type="button"
@@ -363,7 +365,7 @@ export default function Auth() {
                     placeholder="Confirmar senha"
                     autoComplete="new-password"
                     {...register("confirmPassword")}
-                    className={inputCls}
+                    className={authInputCls}
                   />
                 </Field>
               )}

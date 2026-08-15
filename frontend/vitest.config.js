@@ -12,7 +12,9 @@ export default defineConfig({
     globals: true,
     setupFiles: "./src/test/setup.js",
   },
-  // O transform de teste usa o runtime clássico de JSX; injeta o React para os
-  // componentes (.jsx) não precisarem importá-lo explicitamente.
+  // NÃO remover: o transform de teste do Vitest usa o runtime CLÁSSICO de JSX,
+  // então sem isto todo componente quebra com "React is not defined" — mesmo
+  // com React 19 e com o build de produção (vite.config.js) usando o runtime
+  // automático. Foi verificado removendo: 4 suites caem na hora.
   esbuild: { jsxInject: `import React from 'react'` },
 });
