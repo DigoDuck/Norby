@@ -97,11 +97,29 @@ Roteamento geral em `~/.claude/SKILLS.md`. Aqui só o que é específico do Norb
   antes de varrer arquivo.
 - **Verificação visual** usa a skill de projeto `run-app` (sobe a stack e
   dirige o Edge via Playwright). Frame branco é falha de launch, não sucesso.
-- **Fluxos de tracker do mattpocock não se aplicam** (`triage`, `to-spec`,
-  `to-tickets`, `wayfinder`): specs vivem no Obsidian e `docs/` é gitignored,
-  então não há tracker configurado. Usar `grilling` e `writing-plans`.
+- **Fluxos de tracker do mattpocock** (`triage`, `to-spec`, `to-tickets`,
+  `wayfinder`) estão configurados desde 2026-08-15: ver "## Agent skills"
+  abaixo. As specs de produto seguem no Obsidian; o que vive no repo é o
+  ticket acionável e a decisão de arquitetura.
 - **`pytest` e `alembic` rodam dentro do container** `norby_backend`; o host não
   conecta no Postgres do Docker.
+
+## Agent skills
+
+### Issue tracker
+
+Issues e specs vivem nas GitHub Issues de `DigoDuck/Norby`, via `gh` CLI.
+Ver `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Os cinco papéis canônicos, cada rótulo igual ao próprio nome.
+Ver `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: um `CONTEXT.md` na raiz mais `docs/adr/`.
+Ver `docs/agents/domain.md`.
 
 ## NÃO faça
 
