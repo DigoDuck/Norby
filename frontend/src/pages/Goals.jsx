@@ -23,7 +23,9 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 
-const TYPE_OPTIONS = [
+// Tipo de META (não de lançamento): nome próprio para não confundir com o
+// TRANSACTION_TYPE_OPTIONS compartilhado.
+const GOAL_TYPE_OPTIONS = [
   { value: "SAVINGS", label: "Poupança" },
   { value: "BUDGET", label: "Orçamento" },
 ];
@@ -185,7 +187,7 @@ export default function Goals() {
                     <Segmented
                       value={field.value}
                       onChange={field.onChange}
-                      options={TYPE_OPTIONS}
+                      options={GOAL_TYPE_OPTIONS}
                       ariaLabel="Tipo"
                     />
                   )}

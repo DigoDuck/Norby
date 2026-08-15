@@ -115,7 +115,7 @@ export default function Auth() {
   const [showPass, setShowPass] = useState(false);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
-  const { login } = useAuthStore();
+  const login = useAuthStore((s) => s.login);
   const navigate = useNavigate();
 
   const schema = mode === "login" ? loginSchema : registerSchema;

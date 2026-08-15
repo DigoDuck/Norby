@@ -31,6 +31,7 @@ import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import NorthStar from "@/components/shared/NorthStar";
 import AiOrb from "@/components/shared/AiOrb";
+import Money from "@/components/shared/Money";
 import HeroRing from "@/components/shared/HeroRing";
 import { useAuthStore } from "@/store/authStore";
 import { formatDateBR, formatBRL, parseDateOnly } from "@/lib/utils";
@@ -121,22 +122,6 @@ function ChartTooltip({ active, payload, label }) {
   );
 }
 
-// Valor monetário grande com os centavos rebaixados ("R$ 8.240" + ",50").
-// Mesmo tratamento do Money.jsx: centavos são informação secundária, não acento.
-function MoneyHero({ value }) {
-  const formatted = formatBRL(value);
-  const idx = formatted.lastIndexOf(",");
-  return (
-    <span className="tnum tracking-tight">
-      <span className="text-4xl font-semibold text-content">
-        {formatted.slice(0, idx)}
-      </span>
-      <span className="text-2xl font-semibold text-content-2">
-        {formatted.slice(idx)}
-      </span>
-    </span>
-  );
-}
 
 export default function Dashboard() {
   const [wallets, setWallets] = useState([]);
@@ -148,7 +133,7 @@ export default function Dashboard() {
   const [selectedWallet, setSelectedWallet] = useState("all");
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
 
   useEffect(() => {
     async function loadData() {
@@ -355,7 +340,11 @@ export default function Dashboard() {
 
           <div className="relative">
             <div className="flex items-baseline gap-2">
-              <MoneyHero value={shownBalance} />
+              <Money
+                value={shownBalance}
+                className="tracking-tight text-4xl font-semibold text-content"
+                centsClassName="text-2xl font-semibold text-content-2"
+              />
               <span className="text-xs font-medium text-content-3">BRL</span>
             </div>
             {balanceChange !== undefined && (

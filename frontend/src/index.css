@@ -29,7 +29,6 @@
 
   --line: 255 255 255;           /* usado sempre com alpha: border-line/10 */
   --state-hover: 255 255 255;
-  --state-active: 255 255 255;
   --overlay: 4 5 8;
 
   /* A referência separa os dois: azure no texto interativo, índigo no
@@ -86,7 +85,6 @@
 
   --line: 24 27 38;
   --state-hover: 24 27 38;
-  --state-active: 24 27 38;
   --overlay: 24 27 38;
 
   /* Mesma família azure do escuro. A referência usa #2C6FF4, que dá 4,2:1

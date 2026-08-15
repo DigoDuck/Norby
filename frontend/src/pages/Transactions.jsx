@@ -6,7 +6,7 @@ import { Plus, Search, Trash2, Pencil } from "lucide-react";
 
 import { transactionsApi } from "@/api/transactions";
 import { walletsApi } from "@/api/wallets";
-import { categoriesFor, emojiForCategory, reconcileCategory } from "@/lib/categories";
+import { categoriesFor, emojiForCategory, reconcileCategory, TRANSACTION_TYPE_OPTIONS } from "@/lib/categories";
 import { transactionSchema } from "@/lib/schemas";
 import { apiErrorMessage, formatDateBR, formatBRL, inputCls, toDateInput, todayInput } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
@@ -25,18 +25,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 
-const TYPE_OPTIONS = [
-  {
-    value: "EXPENSE",
-    label: "Despesa",
-    activeClass: "bg-expense/[0.15] text-expense ring-1 ring-inset ring-expense/30",
-  },
-  {
-    value: "INCOME",
-    label: "Receita",
-    activeClass: "bg-income/[0.15] text-income ring-1 ring-inset ring-income/30",
-  },
-];
 
 
 // Valores iniciais do formulário (date sempre fresca → função).
@@ -243,7 +231,7 @@ export default function Transactions() {
                         field.onChange(v);
                         setValue("category", reconcileCategory(v, getValues("category")));
                       }}
-                      options={TYPE_OPTIONS}
+                      options={TRANSACTION_TYPE_OPTIONS}
                       ariaLabel="Tipo"
                     />
                   )}

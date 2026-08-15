@@ -59,3 +59,19 @@ const CATEGORY_EMOJI = {
 export function emojiForCategory(category, type) {
   return CATEGORY_EMOJI[category] ?? (type === "INCOME" ? "🪙" : "💸");
 }
+
+// Opções do seletor de tipo de LANÇAMENTO. Estavam duplicadas byte a byte em
+// Relatórios e Recorrências. (Metas tem um TYPE_OPTIONS próprio, mas é outro
+// conceito — tipo de meta —, por isso não entra aqui.)
+export const TRANSACTION_TYPE_OPTIONS = [
+  {
+    value: "EXPENSE",
+    label: "Despesa",
+    activeClass: "bg-expense/[0.15] text-expense ring-1 ring-inset ring-expense/30",
+  },
+  {
+    value: "INCOME",
+    label: "Receita",
+    activeClass: "bg-income/[0.15] text-income ring-1 ring-inset ring-income/30",
+  },
+];

@@ -38,7 +38,8 @@ function SectionHead({ icon, children, danger }) {
 }
 
 export default function Settings() {
-  const { user, updateUser } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
+  const updateUser = useAuthStore((s) => s.updateUser);
   const navigate = useNavigate();
   // useId em vez de string fixa: o componente pode aparecer mais de uma vez na
   // árvore sem duplicar id, que quebraria a associação label/campo.

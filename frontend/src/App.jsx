@@ -15,7 +15,7 @@ import Privacidade from "./pages/Privacidade";
 import Termos from "./pages/Termos";
 
 function ProtectedRoute({ children }) {
-  const { isAuthenticated } = useAuthStore();
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   return isAuthenticated ? children : <Navigate to="/" replace />;
 }
 
