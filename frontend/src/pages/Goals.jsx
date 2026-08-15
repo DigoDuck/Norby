@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -51,6 +51,9 @@ export default function Goals() {
   const [goals, setGoals] = useState([]);
   const [insight, setInsight] = useState(null);
   const [open, setOpen] = useState(false);
+  // O card tracejado abre o mesmo diálogo do DialogTrigger do topo; sem
+  // registrar quem abriu, o foco não volta para o card ao fechar.
+  const ultimoGatilho = useRef(null);
   const [serverError, setServerError] = useState(null);
   const navigate = useNavigate();
 
@@ -149,7 +152,10 @@ export default function Goals() {
           >
             <Plus size={16} /> Nova meta
           </DialogTrigger>
-          <DialogContent className="bg-surface border-line/10 text-content">
+          <DialogContent
+            finalFocus={ultimoGatilho}
+            className="bg-surface border-line/10 text-content"
+          >
             <DialogHeader>
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-accent-fill flex items-center justify-center shrink-0">
@@ -448,7 +454,10 @@ export default function Goals() {
         {goals.length > 0 && (
           <button
             type="button"
-            onClick={() => setOpen(true)}
+            onClick={(e) => {
+              ultimoGatilho.current = e.currentTarget;
+              setOpen(true);
+            }}
             className="inset-panel min-h-[236px] border-dashed border-line/20 flex flex-col items-center justify-center gap-3 text-content-2 hover:border-accent/40 hover:text-content hover:bg-state/[0.02] transition-colors"
           >
             <div className="w-11 h-11 rounded-xl bg-accent/[0.12] flex items-center justify-center">
