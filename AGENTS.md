@@ -130,10 +130,16 @@ Ver `docs/agents/domain.md`.
 - **Nunca** commitar segredos. Variáveis de API, autenticação e banco ficam fora
   do git, apenas em `.env` (gitignored).
 
-## Git commits
+## Git commits e PRs
 
 - **Mensagens de commit em inglês** (comentários de código e docs do vault podem ser PT).
+- **Título e corpo de PR também em inglês.** Vale para descrição de issue e
+  qualquer texto que fique no GitHub. O que continua em PT: UI, comentários de
+  código, e os docs deste repo (`AGENTS.md`, `DESIGN.md`, `LGPD.md`, `README.md`).
 - **NUNCA** adicione "Co-authored-by: Claude" ou qualquer trailer de coautoria em mensagens de commit. Comandos `git commit` devem conter apenas a mensagem solicitada, sem assinatura ou atribuição ao Claude.
+- **NUNCA** adicione assinatura, atribuição ou selo de IA em corpo de PR,
+  descrição de issue ou qualquer texto gerado — nada de "Generated with", link
+  para claude.com ou similar.
 
 ## Deploy (produção)
 
