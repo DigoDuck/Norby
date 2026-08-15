@@ -4,6 +4,8 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 from uuid import UUID
 from datetime import datetime
 
+from app.schemas.common import ShortText
+
 class UserRegister(BaseModel):
     name: str = Field(min_length=2, max_length=100)
     email: EmailStr
@@ -41,7 +43,9 @@ class UserLogin(BaseModel):
     password: str
 
 class UserUpdate(BaseModel):
-    name: str | None = None
+    # ShortText espelha o String(100) da coluna: sem ele, um nome de 300 chars
+    # passava na validação e estourava no banco (500), e string vazia era aceita.
+    name: ShortText | None = None
     email: EmailStr | None = None
     
 class UserResponse(BaseModel):

@@ -286,3 +286,28 @@ async def test_update_me_ignores_explicit_null(make_auth_client):
     res = await ac.put("/auth/me", json={"name": None})
     assert res.status_code == 200
     assert res.json()["name"] == antes["name"]
+
+
+@pytest.mark.asyncio
+async def test_update_me_rejects_long_name(make_auth_client):
+    # UserRegister limita o nome a 100 chars, UserUpdate não limitava nada:
+    # o valor batia no String(100) da coluna e virava 500.
+    ac = await make_auth_client("Alice")
+    res = await ac.put("/auth/me", json={"name": "x" * 300})
+    assert res.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_update_me_rejects_empty_name(make_auth_client):
+    ac = await make_auth_client("Alice")
+    res = await ac.put("/auth/me", json={"name": ""})
+    assert res.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_update_me_changes_name(make_auth_client):
+    # Caminho feliz: a rota não tinha nenhum teste antes desta fase.
+    ac = await make_auth_client("Alice")
+    res = await ac.put("/auth/me", json={"name": "Nome Novo"})
+    assert res.status_code == 200
+    assert res.json()["name"] == "Nome Novo"
