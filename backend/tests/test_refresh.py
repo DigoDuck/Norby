@@ -100,3 +100,24 @@ async def test_reusing_rotated_token_revokes_all_sessions(client):
     assert (await client.post("/auth/refresh", json={"refresh_token": r1})).status_code == 401
     # O sucessor legítimo também morre: a sessão inteira foi invalidada.
     assert (await client.post("/auth/refresh", json={"refresh_token": r2})).status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_logout_with_rotated_token_revokes_successor(client):
+    # SEC-01: atacante rouba R0 e rotaciona para R1. A vítima desloga com R0.
+    # O logout precisa tratar isso como reuso e derrubar R1 também, senão o
+    # atacante mantém sessão viva por 7 dias depois do logout da vítima.
+    body = await _register(client)
+    r0 = body["refresh_token"]
+
+    r1 = (await client.post("/auth/refresh", json={"refresh_token": r0})).json()[
+        "refresh_token"
+    ]
+    assert r1
+
+    res = await client.post("/auth/logout", json={"refresh_token": r0})
+    assert res.status_code == 204
+
+    # O sucessor do atacante tem que estar morto.
+    after = await client.post("/auth/refresh", json={"refresh_token": r1})
+    assert after.status_code == 401

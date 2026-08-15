@@ -52,16 +52,6 @@ async def create_refresh_token(user_id: str, db: AsyncSession) -> str:
     await db.commit()
     return raw
 
-async def _get_valid_refresh(raw: str, db: AsyncSession) -> RefreshToken | None:
-    """Retorna o registro do refresh se existir, não estiver revogado e não tiver expirado."""
-    result = await db.execute(select(RefreshToken).where(RefreshToken.token_hash == _hash_token(raw)))
-    record = result.scalar_one_or_none()
-    if record is None or record.revoked:
-        return None
-    if record.expires_at <= datetime.now(timezone.utc):
-        return None
-    return record
-
 async def rotate_refresh_token(raw: str, db: AsyncSession) -> tuple[str, str, User] | None:
     """Valida, revoga o antigo e emite o par novo em uma transação só.
 
@@ -106,8 +96,35 @@ async def rotate_refresh_token(raw: str, db: AsyncSession) -> tuple[str, str, Us
     return create_access_token(str(user.id)), new_refresh, user
 
 async def revoke_refresh_token(raw: str, db: AsyncSession) -> None:
-    """Revoga um refresh específico (logout). Silencioso se o token não existir."""
-    record = await _get_valid_refresh(raw, db)
-    if record is not None:
-        record.revoked = True
+    """Revoga o refresh do logout. Token já rotacionado é sinal de roubo.
+
+    Apresentar no logout um token que já foi rotacionado significa que quem
+    está deslogando não tem o sucessor. Pode ser uma aba velha ou alguém que
+    roubou R0, rotacionou para R1 e deixou a vítima com R0. Nos dois casos, a
+    resposta segura é derrubar todas as sessões do usuário.
+
+    Continua idempotente: token desconhecido não levanta erro.
+    """
+    result = await db.execute(
+        select(RefreshToken)
+        .where(RefreshToken.token_hash == _hash_token(raw))
+        .with_for_update()
+    )
+    record = result.scalar_one_or_none()
+    if record is None:
+        return
+
+    if record.revoked:
+        await db.execute(
+            update(RefreshToken)
+            .where(
+                RefreshToken.user_id == record.user_id,
+                RefreshToken.revoked.is_(False),
+            )
+            .values(revoked=True)
+        )
         await db.commit()
+        return
+
+    record.revoked = True
+    await db.commit()
