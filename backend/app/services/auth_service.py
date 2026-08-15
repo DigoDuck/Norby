@@ -11,13 +11,24 @@ from app.config import get_settings
 from app.models.sql_models import RefreshToken, User
 
 settings = get_settings()
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# bcrypt_sha256 aplica SHA-256 antes do bcrypt, então a senha inteira conta e o
+# limite de 72 bytes do bcrypt cru deixa de existir. "bcrypt" permanece para
+# verificar hashes antigos, que serão atualizados no próximo login.
+pwd_context = CryptContext(schemes=["bcrypt_sha256", "bcrypt"], deprecated="auto")
 
 def hash_password(password: str) -> str:
     return pwd_context.hash(password) # Retorna a senha criptografada
 
 def verify_password(plain: str, hashed: str) -> bool:
     return pwd_context.verify(plain, hashed) # Compara a senha com hash
+
+def verify_and_upgrade(plain: str, hashed: str) -> tuple[bool, str | None]:
+    """Verifica a senha e devolve um hash novo quando o esquema está obsoleto."""
+    if not pwd_context.verify(plain, hashed):
+        return False, None
+    if pwd_context.needs_update(hashed):
+        return True, pwd_context.hash(plain)
+    return True, None
 
 # Hash descartável usado quando o e-mail não existe. Verificar contra ele custa
 # o mesmo que verificar contra um hash real, então o tempo de resposta do login

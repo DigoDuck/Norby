@@ -14,7 +14,7 @@ from app.schemas.user import (
     DeleteAccountRequest, UserResponse,
 )
 from app.services.auth_service import (
-    hash_password, verify_password, create_access_token,
+    hash_password, verify_password, verify_and_upgrade, create_access_token,
     create_refresh_token, rotate_refresh_token, revoke_refresh_token,
     _DUMMY_HASH,
 )
@@ -55,12 +55,19 @@ async def login(request: Request, payload: UserLogin, db: AsyncSession = Depends
 
     # bcrypt roda SEMPRE — contra o hash real ou contra o dummy. Sem isso, o
     # e-mail inexistente retorna ~200ms mais rápido e vira oráculo de enumeração.
-    # verify_password é bloqueante → offload para thread.
-    password_ok = await asyncio.to_thread(
-        verify_password, payload.password, user.password_hash if user else _DUMMY_HASH
+    # verify_and_upgrade é bloqueante e também produz o hash novo quando o
+    # usuário ainda está no bcrypt legado.
+    password_ok, upgraded_hash = await asyncio.to_thread(
+        verify_and_upgrade,
+        payload.password,
+        user.password_hash if user else _DUMMY_HASH,
     )
     if not user or not password_ok:
         raise HTTPException(status_code=401, detail="Credenciais inválidas")
+
+    if upgraded_hash:
+        user.password_hash = upgraded_hash
+        await db.commit()
 
     access = create_access_token(str(user.id))
     refresh = await create_refresh_token(str(user.id), db)

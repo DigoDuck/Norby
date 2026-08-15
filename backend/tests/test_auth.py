@@ -104,13 +104,13 @@ async def test_login_runs_bcrypt_even_for_unknown_email(client, monkeypatch):
     import app.routers.auth as auth_router
 
     calls = []
-    real = auth_router.verify_password
+    real = auth_router.verify_and_upgrade
 
     def spy(plain, hashed):
         calls.append(hashed)
         return real(plain, hashed)
 
-    monkeypatch.setattr(auth_router, "verify_password", spy)
+    monkeypatch.setattr(auth_router, "verify_and_upgrade", spy)
 
     res = await client.post(
         "/auth/login", json={"email": "ninguem@test.com", "password": "secret123"}
@@ -189,3 +189,54 @@ async def test_register_counts_password_bytes_not_characters(client):
     })
     assert res.status_code == 422
     assert any("72 bytes" in error["msg"] for error in res.json()["detail"])
+
+
+@pytest.mark.asyncio
+async def test_new_passwords_use_bcrypt_sha256(client, db_session):
+    from sqlalchemy import select
+    from app.models.sql_models import User
+
+    await client.post("/auth/register", json={
+        "name": "Fay", "email": "fay@test.com",
+        "password": "secret123", "accept_privacy": True,
+    })
+    user = (await db_session.execute(
+        select(User).where(User.email == "fay@test.com")
+    )).scalar_one()
+    assert user.password_hash.startswith("$bcrypt-sha256$")
+
+
+def test_verify_and_upgrade_rehashes_legacy_bcrypt():
+    from passlib.hash import bcrypt
+    from app.services.auth_service import verify_and_upgrade
+
+    legacy = bcrypt.using(rounds=12).hash("secret123")
+    ok, upgraded = verify_and_upgrade("secret123", legacy)
+    assert ok is True
+    assert upgraded is not None and upgraded.startswith("$bcrypt-sha256$")
+
+    ok, upgraded = verify_and_upgrade("senha-errada", legacy)
+    assert ok is False
+    assert upgraded is None
+
+
+@pytest.mark.asyncio
+async def test_login_persists_upgraded_legacy_bcrypt_hash(client, db_session):
+    from passlib.hash import bcrypt
+    from app.models.sql_models import User
+
+    user = User(
+        name="Gus",
+        email="gus@test.com",
+        password_hash=bcrypt.using(rounds=12).hash("secret123"),
+    )
+    db_session.add(user)
+    await db_session.commit()
+
+    response = await client.post(
+        "/auth/login", json={"email": "gus@test.com", "password": "secret123"}
+    )
+    assert response.status_code == 200
+
+    await db_session.refresh(user)
+    assert user.password_hash.startswith("$bcrypt-sha256$")
