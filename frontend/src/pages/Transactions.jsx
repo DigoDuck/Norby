@@ -7,7 +7,7 @@ import { Plus, Search, Trash2, Pencil } from "lucide-react";
 import { transactionsApi } from "@/api/transactions";
 import { walletsApi } from "@/api/wallets";
 import { recurringApi } from "@/api/recurring";
-import { categoriesFor, reconcileCategory } from "@/lib/categories";
+import { categoriesFor, emojiForCategory, reconcileCategory } from "@/lib/categories";
 import { transactionSchema } from "@/lib/schemas";
 import { apiErrorMessage, formatDateBR, formatBRL, inputCls, toDateInput, todayInput } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
@@ -39,22 +39,6 @@ const TYPE_OPTIONS = [
   },
 ];
 
-const CATEGORY_EMOJI = {
-  Alimentação: "🍽️",
-  Moradia: "🏠",
-  Transporte: "🚗",
-  Saúde: "🩺",
-  Educação: "📚",
-  Lazer: "🎬",
-  Compras: "🛍️",
-  "Contas & Serviços": "🧾",
-  Salário: "💼",
-  "Freelance/Extra": "✨",
-  Investimentos: "📈",
-  Reembolso: "↩️",
-  Presente: "🎁",
-  Outros: "🏷️",
-};
 
 // Valores iniciais do formulário (date sempre fresca → função).
 const emptyForm = () => ({
@@ -485,7 +469,7 @@ export default function Transactions() {
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="flex items-center gap-2 text-sm font-medium text-content">
-                    <span aria-hidden="true">{CATEGORY_EMOJI[t.category] ?? "🏷️"}</span>
+                    <span aria-hidden="true">{emojiForCategory(t.category, t.type)}</span>
                     <span className="truncate">{t.category}</span>
                   </p>
                   <p className="mt-1 truncate text-xs text-content-2">

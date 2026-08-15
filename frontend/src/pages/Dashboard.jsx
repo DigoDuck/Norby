@@ -36,6 +36,7 @@ import HeroRing from "@/components/shared/HeroRing";
 import { useAuthStore } from "@/store/authStore";
 import { formatDateBR, formatBRL, parseDateOnly } from "@/lib/utils";
 import { colorForCategory } from "@/lib/palette";
+import { emojiForCategory } from "@/lib/categories";
 import { computeRitmo, headroom } from "@/lib/ritmo";
 
 // Rótulo curto pt-BR de uma chave ano-mês ("2026-07" → "jul"), em horário local.
@@ -57,25 +58,6 @@ const INCOME_COLOR = "rgb(var(--income))";
 const EXPENSE_COLOR = "rgb(var(--expense))";
 
 const axisTick = { fill: "rgb(var(--axis))", fontSize: 11 };
-
-// Emoji por categoria (rascunho aprovado): chip visual das movimentações.
-const CATEGORY_EMOJI = {
-  "Alimentação": "🍔",
-  "Moradia": "🏠",
-  "Transporte": "🚇",
-  "Saúde": "💊",
-  "Educação": "📚",
-  "Lazer": "🎬",
-  "Compras": "🛍️",
-  "Contas & Serviços": "🧾",
-  "Salário": "💼",
-  "Freelance/Extra": "💰",
-  "Investimentos": "📈",
-  "Reembolso": "↩️",
-  "Presente": "🎁",
-};
-const emojiFor = (t) =>
-  CATEGORY_EMOJI[t.category] ?? (t.type === "INCOME" ? "🪙" : "💸");
 
 // "Hoje" / "Ontem" / "N dias atrás" / dd/mm/aaaa — para as movimentações.
 function relativeDay(value) {
@@ -925,7 +907,7 @@ export default function Dashboard() {
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="w-9 h-9 rounded-[10px] bg-surface-inset flex items-center justify-center shrink-0 text-base">
-                        {emojiFor(t)}
+                        {emojiForCategory(t.category, t.type)}
                       </div>
                       <div className="min-w-0">
                         <p className="text-[13px] font-medium text-content truncate">
