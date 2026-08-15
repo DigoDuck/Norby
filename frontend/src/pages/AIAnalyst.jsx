@@ -197,7 +197,12 @@ export default function AIAnalyst() {
 
         {/* Mensagens */}
         <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-6">
-          <div className="max-w-[760px] mx-auto flex flex-col gap-5">
+          {/* polite: anuncia a resposta quando ela chega, sem interromper a
+              leitura em curso. Antes, quem não via a tela esperava em silêncio. */}
+          <div
+            aria-live="polite"
+            className="max-w-[760px] mx-auto flex flex-col gap-5"
+          >
             {showingWelcome && (
               <div className="flex flex-col items-center gap-4 py-2 text-center sm:py-5">
                 <AiOrb size={72} />

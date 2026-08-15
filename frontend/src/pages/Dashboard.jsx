@@ -541,7 +541,16 @@ export default function Dashboard() {
             )}
           </div>
 
+          {/* role=img + resumo: o `title` de cada célula é invisível para
+              teclado e ignorado por boa parte dos leitores de tela, então o
+              painel inteiro só existia para quem usa mouse e enxerga. */}
           <div
+            role="img"
+            aria-label={
+              ritmo.hasPace
+                ? `${ritmo.onPaceCount} dos últimos ${STREAK_DAYS} dias dentro do seu ritmo de gasto diário`
+                : `Sem ritmo calculado nos últimos ${STREAK_DAYS} dias`
+            }
             className="grid gap-1 mt-4"
             style={{ gridTemplateColumns: "repeat(14, minmax(0, 1fr))" }}
           >
@@ -621,6 +630,7 @@ export default function Dashboard() {
                 </p>
                 <div
                   role="progressbar"
+                  aria-label={`Progresso da meta ${featuredGoal.name}`}
                   aria-valuenow={goalPct}
                   aria-valuemin={0}
                   aria-valuemax={100}
