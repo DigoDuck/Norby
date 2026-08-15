@@ -345,7 +345,6 @@
   mask-composite: exclude;
   pointer-events: none;
 }
-.stroke-iris-glow { box-shadow: var(--iris-glow); }
 
 /* Tile da marca: o mesmo espectro, agora chapado. rounded-[28%] mantém o
    squircle proporcional em qualquer tamanho, coisa que um raio fixo perde. */
