@@ -136,7 +136,12 @@ async def test_list_is_scoped_to_user(make_auth_client):
     w = await make_wallet(alice)
     await alice.post("/transactions/", json=tx_payload(w["id"]))
     assert len((await alice.get("/transactions/")).json()) == 1
-    assert len((await bob.get("/transactions/")).json()) == 0
+    bob_res = await bob.get("/transactions/")
+    assert len(bob_res.json()) == 0
+    # x-total-count precisa herdar o mesmo escopo de usuário do corpo: sem
+    # isto, um bug futuro na query de contagem vazaria quantas transações de
+    # Alice existem, mesmo com a lista do Bob corretamente vazia.
+    assert bob_res.headers["x-total-count"] == "0"
 
 
 @pytest.mark.asyncio
