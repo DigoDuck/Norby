@@ -40,6 +40,17 @@ async def setup_database():
     yield
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
+    # Fix round 2 (issue #22, investigação do flake em test_wait_is_capped_at_60_seconds):
+    # test_engine é criado uma única vez no import deste módulo (fora de
+    # qualquer event loop), mas com asyncio_default_fixture_loop_scope=function
+    # (pytest.ini) cada teste roda num event loop NOVO. Confirmado por sonda
+    # manual: id(loop) muda a cada teste, id(engine)/id(engine.pool) não — o
+    # mesmo AsyncEngine/pool é reusado por 170 loops diferentes numa suíte
+    # completa. É o antipadrão que a documentação do SQLAlchemy alerta
+    # explicitamente (primitivas assíncronas internas do pool podem ficar
+    # presas ao loop em que foram criadas). dispose() força o pool a soltar
+    # esse estado no fim de cada teste, antes do próximo loop assumir.
+    await test_engine.dispose()
 
 
 def _override_get_db():
