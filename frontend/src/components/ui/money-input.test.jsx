@@ -116,6 +116,21 @@ describe("MoneyInput", () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
+  it("com allowNegative, colar um valor com '-' num campo zerado preserva o sinal", () => {
+    // Bug real: colar "-150,50" descartava o "-" e enviava 150.5, porque o
+    // sinal só era reaplicado a partir do "value" anterior (que em 0 não tem
+    // sinal nenhum pra reaplicar). O texto colado tem que ser lido também.
+    const { input, onChange } = setup(0, { allowNegative: true });
+    fireEvent.change(input, { target: { value: "-150,50" } });
+    expect(onChange).toHaveBeenLastCalledWith(-150.5);
+  });
+
+  it("sem allowNegative, colar um valor com '-' ignora o sinal", () => {
+    const { input, onChange } = setup(0);
+    fireEvent.change(input, { target: { value: "-150,50" } });
+    expect(onChange).toHaveBeenLastCalledWith(150.5);
+  });
+
   it("corta em 15 dígitos de centavos (MAX_MONEY): o 16º dígito é ignorado, não desloca o número", () => {
     const { input, onChange } = setup();
 

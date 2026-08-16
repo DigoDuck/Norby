@@ -472,7 +472,7 @@ export default function Goals() {
                 {isSavings && (
                   <AmountPromptDialog
                     title={`Aporte em "${g.name}"`}
-                    description="Use um valor negativo para corrigir um aporte."
+                    description="Escolha se é um aporte novo ou a correção de um valor já lançado."
                     submitLabel="Adicionar"
                     errorFallback="Não foi possível salvar o aporte."
                     onSubmit={(amount) => contribute(g.id, amount)}

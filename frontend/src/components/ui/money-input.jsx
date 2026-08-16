@@ -13,6 +13,11 @@ import { Input } from "@/components/ui/input";
 // "-" num valor positivo torna negativo, digitar de novo torna positivo. Com
 // allowNegative desligado, "-" é ignorado como qualquer outro caractere não
 // numérico, igual ao comportamento de sempre.
+//
+// Colar também carrega sinal: um "-" presente no texto que chega (colagem ou
+// digitação livre) vira negativo mesmo partindo de um campo zerado — não dá
+// pra depender só do "value" anterior, porque em 0 não existe sinal prévio
+// pra reaplicar (ver handleChange).
 function formatar(centavos) {
   return (centavos / 100).toLocaleString("pt-BR", {
     minimumFractionDigits: 2,
@@ -24,13 +29,17 @@ function MoneyInput({ value = 0, onChange, allowNegative = false, ...props }) {
   const centavos = Math.round(Number(value || 0) * 100);
 
   function handleChange(e) {
-    const digitos = e.target.value.replace(/\D/g, "");
+    const texto = e.target.value;
+    const digitos = texto.replace(/\D/g, "");
     // Corta em 15 dígitos: MAX_MONEY (Numeric(15,2) no banco) é
     // 9999999999999.99 — 13 dígitos inteiros + 2 decimais = 15 dígitos de
     // centavos. Acima disso o dígito extra é ignorado, não desloca o número.
     const limitado = digitos.slice(0, 15);
     const magnitude = Number(limitado || 0) / 100;
-    const negativo = allowNegative && value < 0;
+    // Sinal vem do texto que chegou (colar "-150,50" num campo zerado tem
+    // que resultar em negativo) OU do sinal que o valor já carregava (digitar
+    // por cima de um valor já negativo não apaga o "-" que ele mostrava).
+    const negativo = allowNegative && (texto.includes("-") || value < 0);
     onChange(negativo ? -magnitude : magnitude);
   }
 
