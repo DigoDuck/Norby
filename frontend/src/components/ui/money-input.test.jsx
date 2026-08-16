@@ -3,10 +3,27 @@ import { render, screen, fireEvent } from "@testing-library/react";
 
 import { MoneyInput } from "./money-input";
 
-function setup(valorInicial = 0) {
+function setup(valorInicial = 0, extraProps = {}) {
   const onChange = vi.fn();
-  render(<MoneyInput value={valorInicial} onChange={onChange} aria-label="Valor" />);
-  return { input: screen.getByLabelText("Valor"), onChange };
+  const utils = render(
+    <MoneyInput value={valorInicial} onChange={onChange} aria-label="Valor" {...extraProps} />,
+  );
+  return {
+    input: screen.getByLabelText("Valor"),
+    onChange,
+    // Re-renderiza com um novo `value`: MoneyInput é controlado, então o
+    // teste precisa "devolver" o valor emitido pelo onChange como faria o
+    // componente pai, senão o segundo evento ainda vê o value antigo.
+    setValue: (novoValor, novasProps = extraProps) =>
+      utils.rerender(
+        <MoneyInput
+          value={novoValor}
+          onChange={onChange}
+          aria-label="Valor"
+          {...novasProps}
+        />,
+      ),
+  };
 }
 
 describe("MoneyInput", () => {
@@ -78,5 +95,34 @@ describe("MoneyInput", () => {
     fireEvent.select(input);
     expect(input.selectionStart).toBe(0);
     expect(input.selectionEnd).toBe(fim);
+  });
+
+  it("com allowNegative, a tecla '-' alterna o sinal do valor atual", () => {
+    const { input, onChange, setValue } = setup(150.5, { allowNegative: true });
+
+    fireEvent.keyDown(input, { key: "-" });
+    expect(onChange).toHaveBeenLastCalledWith(-150.5);
+
+    // Simula o pai controlado devolvendo o valor que o onChange emitiu.
+    setValue(-150.5);
+    fireEvent.keyDown(input, { key: "-" });
+    expect(onChange).toHaveBeenLastCalledWith(150.5);
+  });
+
+  it("sem allowNegative (default), a tecla '-' é ignorada como qualquer outro caractere", () => {
+    const { input, onChange } = setup(150.5);
+
+    fireEvent.keyDown(input, { key: "-" });
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("corta em 15 dígitos de centavos (MAX_MONEY): o 16º dígito é ignorado, não desloca o número", () => {
+    const { input, onChange } = setup();
+
+    fireEvent.change(input, { target: { value: "999999999999999" } }); // 15 dígitos
+    expect(onChange).toHaveBeenLastCalledWith(9999999999999.99);
+
+    fireEvent.change(input, { target: { value: "9999999999999999" } }); // 16 dígitos
+    expect(onChange).toHaveBeenLastCalledWith(9999999999999.99);
   });
 });

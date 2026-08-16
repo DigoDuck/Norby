@@ -11,7 +11,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { apiErrorMessage, inputCls } from "@/lib/utils";
+import { MoneyInput } from "@/components/ui/money-input";
+import { apiErrorMessage } from "@/lib/utils";
 
 /**
  * Diálogo com um input de valor validado (R$), no lugar de `prompt()`.
@@ -29,22 +30,21 @@ export function AmountPromptDialog({
 }) {
   const inputId = useId();
   const [open, setOpen] = useState(false);
-  const [value, setValue] = useState("");
+  const [amount, setAmount] = useState(0);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
 
   function handleOpenChange(v) {
     setOpen(v);
     if (!v) {
-      setValue("");
+      setAmount(0);
       setError(null);
     }
   }
 
   async function handleSubmit(e) {
     e.preventDefault();
-    const amount = Number(value);
-    if (value.trim() === "" || Number.isNaN(amount) || amount === 0) {
+    if (amount === 0) {
       setError("Informe um valor diferente de zero.");
       return;
     }
@@ -74,15 +74,7 @@ export function AmountPromptDialog({
             <label htmlFor={inputId} className="text-xs text-content-2">
               Valor
             </label>
-            <input
-              id={inputId}
-              type="number"
-              step="0.01"
-              inputMode="decimal"
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              className={inputCls}
-            />
+            <MoneyInput id={inputId} value={amount} onChange={setAmount} allowNegative />
           </div>
 
           {error && <p className="text-danger text-xs">{error}</p>}

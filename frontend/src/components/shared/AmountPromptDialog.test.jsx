@@ -18,7 +18,11 @@ describe("AmountPromptDialog", () => {
       />,
     );
     open();
-    fireEvent.change(await screen.findByLabelText("Valor"), { target: { value: "-150.5" } });
+    const input = await screen.findByLabelText("Valor");
+    // MoneyInput: digita o valor e depois usa "-" para alternar o sinal
+    // (correção de um aporte lançado errado), como no fluxo real do usuário.
+    fireEvent.change(input, { target: { value: "150,50" } });
+    fireEvent.keyDown(input, { key: "-" });
     fireEvent.click(screen.getByRole("button", { name: "Adicionar" }));
     await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(-150.5));
   });
