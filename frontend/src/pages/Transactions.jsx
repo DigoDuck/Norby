@@ -27,6 +27,8 @@ import {
 
 
 
+const PAGE_SIZE = 50;
+
 // Valores iniciais do formulário (date sempre fresca → função).
 const emptyForm = () => ({
   wallet_id: "",
@@ -46,6 +48,8 @@ export default function Transactions() {
   const [serverError, setServerError] = useState(null);
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState("");
+  const [offset, setOffset] = useState(0);
+  const [total, setTotal] = useState(0);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -70,11 +74,18 @@ export default function Transactions() {
   // request, só ignorar a resposta obsoleta. Trocar se o custo da chamada pesar.
   const requisicaoAtual = useRef(0);
 
-  async function load(params = {}) {
+  async function load(params = {}, novoOffset = 0) {
     const seq = ++requisicaoAtual.current;
-    const res = await transactionsApi.list(params);
+    const res = await transactionsApi.list({
+      ...params,
+      limit: PAGE_SIZE,
+      offset: novoOffset,
+    });
     if (seq !== requisicaoAtual.current) return; // resposta obsoleta
     setTransactions(res.data);
+    // O header só chega ao JS porque o backend o declara em expose_headers.
+    setTotal(Number(res.headers?.["x-total-count"] ?? res.data.length));
+    setOffset(novoOffset);
   }
 
   useEffect(() => {
@@ -107,7 +118,7 @@ export default function Transactions() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const reload = () => load(filterType ? { type: filterType } : {});
+  const reload = () => load(filterType ? { type: filterType } : {}, 0);
 
   const walletOptions = wallets.map((w) => ({ value: w.id, label: w.name }));
 
@@ -178,10 +189,10 @@ export default function Transactions() {
     reload();
   }
 
-  // Teto que o backend aplica na listagem (Query(200, le=500)). A busca é
-  // client-side sobre o que veio, então precisamos saber se batemos no teto
-  // para não afirmar que nada existe quando só não foi carregado.
-  const LISTAGEM_MAX = 200;
+  // A busca é client-side sobre a página carregada, não sobre todo o
+  // histórico. Se houver mais páginas, precisamos avisar em vez de afirmar
+  // que a transação não existe.
+  const haMaisPaginas = total > transactions.length;
 
   const filtered = transactions.filter(
     (t) =>
@@ -366,7 +377,7 @@ export default function Transactions() {
                 aria-pressed={filterType === t}
                 onClick={() => {
                   setFilterType(t);
-                  load(t ? { type: t } : {});
+                  load(t ? { type: t } : {}, 0);
                 }}
                 className={`rounded-xl px-3 py-2 text-sm transition-colors ${
                   filterType === t
@@ -523,9 +534,37 @@ export default function Transactions() {
 
         {filtered.length === 0 && (
           <div className="text-center py-12 text-content-3 text-sm">
-            {search && transactions.length >= LISTAGEM_MAX
-              ? "Nenhuma transação encontrada entre as mais recentes. A busca cobre só as transações já carregadas."
+            {search && haMaisPaginas
+              ? "Nenhuma transação encontrada nesta página. A busca cobre só as transações já carregadas."
               : "Nenhuma transação encontrada."}
+          </div>
+        )}
+
+        {total > PAGE_SIZE && (
+          <div className="flex items-center justify-between gap-4 pt-2">
+            <p className="text-sm text-content-2 tnum">
+              {offset + 1}–{Math.min(offset + PAGE_SIZE, total)} de {total}
+            </p>
+            <div className="flex gap-2">
+              <Button
+                variant="ghost"
+                disabled={offset === 0}
+                onClick={() =>
+                  load(filterType ? { type: filterType } : {}, offset - PAGE_SIZE)
+                }
+              >
+                Anterior
+              </Button>
+              <Button
+                variant="ghost"
+                disabled={offset + PAGE_SIZE >= total}
+                onClick={() =>
+                  load(filterType ? { type: filterType } : {}, offset + PAGE_SIZE)
+                }
+              >
+                Próxima
+              </Button>
+            </div>
           </div>
         )}
       </div>
