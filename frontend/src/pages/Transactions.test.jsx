@@ -30,9 +30,11 @@ function tx(id) {
   };
 }
 
-function pagina(qtd, total) {
+// prefixo diferente por página deixa os itens distinguíveis no DOM, para
+// provar que o render acompanhou a troca de página e não só a chamada à API.
+function pagina(qtd, total, prefixo = "") {
   return {
-    data: Array.from({ length: qtd }, (_, i) => tx(String(i))),
+    data: Array.from({ length: qtd }, (_, i) => tx(`${prefixo}${i}`)),
     headers: { "x-total-count": String(total) },
   };
 }
@@ -42,9 +44,9 @@ describe("Transactions", () => {
     vi.clearAllMocks();
   });
 
-  it("pede a primeira página com limit e offset explícitos", async () => {
+  it("pede a primeira página com limit e offset explícitos e renderiza os itens recebidos", async () => {
     // Sem limit explícito o backend aplica 200 e o resto some calado.
-    transactionsApi.list.mockResolvedValue(pagina(50, 50));
+    transactionsApi.list.mockResolvedValue(pagina(50, 50, "p1-"));
 
     render(
       <MemoryRouter>
@@ -57,16 +59,23 @@ describe("Transactions", () => {
         expect.objectContaining({ limit: 50, offset: 0 }),
       ),
     );
+    // Não basta a API ter sido chamada certo: setTransactions precisa ter
+    // de fato colocado a resposta na tela.
+    expect((await screen.findAllByText("Item p1-0")).length).toBeGreaterThan(0);
   });
 
-  it("avança de página e busca o offset seguinte", async () => {
-    transactionsApi.list.mockResolvedValue(pagina(50, 120));
+  it("avança de página, busca o offset seguinte e troca a lista renderizada", async () => {
+    transactionsApi.list
+      .mockResolvedValueOnce(pagina(50, 120, "p1-"))
+      .mockResolvedValueOnce(pagina(50, 120, "p2-"));
 
     render(
       <MemoryRouter>
         <Transactions />
       </MemoryRouter>,
     );
+
+    expect((await screen.findAllByText("Item p1-0")).length).toBeGreaterThan(0);
 
     const proxima = await screen.findByRole("button", { name: /próxima/i });
     fireEvent.click(proxima);
@@ -76,6 +85,11 @@ describe("Transactions", () => {
         expect.objectContaining({ limit: 50, offset: 50 }),
       ),
     );
+    // Prova que o render acompanhou a chamada: item da página 1 some, item
+    // da página 2 aparece, e o contador reflete a faixa nova.
+    expect((await screen.findAllByText("Item p2-0")).length).toBeGreaterThan(0);
+    expect(screen.queryByText("Item p1-0")).not.toBeInTheDocument();
+    expect(await screen.findByText(/51.+100.+120/)).toBeInTheDocument();
   });
 
   it("mostra quantas transações existem no total", async () => {
