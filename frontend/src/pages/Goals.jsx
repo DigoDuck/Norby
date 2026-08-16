@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Plus, Trash2, Target, PiggyBank, ArrowRight, Check } from "lucide-react";
+import { Plus, Trash2, Target, PiggyBank, ArrowRight, Check, Pencil } from "lucide-react";
 
 import { goalsApi } from "@/api/goals";
 import { aiApi } from "@/api/ai";
@@ -57,6 +57,7 @@ export default function Goals() {
   // registrar quem abriu, o foco não volta para o card ao fechar.
   const ultimoGatilho = useRef(null);
   const [serverError, setServerError] = useState(null);
+  const [editing, setEditing] = useState(null);
   const navigate = useNavigate();
 
   const {
@@ -86,23 +87,43 @@ export default function Goals() {
     setOpen(v);
     if (!v) {
       setServerError(null);
+      setEditing(null);
       reset(EMPTY_FORM);
     }
   }
 
+  // Abre o dialog em modo edição, pré-preenchido com nome e valor-alvo.
+  function abrirEdicao(goal) {
+    setEditing(goal);
+    setServerError(null);
+    reset({ ...EMPTY_FORM, name: goal.name, target_amount: Number(goal.target_amount) });
+    setOpen(true);
+  }
+
   async function onSubmit(data) {
     setServerError(null);
-    const payload = {
-      name: data.name,
-      type: data.type,
-      target_amount: data.target_amount,
-      ...(data.type === "SAVINGS"
-        ? { current_amount: data.current_amount || 0 }
-        : { category: data.category }),
-    };
     try {
-      await goalsApi.create(payload);
-      setOpen(false);
+      if (editing) {
+        // GoalUpdate aceita SÓ name e target_amount; qualquer outro campo é
+        // descartado em silêncio pelo backend.
+        await goalsApi.update(editing.id, {
+          name: data.name,
+          target_amount: data.target_amount,
+        });
+      } else {
+        await goalsApi.create({
+          name: data.name,
+          type: data.type,
+          target_amount: data.target_amount,
+          ...(data.type === "SAVINGS"
+            ? { current_amount: data.current_amount || 0 }
+            : { category: data.category }),
+        });
+      }
+      // Via handleOpenChange (não só setOpen) para limpar `editing` e o
+      // formulário: senão "Nova meta" logo depois de editar reabre em modo
+      // edição, com o risco de um PUT no id da meta antiga em vez de POST.
+      handleOpenChange(false);
       load();
     } catch (err) {
       setServerError(apiErrorMessage(err, "Não foi possível salvar a meta."));
@@ -169,7 +190,7 @@ export default function Goals() {
                   <Target size={20} className="text-accent-contrast" />
                 </div>
                 <div>
-                  <DialogTitle>Nova meta</DialogTitle>
+                  <DialogTitle>{editing ? "Editar meta" : "Nova meta"}</DialogTitle>
                   <p className="text-xs text-content-2 mt-0.5">
                     Poupança para um objetivo ou orçamento de uma categoria
                   </p>
@@ -178,21 +199,23 @@ export default function Goals() {
             </DialogHeader>
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-3 mt-1">
-              {/* Tipo */}
-              <Field label="Tipo" error={errors.type?.message}>
-                <Controller
-                  name="type"
-                  control={control}
-                  render={({ field }) => (
-                    <Segmented
-                      value={field.value}
-                      onChange={field.onChange}
-                      options={GOAL_TYPE_OPTIONS}
-                      ariaLabel="Tipo"
-                    />
-                  )}
-                />
-              </Field>
+              {/* Tipo (edição não altera: GoalUpdate não aceita este campo) */}
+              {!editing && (
+                <Field label="Tipo" error={errors.type?.message}>
+                  <Controller
+                    name="type"
+                    control={control}
+                    render={({ field }) => (
+                      <Segmented
+                        value={field.value}
+                        onChange={field.onChange}
+                        options={GOAL_TYPE_OPTIONS}
+                        ariaLabel="Tipo"
+                      />
+                    )}
+                  />
+                </Field>
+              )}
 
               {/* Nome */}
               <Field label="Nome" htmlFor="name" error={errors.name?.message}>
@@ -221,8 +244,9 @@ export default function Goals() {
                 />
               </Field>
 
-              {/* Condicional: SAVINGS → já guardado; BUDGET → categoria */}
-              {type === "SAVINGS" ? (
+              {/* Condicional: SAVINGS → já guardado; BUDGET → categoria.
+                  Edição não altera nenhum dos dois: GoalUpdate não aceita. */}
+              {!editing && (type === "SAVINGS" ? (
                 <Field
                   label="Já guardado (opcional)"
                   htmlFor="current_amount"
@@ -258,7 +282,7 @@ export default function Goals() {
                     )}
                   />
                 </Field>
-              )}
+              ))}
 
               {serverError && (
                 <p className="text-danger text-xs">{serverError}</p>
@@ -278,7 +302,7 @@ export default function Goals() {
                   disabled={isSubmitting}
                   className="flex-[1.4] bg-accent-fill text-accent-contrast hover:bg-accent-fill/90 font-medium"
                 >
-                  {isSubmitting ? "Salvando…" : "Criar meta"}
+                  {isSubmitting ? "Salvando…" : editing ? "Salvar" : "Criar meta"}
                 </Button>
               </div>
             </form>
@@ -436,6 +460,18 @@ export default function Goals() {
                     }
                   />
                 )}
+                <button
+                  type="button"
+                  title="Editar"
+                  aria-label={`Editar meta ${g.name}`}
+                  onClick={(e) => {
+                    ultimoGatilho.current = e.currentTarget;
+                    abrirEdicao(g);
+                  }}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg border border-line/10 text-content-3 hover:text-accent hover:border-accent/40 transition-colors"
+                >
+                  <Pencil size={14} />
+                </button>
                 <ConfirmDialog
                   title="Remover esta meta?"
                   confirmLabel="Remover"

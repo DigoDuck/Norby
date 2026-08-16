@@ -71,4 +71,43 @@ describe("Goals", () => {
     await abrirEFechar(botaoTopo);
     await waitFor(() => expect(botaoTopo).toHaveFocus());
   });
+
+  it("edita nome e valor da meta pelo dialog de edição", async () => {
+    goalsApi.update.mockResolvedValue({ data: { ...META, name: "Reserva nova" } });
+    renderGoals();
+
+    fireEvent.click(await screen.findByRole("button", { name: /editar meta/i }));
+    const dialog = await screen.findByRole("dialog");
+
+    fireEvent.change(screen.getByLabelText(/nome/i), {
+      target: { value: "Reserva nova" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /salvar/i }));
+
+    await waitFor(() =>
+      expect(goalsApi.update).toHaveBeenCalledWith("1", {
+        name: "Reserva nova",
+        target_amount: 1000,
+      }),
+    );
+    // O dialog fecha no sucesso; se ficar aberto, o usuário salva duas vezes.
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
+  });
+
+  it("não envia campos que o backend ignora na edição", async () => {
+    // GoalUpdate aceita só name e target_amount. Mandar type/category dá a
+    // impressão de que foram salvos.
+    goalsApi.update.mockResolvedValue({ data: META });
+    renderGoals();
+
+    fireEvent.click(await screen.findByRole("button", { name: /editar meta/i }));
+    await screen.findByRole("dialog");
+    fireEvent.click(screen.getByRole("button", { name: /salvar/i }));
+
+    await waitFor(() => expect(goalsApi.update).toHaveBeenCalled());
+    const [, payload] = goalsApi.update.mock.calls[0];
+    expect(Object.keys(payload).sort()).toEqual(["name", "target_amount"]);
+  });
 });
