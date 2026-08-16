@@ -95,7 +95,11 @@ export default function Goals() {
 
   // Abre o dialog em modo edição, pré-preenchido com nome e valor-alvo.
   // `type` também é preservado: não é enviado no PUT, mas o rótulo do campo
-  // de valor ("Valor-alvo" vs "Teto mensal") depende dele.
+  // de valor ("Valor-alvo" vs "Teto mensal") depende dele. `category` também
+  // precisa vir junto: o campo de categoria não é renderizado em modo edição,
+  // mas o .refine do goalSchema exige categoria não-vazia quando type ===
+  // BUDGET. Sem isso a validação falha contra um campo invisível e o submit
+  // trava sem erro visível nenhum.
   function abrirEdicao(goal) {
     setEditing(goal);
     setServerError(null);
@@ -104,8 +108,17 @@ export default function Goals() {
       name: goal.name,
       target_amount: Number(goal.target_amount),
       type: goal.type,
+      category: goal.category || "",
     });
     setOpen(true);
+  }
+
+  // Rede de segurança: se a validação falhar por qualquer motivo que não
+  // tenha campo visível pra mostrar o erro (ex.: uma meta BUDGET legada com
+  // categoria vazia, o que o backend não deveria permitir mas não é garantia
+  // absoluta), o usuário vê uma mensagem em vez de o botão não fazer nada.
+  function onInvalid() {
+    setServerError("Confira os campos do formulário.");
   }
 
   async function onSubmit(data) {
@@ -206,7 +219,7 @@ export default function Goals() {
               </div>
             </DialogHeader>
 
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-3 mt-1">
+            <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="space-y-3 mt-1">
               {/* Tipo (edição não altera: GoalUpdate não aceita este campo) */}
               {!editing && (
                 <Field label="Tipo" error={errors.type?.message}>

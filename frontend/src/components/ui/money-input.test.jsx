@@ -41,4 +41,29 @@ describe("MoneyInput", () => {
     const { input } = setup(1234.5);
     expect(input).toHaveValue("1.234,50");
   });
+
+  it("prende o cursor no fim ao clicar no meio do texto", () => {
+    // Bug real: clicar no meio de "1.234,56" e digitar deixava o dígito
+    // entrar na posição do clique em vez de ir pro fim, trocando o valor
+    // inteiro sem o usuário entender por quê. jsdom não simula clique →
+    // posição de caret (não calcula layout de texto), então simulamos o
+    // clique no meio ajustando selectionRange manualmente antes do evento —
+    // o que dá pra verificar aqui é que o handler sempre devolve a seleção
+    // pro fim, não a posição visual real do clique.
+    const { input } = setup(1234.56);
+    input.setSelectionRange(3, 3);
+    fireEvent.click(input);
+    const fim = input.value.length;
+    expect(input.selectionStart).toBe(fim);
+    expect(input.selectionEnd).toBe(fim);
+  });
+
+  it("prende o cursor no fim também por navegação de teclado (setas, home)", () => {
+    const { input } = setup(1234.56);
+    input.setSelectionRange(0, 0); // simula "Home"
+    fireEvent.keyUp(input, { key: "Home" });
+    const fim = input.value.length;
+    expect(input.selectionStart).toBe(fim);
+    expect(input.selectionEnd).toBe(fim);
+  });
 });

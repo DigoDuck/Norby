@@ -124,6 +124,32 @@ describe("Goals", () => {
     expect(Object.keys(payload).sort()).toEqual(["name", "target_amount"]);
   });
 
+  it("salva a edição de uma meta BUDGET (categoria some do form mas não pode travar o submit)", async () => {
+    // Bug real: abrirEdicao não copiava goal.category pro form. O type é
+    // preservado (correção anterior) e o .refine do goalSchema exige categoria
+    // não-vazia quando type === BUDGET — mas o campo de categoria não é
+    // renderizado em modo edição, então o erro de validação não tinha onde
+    // aparecer: handleSubmit bloqueava calado e nenhuma request saía.
+    goalsApi.list.mockResolvedValue({ data: [META_BUDGET] });
+    goalsApi.update.mockResolvedValue({ data: META_BUDGET });
+    renderGoals();
+
+    fireEvent.click(await screen.findByRole("button", { name: /editar meta/i }));
+    await screen.findByRole("dialog");
+
+    fireEvent.click(screen.getByRole("button", { name: /salvar/i }));
+
+    await waitFor(() =>
+      expect(goalsApi.update).toHaveBeenCalledWith("2", {
+        name: "Mercado",
+        target_amount: 600,
+      }),
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
+  });
+
   it("mostra o rótulo 'Teto mensal' ao editar uma meta do tipo BUDGET", async () => {
     // reset() do abrirEdicao precisa preservar goal.type: EMPTY_FORM.type é
     // "SAVINGS", e sem isso o rótulo do campo de valor mostra "Valor-alvo"

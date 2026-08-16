@@ -25,6 +25,19 @@ function MoneyInput({ value = 0, onChange, ...props }) {
     onChange(Number(limitado || 0) / 100);
   }
 
+  // Preenchimento é sempre pela direita: o cursor tem que ficar preso no fim,
+  // senão clicar no meio do texto faz a tecla seguinte entrar numa posição
+  // diferente da que o usuário via (o dígito cai no lugar errado). Cobre
+  // clique, foco por tab e navegação por teclado — qualquer jeito de mudar a
+  // seleção reposiciona ela no fim de novo.
+  function fixarCursorNoFim(e) {
+    const el = e.target;
+    const fim = el.value.length;
+    if (el.selectionStart !== fim || el.selectionEnd !== fim) {
+      el.setSelectionRange(fim, fim);
+    }
+  }
+
   return (
     <Input
       {...props}
@@ -32,6 +45,10 @@ function MoneyInput({ value = 0, onChange, ...props }) {
       inputMode="numeric"
       value={formatar(centavos)}
       onChange={handleChange}
+      onClick={fixarCursorNoFim}
+      onFocus={fixarCursorNoFim}
+      onKeyUp={fixarCursorNoFim}
+      onSelect={fixarCursorNoFim}
     />
   );
 }

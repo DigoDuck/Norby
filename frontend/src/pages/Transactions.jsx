@@ -589,7 +589,9 @@ export default function Transactions() {
                 ? "Busca ativa: contagem total oculta"
                 : totalConhecido
                   ? `${offset + 1}–${Math.min(offset + PAGE_SIZE, total)} de ${total}`
-                  : `${offset + 1}–${offset + transactions.length}`}
+                  : transactions.length === 0
+                    ? "Nenhuma transação nesta página"
+                    : `${offset + 1}–${offset + transactions.length}`}
             </p>
             <div className="flex gap-2">
               <Button

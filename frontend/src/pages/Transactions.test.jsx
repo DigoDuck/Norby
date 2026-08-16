@@ -149,4 +149,70 @@ describe("Transactions", () => {
     // Sem total conhecido, o contador não pode inventar um "de X".
     expect(screen.getByText("1–50")).toBeInTheDocument();
   });
+
+  it("não mostra faixa invertida quando, sem X-Total-Count, a página seguinte vem vazia", async () => {
+    // Heurística do modo fallback: "página veio cheia, habilita Próxima". Com
+    // um total que é múltiplo exato de PAGE_SIZE isso é falso positivo — a
+    // página seguinte volta vazia e offset+1–offset+0 vira "51–50" ao lado de
+    // "Nenhuma transação encontrada".
+    transactionsApi.list
+      .mockResolvedValueOnce({
+        data: Array.from({ length: 50 }, (_, i) => tx(`f-${i}`)),
+        headers: {},
+      })
+      .mockResolvedValueOnce({ data: [], headers: {} });
+
+    render(
+      <MemoryRouter>
+        <Transactions />
+      </MemoryRouter>,
+    );
+
+    await screen.findAllByText("Item f-0");
+    fireEvent.click(await screen.findByRole("button", { name: /próxima/i }));
+
+    await waitFor(() =>
+      expect(transactionsApi.list).toHaveBeenLastCalledWith(
+        expect.objectContaining({ offset: 50 }),
+      ),
+    );
+    await screen.findByText(/nenhuma transação encontrada/i);
+    expect(screen.queryByText("51–50")).not.toBeInTheDocument();
+  });
+
+  it("preserva a página ao editar uma transação, em vez de voltar para offset 0", async () => {
+    // A rodada anterior alegou "cobertura indireta pelos testes de paginação",
+    // mas aqueles exercitam o load() disparado por "Próxima", não o disparado
+    // pelo submit da edição — call sites diferentes, sem garantia nenhuma.
+    transactionsApi.list
+      .mockResolvedValueOnce(pagina(50, 120, "p1-"))
+      .mockResolvedValueOnce(pagina(50, 120, "p2-"));
+    transactionsApi.update.mockResolvedValue({ data: tx("p2-0") });
+
+    render(
+      <MemoryRouter>
+        <Transactions />
+      </MemoryRouter>,
+    );
+
+    await screen.findAllByText("Item p1-0");
+    fireEvent.click(await screen.findByRole("button", { name: /próxima/i }));
+    await screen.findAllByText("Item p2-0");
+
+    transactionsApi.list.mockResolvedValueOnce(pagina(50, 120, "p2-"));
+
+    const editButtons = await screen.findAllByRole("button", {
+      name: /editar transação/i,
+    });
+    fireEvent.click(editButtons[0]);
+    await screen.findByRole("dialog");
+    fireEvent.click(screen.getByRole("button", { name: /salvar alterações/i }));
+
+    await waitFor(() => expect(transactionsApi.update).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(transactionsApi.list).toHaveBeenLastCalledWith(
+        expect.objectContaining({ offset: 50 }),
+      ),
+    );
+  });
 });
