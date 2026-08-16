@@ -4,6 +4,7 @@ import math
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import delete, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
@@ -57,16 +58,29 @@ async def check_throttle(email: str, db: AsyncSession) -> int | None:
 
 async def record_failure(email: str, db: AsyncSession) -> None:
     """Incrementa o contador da chave. Roda IDÊNTICO exista ou não o email —
-    é isso que impede o mecanismo de virar oráculo de enumeração de conta."""
+    é isso que impede o mecanismo de virar oráculo de enumeração de conta.
+
+    Fix round 1 (issue #22): o read-modify-write anterior (SELECT, depois
+    UPDATE/INSERT em Python) perdia incremento sob concorrência — duas falhas
+    simultâneas na mesma chave liam o mesmo failure_count e as duas gravavam
+    n+1, uma se perdia — e quando as duas eram a PRIMEIRA falha da chave, as
+    duas caíam no INSERT e a segunda estourava o índice único como
+    IntegrityError não tratado (o middleware global vira isso em 500). Upsert
+    do Postgres resolve os dois: o incremento é atômico no banco e o conflito
+    é resolvido pelo índice único que já existe em key_hash, sem exception.
+    """
     await _purge_expired(db)
     key = _key_hash(email)
-    row = await db.scalar(select(LoginThrottle).where(LoginThrottle.key_hash == key))
     now = datetime.now(timezone.utc)
-    if row is None:
-        db.add(LoginThrottle(key_hash=key, failure_count=1, last_failure_at=now))
-    else:
-        row.failure_count += 1
-        row.last_failure_at = now
+    stmt = pg_insert(LoginThrottle).values(key_hash=key, failure_count=1, last_failure_at=now)
+    stmt = stmt.on_conflict_do_update(
+        index_elements=[LoginThrottle.key_hash],
+        set_={
+            "failure_count": LoginThrottle.failure_count + 1,
+            "last_failure_at": now,
+        },
+    )
+    await db.execute(stmt)
     await db.commit()
 
 

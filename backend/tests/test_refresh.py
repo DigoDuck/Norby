@@ -94,8 +94,9 @@ async def test_logout_is_rate_limited(client):
 @pytest.mark.asyncio
 async def test_logout_bucket_is_keyed_by_the_refresh_token_not_ip(client):
     # Issue #22: logout derruba TODAS as sessões de quem é dono do token, então
-    # a chave não pode ser o IP (atrás do proxy, o balde seria compartilhado
-    # por todo mundo). Dois tokens diferentes não podem esgotar o mesmo balde.
+    # a chave principal não pode ser o IP (atrás do proxy, o balde seria
+    # compartilhado por todo mundo). Dois tokens diferentes não podem esgotar
+    # o mesmo balde POR TOKEN.
     from app.limiter import limiter
 
     limiter.reset()
@@ -104,10 +105,43 @@ async def test_logout_bucket_is_keyed_by_the_refresh_token_not_ip(client):
         for _ in range(120):
             res = await client.post("/auth/logout", json={"refresh_token": "token-a"})
             assert res.status_code == 204
+        estourou = await client.post("/auth/logout", json={"refresh_token": "token-a"})
+        assert estourou.status_code == 429
 
-        # "token-a" está no teto, mas "token-b" nunca foi usado: balde livre.
+        # Fix round 1: o endpoint também tem um teto por IP empilhado (ver
+        # test_logout_has_an_ip_wide_flood_ceiling), e as 120 chamadas acima
+        # já o saturaram (mesmo IP simulado nos testes). Resetamos aqui pra
+        # isolar exatamente o que este teste prova: a chave por TOKEN é
+        # independente entre tokens diferentes, não que o IP nunca estoura.
+        limiter.reset()
         outro = await client.post("/auth/logout", json={"refresh_token": "token-b"})
         assert outro.status_code == 204
+    finally:
+        limiter.enabled = False
+        limiter.reset()
+
+
+@pytest.mark.asyncio
+async def test_logout_has_an_ip_wide_flood_ceiling(client):
+    # Fix round 1 (issue #22 review): chavear só pelo token deixava o teto
+    # sem efeito nenhum contra flood — um token aleatório novo em toda
+    # chamada nunca esgota o PRÓPRIO balde. O teto por IP empilhado (chave
+    # padrão do slowapi) estoura mesmo com um token diferente a cada chamada.
+    import uuid as uuid_mod
+
+    from app.limiter import limiter
+
+    limiter.reset()
+    limiter.enabled = True
+    try:
+        for _ in range(120):
+            token = uuid_mod.uuid4().hex
+            res = await client.post("/auth/logout", json={"refresh_token": token})
+            assert res.status_code == 204
+        estourou = await client.post(
+            "/auth/logout", json={"refresh_token": uuid_mod.uuid4().hex}
+        )
+        assert estourou.status_code == 429
     finally:
         limiter.enabled = False
         limiter.reset()

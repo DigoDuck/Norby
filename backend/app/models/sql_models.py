@@ -6,7 +6,7 @@ from typing import Optional, List
 
 from sqlalchemy import (
     String, DateTime, Date, Numeric, ForeignKey,
-    Enum, Integer, Boolean, CheckConstraint
+    Enum, Integer, Boolean, CheckConstraint, Index, text
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -30,6 +30,16 @@ class GoalType(str, PyEnum):
 
 class User(Base):
     __tablename__= "users"
+
+    # Fix round 1 (issue #22): login/cadastro comparam email por
+    # func.lower(User.email) pra não deixar "Joao@x.com" e "joao@x.com"
+    # virarem contas distintas (isso permitia contornar o throttle: a
+    # conta-sombra podia logar com sucesso e resetar o balde da vítima, cuja
+    # chave HMAC já normalizava a caixa). O índice único funcional garante o
+    # invariante no banco também, não só na query — ver migration correspondente.
+    __table_args__ = (
+        Index("ix_users_email_lower", text("lower(email)"), unique=True),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
@@ -79,7 +89,13 @@ class LoginThrottle(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     key_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
     failure_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    last_failure_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
+    # Fix round 1: indexado porque a purga (DELETE ... WHERE last_failure_at <
+    # cutoff, ver throttle_service._purge_expired) roda em TODA falha de
+    # login. Sem índice, cada falha varre a tabela inteira — o mecanismo de
+    # defesa amplificando o próprio ataque em volume.
+    last_failure_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow, index=True
+    )
 
 class Wallet(Base):
     __tablename__= "wallets"

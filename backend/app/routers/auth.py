@@ -5,8 +5,9 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import func, select
 from app.dependencies import get_db, get_current_user
 from app.limiter import limiter, user_key, refresh_token_key
 from app.models.sql_models import User
@@ -64,8 +65,13 @@ async def register(
     if retry_after is not None:
         raise _throttled(retry_after)
 
-    # Verifica email duplicado
-    existing = await db.execute(select(User).where(User.email == payload.email))
+    # Verifica email duplicado. func.lower(): "Joao@x.com" e "joao@x.com" são
+    # a MESMA conta pro throttle (a chave HMAC já normaliza caixa), então
+    # deixar a checagem sensível a caixa permitia criar uma conta-sombra que,
+    # ao logar com sucesso, resetava o balde da vítima (fix round 1, issue
+    # #22 — ver também o índice único funcional em ix_users_email_lower).
+    normalized_email = payload.email.strip().lower()
+    existing = await db.execute(select(User).where(func.lower(User.email) == normalized_email))
     if existing.scalar_one_or_none():
         await record_failure(payload.email, db)
         raise HTTPException(status_code=400, detail="Email já cadastrado")
@@ -80,7 +86,15 @@ async def register(
         privacy_accepted_at=datetime.now(timezone.utc),
     )
     db.add(user)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        # Corrida: duas contas com o mesmo email em caixas diferentes
+        # passaram no SELECT acima ao mesmo tempo. O índice único funcional
+        # em lower(email) barra no banco; sem este catch, viraria 500.
+        await db.rollback()
+        await record_failure(payload.email, db)
+        raise HTTPException(status_code=400, detail="Email já cadastrado")
     await db.refresh(user)
     await record_success(payload.email, db)
 
@@ -103,7 +117,10 @@ async def login(
     if retry_after is not None:
         raise _throttled(retry_after)
 
-    result = await db.execute(select(User).where(User.email == payload.email))
+    # func.lower(): login precisa aceitar a caixa que o usuário digitar, não
+    # só a caixa exata gravada no cadastro (fix round 1, issue #22).
+    normalized_email = payload.email.strip().lower()
+    result = await db.execute(select(User).where(func.lower(User.email) == normalized_email))
     user = result.scalar_one_or_none()
 
     # bcrypt roda SEMPRE — contra o hash real ou contra o dummy. Sem isso, o
@@ -159,10 +176,15 @@ async def _refresh_body(request: Request, payload: RefreshRequest) -> RefreshReq
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 # Desde que o logout passou a derrubar TODAS as sessões ao receber um token já
 # rotacionado, ele carrega o mesmo poder do /auth/refresh. Issue #22: a chave
-# passou a ser o hash do token apresentado, não mais o IP (atrás do proxy o
-# balde seria compartilhado por todo mundo, ver "Rate limit atrás do proxy" no
-# AGENTS.md) — assim um token antigo da vítima não esgota o balde de outra
-# sessão. Teto global também subiu de 20 para 120/min (só flood protection).
+# principal passou a ser o hash do token apresentado, não mais o IP (atrás do
+# proxy o balde seria compartilhado por todo mundo, ver "Rate limit atrás do
+# proxy" no AGENTS.md) — assim um token antigo da vítima não esgota o balde de
+# outra sessão.
+# Fix round 1: chavear só pelo token deixava o teto sem efeito nenhum contra
+# flood — um token aleatório novo a cada chamada nunca esgota o PRÓPRIO balde.
+# O segundo limite abaixo, por IP (chave padrão do slowapi), é o freio de
+# flood de verdade; os dois ficam empilhados e qualquer um dos dois barra.
+@limiter.limit("120/minute")
 @limiter.limit("120/minute", key_func=refresh_token_key)
 async def logout(
     request: Request,
@@ -186,17 +208,34 @@ async def update_me(
     # exclude_none: `null` explícito no corpo gravaria NULL em coluna NOT NULL.
     data = payload.model_dump(exclude_none=True)
 
-    # Se o email mudar, garante que não está em uso por outro usuário
+    # Se o email mudar, garante que não está em uso por outro usuário.
+    # func.lower() + exclusão do próprio id: fix round 1 (issue #22) — sem
+    # isso, "Joao@x.com" e "joao@x.com" seriam contas diferentes (mesmo
+    # problema do cadastro), e trocar só a caixa do próprio email bateria
+    # falso-positivo contra si mesmo.
     new_email = data.get("email")
     if new_email and new_email != current_user.email:
-        existing = await db.execute(select(User).where(User.email == new_email))
+        normalized_email = new_email.strip().lower()
+        existing = await db.execute(
+            select(User).where(
+                func.lower(User.email) == normalized_email,
+                User.id != current_user.id,
+            )
+        )
         if existing.scalar_one_or_none():
             raise HTTPException(status_code=400, detail="Email já cadastrado")
 
     for field, value in data.items():
         setattr(current_user, field, value)
 
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        # Corrida equivalente à do cadastro: duas trocas de email pro mesmo
+        # endereço (caixas diferentes) em paralelo. Índice único no banco
+        # barra a segunda; sem o catch, viraria 500.
+        await db.rollback()
+        raise HTTPException(status_code=400, detail="Email já cadastrado")
     await db.refresh(current_user)
     return current_user
 
