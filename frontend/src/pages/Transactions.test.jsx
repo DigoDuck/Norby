@@ -64,6 +64,8 @@ describe("Transactions", () => {
     expect((await screen.findAllByText("Item p1-0")).length).toBeGreaterThan(0);
   });
 
+  // Timeout aumentado para 15s: este teste renderiza 50 linhas mockadas e encadeia
+  // múltiplos waitFor; sob disputa de CPU na execução da suíte completa passa dos 5s padrão.
   it("avança de página, busca o offset seguinte e troca a lista renderizada", async () => {
     transactionsApi.list
       .mockResolvedValueOnce(pagina(50, 120, "p1-"))
@@ -90,7 +92,7 @@ describe("Transactions", () => {
     expect((await screen.findAllByText("Item p2-0")).length).toBeGreaterThan(0);
     expect(screen.queryByText("Item p1-0")).not.toBeInTheDocument();
     expect(await screen.findByText(/51.+100.+120/)).toBeInTheDocument();
-  });
+  }, 15000);
 
   it("mostra quantas transações existem no total", async () => {
     transactionsApi.list.mockResolvedValue(pagina(50, 120));
@@ -180,6 +182,8 @@ describe("Transactions", () => {
     expect(screen.queryByText("51–50")).not.toBeInTheDocument();
   });
 
+  // Timeout aumentado para 15s: este teste renderiza 50 linhas mockadas, navega entre páginas
+  // e dispara um diálogo de edição; encadeia múltiplos waitFor; sob disputa de CPU passa dos 5s padrão.
   it("preserva a página ao editar uma transação, em vez de voltar para offset 0", async () => {
     // A rodada anterior alegou "cobertura indireta pelos testes de paginação",
     // mas aqueles exercitam o load() disparado por "Próxima", não o disparado
@@ -214,5 +218,5 @@ describe("Transactions", () => {
         expect.objectContaining({ offset: 50 }),
       ),
     );
-  });
+  }, 15000);
 });
