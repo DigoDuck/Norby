@@ -66,4 +66,17 @@ describe("MoneyInput", () => {
     expect(input.selectionStart).toBe(fim);
     expect(input.selectionEnd).toBe(fim);
   });
+
+  it("deixa seleção de intervalo intacta para Ctrl+A (substituir)", () => {
+    // Reproduz o bug real: Ctrl+A seleciona todo o texto, mas fixarCursorNoFim
+    // colapsava a seleção no fim, impedindo o usuário de digitar por cima. Com
+    // a correção, uma seleção de intervalo (selectionStart !== selectionEnd)
+    // sobrevive ao evento select, e o usuário consegue substituir o valor.
+    const { input } = setup(1234.56);
+    const fim = input.value.length;
+    input.setSelectionRange(0, fim); // simula Ctrl+A (seleção completa)
+    fireEvent.select(input);
+    expect(input.selectionStart).toBe(0);
+    expect(input.selectionEnd).toBe(fim);
+  });
 });

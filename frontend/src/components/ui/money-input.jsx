@@ -28,12 +28,16 @@ function MoneyInput({ value = 0, onChange, ...props }) {
   // Preenchimento é sempre pela direita: o cursor tem que ficar preso no fim,
   // senão clicar no meio do texto faz a tecla seguinte entrar numa posição
   // diferente da que o usuário via (o dígito cai no lugar errado). Cobre
-  // clique, foco por tab e navegação por teclado — qualquer jeito de mudar a
-  // seleção reposiciona ela no fim de novo.
+  // clique, foco por tab e navegação por teclado.
+  //
+  // Guard: só reposiciona se a seleção estiver colapsada (selectionStart ===
+  // selectionEnd). Uma seleção de intervalo (ex.: Ctrl+A) é intenção do
+  // usuário de substituir o valor, então deixamos ela intacta e o usuário
+  // consegue digitar por cima normalmente.
   function fixarCursorNoFim(e) {
     const el = e.target;
     const fim = el.value.length;
-    if (el.selectionStart !== fim || el.selectionEnd !== fim) {
+    if (el.selectionStart === el.selectionEnd && el.selectionEnd !== fim) {
       el.setSelectionRange(fim, fim);
     }
   }
