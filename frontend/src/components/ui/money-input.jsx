@@ -39,7 +39,11 @@ function MoneyInput({ value = 0, onChange, allowNegative = false, ...props }) {
     // Sinal vem do texto que chegou (colar "-150,50" num campo zerado tem
     // que resultar em negativo) OU do sinal que o valor já carregava (digitar
     // por cima de um valor já negativo não apaga o "-" que ele mostrava).
-    const negativo = allowNegative && (texto.includes("-") || value < 0);
+    // Object.is(value, -0): quem controla este input pode representar
+    // "magnitude zero, sinal negativo" como -0 (ver AmountPromptDialog) —
+    // "-0 < 0" é false em JS, então sem esse check o sinal se perderia
+    // exatamente quando o usuário digita o primeiro dígito depois de zero.
+    const negativo = allowNegative && (texto.includes("-") || value < 0 || Object.is(value, -0));
     onChange(negativo ? -magnitude : magnitude);
   }
 
