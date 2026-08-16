@@ -1,3 +1,5 @@
+import hashlib
+
 from jose import JWTError, jwt
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -37,3 +39,22 @@ def user_key(request: Request) -> str:
         except JWTError:
             pass
     return get_remote_address(request)
+
+
+def refresh_token_key(request: Request) -> str:
+    """Chave de rate limit para POST /auth/logout: hash do refresh token apresentado.
+
+    Logout é anônimo (sem Authorization), mas desde que passou a derrubar
+    TODAS as sessões ao receber um token já rotacionado, tem o mesmo poder do
+    /auth/refresh. Chavear pelo IP colocaria todo mundo no mesmo balde atrás
+    do proxy (ver limiter.py acima); chavear pelo token faz o balde ser da
+    sessão, não da rede. O token cru nunca vira chave: só o sha256 dele.
+
+    slowapi chama key_func(request) de forma síncrona, sem acesso ao corpo já
+    parseado pelo Pydantic. O router carimba request.state.refresh_token via
+    uma dependency que roda antes deste decorator (ver auth.py).
+    """
+    token = getattr(request.state, "refresh_token", "")
+    if not token:
+        return get_remote_address(request)
+    return hashlib.sha256(token.encode()).hexdigest()

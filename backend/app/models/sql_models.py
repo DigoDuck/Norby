@@ -64,6 +64,23 @@ class RefreshToken(Base):
 
     user: Mapped["User"] = relationship("User", back_populates="refresh_tokens")
 
+class LoginThrottle(Base):
+    """Atraso progressivo por conta (issue #22), independente de IP.
+
+    Atrás do proxy do Railway `get_remote_address` devolve o mesmo IP pra todo
+    mundo (ver "Rate limit atrás do proxy" no AGENTS.md), então login e
+    cadastro usam esta tabela em vez do IP: a chave é o HMAC-SHA256 do email
+    normalizado (lower + trim) com o secret_key do servidor — o email cru
+    NUNCA é gravado. Ver app/services/throttle_service.py para a curva de
+    espera e a purga de linhas com mais de 24h.
+    """
+    __tablename__ = "login_throttles"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    key_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
+    failure_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    last_failure_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
+
 class Wallet(Base):
     __tablename__= "wallets"
     

@@ -76,15 +76,56 @@ async def test_logout_is_rate_limited(client):
     # Token desconhecido serve: o que se mede aqui é o balde, não a revogação.
     from app.limiter import limiter
 
-    # A fixture global desliga o limiter; religamos só para este teste.
+    # Teto atual: 120/min (issue #22). A fixture global desliga o limiter;
+    # religamos só para este teste.
     limiter.reset()
     limiter.enabled = True
     try:
-        for _ in range(20):
+        for _ in range(120):
             res = await client.post("/auth/logout", json={"refresh_token": "nao-existe"})
             assert res.status_code == 204
         estourou = await client.post("/auth/logout", json={"refresh_token": "nao-existe"})
         assert estourou.status_code == 429
+    finally:
+        limiter.enabled = False
+        limiter.reset()
+
+
+@pytest.mark.asyncio
+async def test_logout_bucket_is_keyed_by_the_refresh_token_not_ip(client):
+    # Issue #22: logout derruba TODAS as sessões de quem é dono do token, então
+    # a chave não pode ser o IP (atrás do proxy, o balde seria compartilhado
+    # por todo mundo). Dois tokens diferentes não podem esgotar o mesmo balde.
+    from app.limiter import limiter
+
+    limiter.reset()
+    limiter.enabled = True
+    try:
+        for _ in range(120):
+            res = await client.post("/auth/logout", json={"refresh_token": "token-a"})
+            assert res.status_code == 204
+
+        # "token-a" está no teto, mas "token-b" nunca foi usado: balde livre.
+        outro = await client.post("/auth/logout", json={"refresh_token": "token-b"})
+        assert outro.status_code == 204
+    finally:
+        limiter.enabled = False
+        limiter.reset()
+
+
+@pytest.mark.asyncio
+async def test_refresh_no_longer_throttles_at_20_per_minute(client):
+    # Issue #22: 20/min era um teto de capacidade, não uma defesa — com token
+    # de acesso de 15min, usuários ativos legítimos já batiam nele. Novo teto
+    # é 600/min; 25 chamadas seguidas não podem estourar.
+    from app.limiter import limiter
+
+    limiter.reset()
+    limiter.enabled = True
+    try:
+        for _ in range(25):
+            res = await client.post("/auth/refresh", json={"refresh_token": "nao-existe"})
+            assert res.status_code == 401
     finally:
         limiter.enabled = False
         limiter.reset()
