@@ -13,6 +13,7 @@ import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/money-input";
 import { Field } from "@/components/ui/field";
 import { Segmented } from "@/components/ui/segmented";
 import { Select } from "@/components/ui/select";
@@ -144,7 +145,7 @@ export default function Transactions() {
     reset({
       wallet_id: t.wallet_id,
       type: t.type,
-      amount: String(t.amount),
+      amount: Number(t.amount),
       category: t.category,
       description: t.description || "",
       date: toDateInput(t.date),
@@ -297,14 +298,17 @@ export default function Transactions() {
                 htmlFor="amount"
                 error={errors.amount?.message}
               >
-                <Input
-                  id="amount"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder="0,00"
-                  className={`${inputCls} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
-                  {...register("amount")}
+                <Controller
+                  name="amount"
+                  control={control}
+                  render={({ field }) => (
+                    <MoneyInput
+                      id="amount"
+                      value={field.value}
+                      onChange={field.onChange}
+                      className={inputCls}
+                    />
+                  )}
                 />
               </Field>
 

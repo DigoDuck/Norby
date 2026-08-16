@@ -16,6 +16,7 @@ import AiOrb from "@/components/shared/AiOrb";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/money-input";
 import { Field } from "@/components/ui/field";
 import { Segmented } from "@/components/ui/segmented";
 import { Select } from "@/components/ui/select";
@@ -240,14 +241,17 @@ export default function Goals() {
                 htmlFor="target_amount"
                 error={errors.target_amount?.message}
               >
-                <Input
-                  id="target_amount"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder="0,00"
-                  className={`${inputCls} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
-                  {...register("target_amount")}
+                <Controller
+                  name="target_amount"
+                  control={control}
+                  render={({ field }) => (
+                    <MoneyInput
+                      id="target_amount"
+                      value={field.value}
+                      onChange={field.onChange}
+                      className={inputCls}
+                    />
+                  )}
                 />
               </Field>
 
@@ -259,14 +263,17 @@ export default function Goals() {
                   htmlFor="current_amount"
                   error={errors.current_amount?.message}
                 >
-                  <Input
-                    id="current_amount"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="0,00"
-                    className={`${inputCls} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
-                    {...register("current_amount")}
+                  <Controller
+                    name="current_amount"
+                    control={control}
+                    render={({ field }) => (
+                      <MoneyInput
+                        id="current_amount"
+                        value={field.value}
+                        onChange={field.onChange}
+                        className={inputCls}
+                      />
+                    )}
                   />
                 </Field>
               ) : (
