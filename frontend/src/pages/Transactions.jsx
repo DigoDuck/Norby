@@ -13,6 +13,7 @@ import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/money-input";
 import { Field } from "@/components/ui/field";
 import { Segmented } from "@/components/ui/segmented";
 import { Select } from "@/components/ui/select";
@@ -26,6 +27,8 @@ import {
 } from "@/components/ui/dialog";
 
 
+
+const PAGE_SIZE = 50;
 
 // Valores iniciais do formulário (date sempre fresca → função).
 const emptyForm = () => ({
@@ -46,6 +49,12 @@ export default function Transactions() {
   const [serverError, setServerError] = useState(null);
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState("");
+  const [offset, setOffset] = useState(0);
+  const [total, setTotal] = useState(0);
+  // false quando o header X-Total-Count não chegou (backend antigo, proxy,
+  // CORS mal configurado): nesse caso `total` é só o length da página, não o
+  // total real, e a UI não pode tratá-lo como se fosse.
+  const [totalConhecido, setTotalConhecido] = useState(true);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -70,11 +79,26 @@ export default function Transactions() {
   // request, só ignorar a resposta obsoleta. Trocar se o custo da chamada pesar.
   const requisicaoAtual = useRef(0);
 
-  async function load(params = {}) {
+  async function load(params = {}, novoOffset = 0) {
     const seq = ++requisicaoAtual.current;
-    const res = await transactionsApi.list(params);
-    if (seq !== requisicaoAtual.current) return; // resposta obsoleta
-    setTransactions(res.data);
+    try {
+      const res = await transactionsApi.list({
+        ...params,
+        limit: PAGE_SIZE,
+        offset: novoOffset,
+      });
+      if (seq !== requisicaoAtual.current) return; // resposta obsoleta
+      setTransactions(res.data);
+      // O header só chega ao JS porque o backend o declara em expose_headers.
+      const headerTotal = res.headers?.["x-total-count"];
+      setTotal(headerTotal != null ? Number(headerTotal) : res.data.length);
+      setTotalConhecido(headerTotal != null);
+      setOffset(novoOffset);
+      setServerError(null);
+    } catch (err) {
+      if (seq !== requisicaoAtual.current) return; // resposta obsoleta
+      setServerError(apiErrorMessage(err, "Não foi possível carregar as transações."));
+    }
   }
 
   useEffect(() => {
@@ -107,7 +131,10 @@ export default function Transactions() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const reload = () => load(filterType ? { type: filterType } : {});
+  // Delete desloca offsets (o item some e os seguintes sobem uma posição) —
+  // voltar pra página 1 evita mostrar uma página com buracos. Mantido de
+  // propósito, ver onSubmit para o caso de edição (que preserva a página).
+  const reload = () => load(filterType ? { type: filterType } : {}, 0);
 
   const walletOptions = wallets.map((w) => ({ value: w.id, label: w.name }));
 
@@ -133,7 +160,7 @@ export default function Transactions() {
     reset({
       wallet_id: t.wallet_id,
       type: t.type,
-      amount: String(t.amount),
+      amount: Number(t.amount),
       category: t.category,
       description: t.description || "",
       date: toDateInput(t.date),
@@ -159,6 +186,7 @@ export default function Transactions() {
       description: data.description || "",
       date: data.date,
     };
+    const wasEditing = Boolean(editing);
     try {
       if (editing) {
         await transactionsApi.update(editing.id, payload);
@@ -167,7 +195,13 @@ export default function Transactions() {
       }
       setOpen(false);
       setEditing(null);
-      reload();
+      // Editar não muda quantos itens existem: preserva a página atual em vez
+      // de reload() (que sempre volta pra página 1).
+      if (wasEditing) {
+        load(filterType ? { type: filterType } : {}, offset);
+      } else {
+        reload();
+      }
     } catch (err) {
       setServerError(apiErrorMessage(err, "Não foi possível salvar a transação."));
     }
@@ -178,10 +212,17 @@ export default function Transactions() {
     reload();
   }
 
-  // Teto que o backend aplica na listagem (Query(200, le=500)). A busca é
-  // client-side sobre o que veio, então precisamos saber se batemos no teto
-  // para não afirmar que nada existe quando só não foi carregado.
-  const LISTAGEM_MAX = 200;
+  // A busca é client-side sobre a página carregada, não sobre todo o
+  // histórico. Se houver mais páginas, precisamos avisar em vez de afirmar
+  // que a transação não existe. Sem total conhecido (header ausente), uma
+  // página cheia é o sinal disponível de que pode haver mais.
+  const haMaisPaginas = totalConhecido
+    ? total > transactions.length
+    : transactions.length === PAGE_SIZE;
+  // Idem para "Próxima": sem total, avança enquanto a página vier cheia.
+  const podeAvancar = totalConhecido
+    ? offset + PAGE_SIZE < total
+    : transactions.length === PAGE_SIZE;
 
   const filtered = transactions.filter(
     (t) =>
@@ -286,14 +327,17 @@ export default function Transactions() {
                 htmlFor="amount"
                 error={errors.amount?.message}
               >
-                <Input
-                  id="amount"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder="0,00"
-                  className={`${inputCls} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
-                  {...register("amount")}
+                <Controller
+                  name="amount"
+                  control={control}
+                  render={({ field }) => (
+                    <MoneyInput
+                      id="amount"
+                      value={field.value}
+                      onChange={field.onChange}
+                      className={inputCls}
+                    />
+                  )}
                 />
               </Field>
 
@@ -347,6 +391,9 @@ export default function Transactions() {
 
       {/* Filtros e relatório em uma única superfície */}
       <div className="glass overflow-hidden p-4 sm:p-5">
+        {serverError && !open && (
+          <p className="text-danger text-xs pb-3">{serverError}</p>
+        )}
         <div className="inset-panel mb-4 flex flex-col gap-3 p-4 sm:flex-row">
           <div className="relative flex-1 sm:max-w-xs">
             <Search size={16} className="absolute left-3 top-2.5 text-content-3" />
@@ -366,7 +413,7 @@ export default function Transactions() {
                 aria-pressed={filterType === t}
                 onClick={() => {
                   setFilterType(t);
-                  load(t ? { type: t } : {});
+                  load(t ? { type: t } : {}, 0);
                 }}
                 className={`rounded-xl px-3 py-2 text-sm transition-colors ${
                   filterType === t
@@ -521,11 +568,51 @@ export default function Transactions() {
           ))}
         </div>
 
+        {/* Independente do resultado ter vindo vazio: a busca só olha a página
+            carregada, então "poucos resultados" é tão enganoso quanto "zero". */}
+        {search && haMaisPaginas && (
+          <p className="pt-2 text-center text-xs text-content-3">
+            A busca cobre só as transações desta página. Pode haver mais resultados em outras páginas.
+          </p>
+        )}
+
         {filtered.length === 0 && (
           <div className="text-center py-12 text-content-3 text-sm">
-            {search && transactions.length >= LISTAGEM_MAX
-              ? "Nenhuma transação encontrada entre as mais recentes. A busca cobre só as transações já carregadas."
-              : "Nenhuma transação encontrada."}
+            Nenhuma transação encontrada.
+          </div>
+        )}
+
+        {(haMaisPaginas || offset > 0) && (
+          <div className="flex items-center justify-between gap-4 pt-2">
+            <p className="text-sm text-content-2 tnum">
+              {search
+                ? "Busca ativa: contagem total oculta"
+                : totalConhecido
+                  ? `${offset + 1}–${Math.min(offset + PAGE_SIZE, total)} de ${total}`
+                  : transactions.length === 0
+                    ? "Nenhuma transação nesta página"
+                    : `${offset + 1}–${offset + transactions.length}`}
+            </p>
+            <div className="flex gap-2">
+              <Button
+                variant="ghost"
+                disabled={offset === 0}
+                onClick={() =>
+                  load(filterType ? { type: filterType } : {}, offset - PAGE_SIZE)
+                }
+              >
+                Anterior
+              </Button>
+              <Button
+                variant="ghost"
+                disabled={!podeAvancar}
+                onClick={() =>
+                  load(filterType ? { type: filterType } : {}, offset + PAGE_SIZE)
+                }
+              >
+                Próxima
+              </Button>
+            </div>
           </div>
         )}
       </div>

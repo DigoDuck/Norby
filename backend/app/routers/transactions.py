@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Depends, Query, HTTPException, status
+from fastapi import APIRouter, Depends, Query, HTTPException, status, Response
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import func, select
 from uuid import UUID
 from datetime import date
 from typing import Optional
@@ -80,6 +80,7 @@ async def list_transactions(
     offset: int = Query(0, ge=0),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    response: Response = None,
 ):
     filters = [Transaction.user_id == current_user.id]
 
@@ -99,6 +100,14 @@ async def list_transactions(
         start, end = current_month_range(date(year, month, 1))
         filters.append(Transaction.date >= start)
         filters.append(Transaction.date < end)
+
+    # Contagem com os MESMOS filtros e sem limit/offset: é o que permite a UI
+    # dizer "página 2 de 7". Sem isso o front mostra 200 linhas e cala sobre o resto.
+    total = (
+        await db.execute(select(func.count()).select_from(Transaction).where(*filters))
+    ).scalar_one()
+    response.headers["X-Total-Count"] = str(total)
+
     result = await db.execute(
         select(Transaction)
         .where(*filters)

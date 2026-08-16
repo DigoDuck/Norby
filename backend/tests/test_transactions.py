@@ -136,7 +136,12 @@ async def test_list_is_scoped_to_user(make_auth_client):
     w = await make_wallet(alice)
     await alice.post("/transactions/", json=tx_payload(w["id"]))
     assert len((await alice.get("/transactions/")).json()) == 1
-    assert len((await bob.get("/transactions/")).json()) == 0
+    bob_res = await bob.get("/transactions/")
+    assert len(bob_res.json()) == 0
+    # x-total-count precisa herdar o mesmo escopo de usuário do corpo: sem
+    # isto, um bug futuro na query de contagem vazaria quantas transações de
+    # Alice existem, mesmo com a lista do Bob corretamente vazia.
+    assert bob_res.headers["x-total-count"] == "0"
 
 
 @pytest.mark.asyncio
@@ -323,3 +328,32 @@ async def test_moving_to_someone_elses_wallet_is_404(make_auth_client):
     # E o saldo do Bob não foi tocado.
     wallets_bob = (await bob.get("/wallets/")).json()
     assert float(wallets_bob[0]["balance"]) == 100.0
+
+
+@pytest.mark.asyncio
+async def test_list_returns_total_count_header(make_auth_client):
+    # A página de Relatórios precisa saber quantas transações existem no total,
+    # não só quantas couberam no limit — senão esconde dado sem avisar.
+    ac = await make_auth_client("Alice")
+    w = await make_wallet(ac, balance=1000)
+    for _ in range(3):
+        await ac.post("/transactions/", json=tx_payload(w["id"], amount="10.00"))
+
+    res = await ac.get("/transactions/?limit=2")
+
+    assert res.status_code == 200
+    assert len(res.json()) == 2
+    assert res.headers["x-total-count"] == "3"
+
+
+@pytest.mark.asyncio
+async def test_total_count_respects_filters(make_auth_client):
+    # A contagem tem que ser a do filtro aplicado, não a da tabela inteira.
+    ac = await make_auth_client("Alice")
+    w = await make_wallet(ac, balance=1000)
+    await ac.post("/transactions/", json=tx_payload(w["id"], type="EXPENSE"))
+    await ac.post("/transactions/", json=tx_payload(w["id"], type="INCOME", amount="5.00"))
+
+    res = await ac.get("/transactions/?type=INCOME")
+
+    assert res.headers["x-total-count"] == "1"

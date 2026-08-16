@@ -72,6 +72,9 @@ app.add_middleware(
     allow_credentials=True, # Permite enviar cookies e headers de autenticação
     allow_methods=["*"],
     allow_headers=["*"], # Permite qualquer header
+    # O navegador esconde headers de resposta que não estejam aqui. Sem esta
+    # linha o X-Total-Count chega no wire e some antes do axios.
+    expose_headers=["X-Total-Count"],
 )
 
 

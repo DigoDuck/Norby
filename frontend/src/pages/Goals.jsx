@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Plus, Trash2, Target, PiggyBank, ArrowRight, Check } from "lucide-react";
+import { Plus, Trash2, Target, PiggyBank, ArrowRight, Check, Pencil } from "lucide-react";
 
 import { goalsApi } from "@/api/goals";
 import { aiApi } from "@/api/ai";
@@ -16,6 +16,7 @@ import AiOrb from "@/components/shared/AiOrb";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/money-input";
 import { Field } from "@/components/ui/field";
 import { Segmented } from "@/components/ui/segmented";
 import { Select } from "@/components/ui/select";
@@ -57,6 +58,7 @@ export default function Goals() {
   // registrar quem abriu, o foco não volta para o card ao fechar.
   const ultimoGatilho = useRef(null);
   const [serverError, setServerError] = useState(null);
+  const [editing, setEditing] = useState(null);
   const navigate = useNavigate();
 
   const {
@@ -86,23 +88,63 @@ export default function Goals() {
     setOpen(v);
     if (!v) {
       setServerError(null);
+      setEditing(null);
       reset(EMPTY_FORM);
     }
   }
 
+  // Abre o dialog em modo edição, pré-preenchido com nome e valor-alvo.
+  // `type` também é preservado: não é enviado no PUT, mas o rótulo do campo
+  // de valor ("Valor-alvo" vs "Teto mensal") depende dele. `category` também
+  // precisa vir junto: o campo de categoria não é renderizado em modo edição,
+  // mas o .refine do goalSchema exige categoria não-vazia quando type ===
+  // BUDGET. Sem isso a validação falha contra um campo invisível e o submit
+  // trava sem erro visível nenhum.
+  function abrirEdicao(goal) {
+    setEditing(goal);
+    setServerError(null);
+    reset({
+      ...EMPTY_FORM,
+      name: goal.name,
+      target_amount: Number(goal.target_amount),
+      type: goal.type,
+      category: goal.category || "",
+    });
+    setOpen(true);
+  }
+
+  // Rede de segurança: se a validação falhar por qualquer motivo que não
+  // tenha campo visível pra mostrar o erro (ex.: uma meta BUDGET legada com
+  // categoria vazia, o que o backend não deveria permitir mas não é garantia
+  // absoluta), o usuário vê uma mensagem em vez de o botão não fazer nada.
+  function onInvalid() {
+    setServerError("Confira os campos do formulário.");
+  }
+
   async function onSubmit(data) {
     setServerError(null);
-    const payload = {
-      name: data.name,
-      type: data.type,
-      target_amount: data.target_amount,
-      ...(data.type === "SAVINGS"
-        ? { current_amount: data.current_amount || 0 }
-        : { category: data.category }),
-    };
     try {
-      await goalsApi.create(payload);
-      setOpen(false);
+      if (editing) {
+        // GoalUpdate aceita SÓ name e target_amount; qualquer outro campo é
+        // descartado em silêncio pelo backend.
+        await goalsApi.update(editing.id, {
+          name: data.name,
+          target_amount: data.target_amount,
+        });
+      } else {
+        await goalsApi.create({
+          name: data.name,
+          type: data.type,
+          target_amount: data.target_amount,
+          ...(data.type === "SAVINGS"
+            ? { current_amount: data.current_amount || 0 }
+            : { category: data.category }),
+        });
+      }
+      // Via handleOpenChange (não só setOpen) para limpar `editing` e o
+      // formulário: senão "Nova meta" logo depois de editar reabre em modo
+      // edição, com o risco de um PUT no id da meta antiga em vez de POST.
+      handleOpenChange(false);
       load();
     } catch (err) {
       setServerError(apiErrorMessage(err, "Não foi possível salvar a meta."));
@@ -169,7 +211,7 @@ export default function Goals() {
                   <Target size={20} className="text-accent-contrast" />
                 </div>
                 <div>
-                  <DialogTitle>Nova meta</DialogTitle>
+                  <DialogTitle>{editing ? "Editar meta" : "Nova meta"}</DialogTitle>
                   <p className="text-xs text-content-2 mt-0.5">
                     Poupança para um objetivo ou orçamento de uma categoria
                   </p>
@@ -177,22 +219,24 @@ export default function Goals() {
               </div>
             </DialogHeader>
 
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-3 mt-1">
-              {/* Tipo */}
-              <Field label="Tipo" error={errors.type?.message}>
-                <Controller
-                  name="type"
-                  control={control}
-                  render={({ field }) => (
-                    <Segmented
-                      value={field.value}
-                      onChange={field.onChange}
-                      options={GOAL_TYPE_OPTIONS}
-                      ariaLabel="Tipo"
-                    />
-                  )}
-                />
-              </Field>
+            <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="space-y-3 mt-1">
+              {/* Tipo (edição não altera: GoalUpdate não aceita este campo) */}
+              {!editing && (
+                <Field label="Tipo" error={errors.type?.message}>
+                  <Controller
+                    name="type"
+                    control={control}
+                    render={({ field }) => (
+                      <Segmented
+                        value={field.value}
+                        onChange={field.onChange}
+                        options={GOAL_TYPE_OPTIONS}
+                        ariaLabel="Tipo"
+                      />
+                    )}
+                  />
+                </Field>
+              )}
 
               {/* Nome */}
               <Field label="Nome" htmlFor="name" error={errors.name?.message}>
@@ -210,32 +254,39 @@ export default function Goals() {
                 htmlFor="target_amount"
                 error={errors.target_amount?.message}
               >
-                <Input
-                  id="target_amount"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder="0,00"
-                  className={`${inputCls} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
-                  {...register("target_amount")}
+                <Controller
+                  name="target_amount"
+                  control={control}
+                  render={({ field }) => (
+                    <MoneyInput
+                      id="target_amount"
+                      value={field.value}
+                      onChange={field.onChange}
+                      className={inputCls}
+                    />
+                  )}
                 />
               </Field>
 
-              {/* Condicional: SAVINGS → já guardado; BUDGET → categoria */}
-              {type === "SAVINGS" ? (
+              {/* Condicional: SAVINGS → já guardado; BUDGET → categoria.
+                  Edição não altera nenhum dos dois: GoalUpdate não aceita. */}
+              {!editing && (type === "SAVINGS" ? (
                 <Field
                   label="Já guardado (opcional)"
                   htmlFor="current_amount"
                   error={errors.current_amount?.message}
                 >
-                  <Input
-                    id="current_amount"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="0,00"
-                    className={`${inputCls} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
-                    {...register("current_amount")}
+                  <Controller
+                    name="current_amount"
+                    control={control}
+                    render={({ field }) => (
+                      <MoneyInput
+                        id="current_amount"
+                        value={field.value}
+                        onChange={field.onChange}
+                        className={inputCls}
+                      />
+                    )}
                   />
                 </Field>
               ) : (
@@ -258,7 +309,7 @@ export default function Goals() {
                     )}
                   />
                 </Field>
-              )}
+              ))}
 
               {serverError && (
                 <p className="text-danger text-xs">{serverError}</p>
@@ -278,7 +329,7 @@ export default function Goals() {
                   disabled={isSubmitting}
                   className="flex-[1.4] bg-accent-fill text-accent-contrast hover:bg-accent-fill/90 font-medium"
                 >
-                  {isSubmitting ? "Salvando…" : "Criar meta"}
+                  {isSubmitting ? "Salvando…" : editing ? "Salvar" : "Criar meta"}
                 </Button>
               </div>
             </form>
@@ -421,7 +472,7 @@ export default function Goals() {
                 {isSavings && (
                   <AmountPromptDialog
                     title={`Aporte em "${g.name}"`}
-                    description="Use um valor negativo para corrigir um aporte."
+                    description="Escolha se é um aporte novo ou a correção de um valor já lançado."
                     submitLabel="Adicionar"
                     errorFallback="Não foi possível salvar o aporte."
                     onSubmit={(amount) => contribute(g.id, amount)}
@@ -436,6 +487,18 @@ export default function Goals() {
                     }
                   />
                 )}
+                <button
+                  type="button"
+                  title="Editar"
+                  aria-label={`Editar meta ${g.name}`}
+                  onClick={(e) => {
+                    ultimoGatilho.current = e.currentTarget;
+                    abrirEdicao(g);
+                  }}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg border border-line/10 text-content-3 hover:text-accent hover:border-accent/40 transition-colors"
+                >
+                  <Pencil size={14} />
+                </button>
                 <ConfirmDialog
                   title="Remover esta meta?"
                   confirmLabel="Remover"

@@ -19,6 +19,14 @@ function ProtectedRoute({ children }) {
   return isAuthenticated ? children : <Navigate to="/" replace />;
 }
 
+// A raiz é a porta de entrada: com sessão válida ela leva ao dashboard em vez
+// de mostrar login de novo. O boot em App já validou o token no /auth/me, então
+// aqui isAuthenticated só é true se o backend confirmou.
+function RootRoute() {
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  return isAuthenticated ? <Navigate to="/dashboard" replace /> : <Auth />;
+}
+
 export default function App() {
   const token = useAuthStore((s) => s.token);
   const [booting, setBooting] = useState(true);
@@ -49,7 +57,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Auth />} />
+        <Route path="/" element={<RootRoute />} />
         <Route path="/privacidade" element={<Privacidade />} />
         <Route path="/termos" element={<Termos />} />
         <Route

@@ -7,6 +7,7 @@ import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import Money from "@/components/shared/Money";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/money-input";
 import {
   Dialog,
   DialogContent,
@@ -168,15 +169,10 @@ export default function Wallets() {
                   <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-content-3 pointer-events-none">
                     R$
                   </span>
-                  <Input
+                  <MoneyInput
                     id={saldoId}
-                    type="number"
-                    step="0.01"
-                    placeholder="0,00"
                     value={form.balance}
-                    onChange={(e) =>
-                      setForm({ ...form, balance: e.target.value })
-                    }
+                    onChange={(n) => setForm({ ...form, balance: n })}
                     className={`${shadcnInputCls} pl-10`}
                   />
                 </div>
