@@ -51,6 +51,10 @@ export default function Transactions() {
   const [filterType, setFilterType] = useState("");
   const [offset, setOffset] = useState(0);
   const [total, setTotal] = useState(0);
+  // false quando o header X-Total-Count não chegou (backend antigo, proxy,
+  // CORS mal configurado): nesse caso `total` é só o length da página, não o
+  // total real, e a UI não pode tratá-lo como se fosse.
+  const [totalConhecido, setTotalConhecido] = useState(true);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -77,16 +81,24 @@ export default function Transactions() {
 
   async function load(params = {}, novoOffset = 0) {
     const seq = ++requisicaoAtual.current;
-    const res = await transactionsApi.list({
-      ...params,
-      limit: PAGE_SIZE,
-      offset: novoOffset,
-    });
-    if (seq !== requisicaoAtual.current) return; // resposta obsoleta
-    setTransactions(res.data);
-    // O header só chega ao JS porque o backend o declara em expose_headers.
-    setTotal(Number(res.headers?.["x-total-count"] ?? res.data.length));
-    setOffset(novoOffset);
+    try {
+      const res = await transactionsApi.list({
+        ...params,
+        limit: PAGE_SIZE,
+        offset: novoOffset,
+      });
+      if (seq !== requisicaoAtual.current) return; // resposta obsoleta
+      setTransactions(res.data);
+      // O header só chega ao JS porque o backend o declara em expose_headers.
+      const headerTotal = res.headers?.["x-total-count"];
+      setTotal(headerTotal != null ? Number(headerTotal) : res.data.length);
+      setTotalConhecido(headerTotal != null);
+      setOffset(novoOffset);
+      setServerError(null);
+    } catch (err) {
+      if (seq !== requisicaoAtual.current) return; // resposta obsoleta
+      setServerError(apiErrorMessage(err, "Não foi possível carregar as transações."));
+    }
   }
 
   useEffect(() => {
@@ -119,6 +131,9 @@ export default function Transactions() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Delete desloca offsets (o item some e os seguintes sobem uma posição) —
+  // voltar pra página 1 evita mostrar uma página com buracos. Mantido de
+  // propósito, ver onSubmit para o caso de edição (que preserva a página).
   const reload = () => load(filterType ? { type: filterType } : {}, 0);
 
   const walletOptions = wallets.map((w) => ({ value: w.id, label: w.name }));
@@ -171,6 +186,7 @@ export default function Transactions() {
       description: data.description || "",
       date: data.date,
     };
+    const wasEditing = Boolean(editing);
     try {
       if (editing) {
         await transactionsApi.update(editing.id, payload);
@@ -179,7 +195,13 @@ export default function Transactions() {
       }
       setOpen(false);
       setEditing(null);
-      reload();
+      // Editar não muda quantos itens existem: preserva a página atual em vez
+      // de reload() (que sempre volta pra página 1).
+      if (wasEditing) {
+        load(filterType ? { type: filterType } : {}, offset);
+      } else {
+        reload();
+      }
     } catch (err) {
       setServerError(apiErrorMessage(err, "Não foi possível salvar a transação."));
     }
@@ -192,8 +214,15 @@ export default function Transactions() {
 
   // A busca é client-side sobre a página carregada, não sobre todo o
   // histórico. Se houver mais páginas, precisamos avisar em vez de afirmar
-  // que a transação não existe.
-  const haMaisPaginas = total > transactions.length;
+  // que a transação não existe. Sem total conhecido (header ausente), uma
+  // página cheia é o sinal disponível de que pode haver mais.
+  const haMaisPaginas = totalConhecido
+    ? total > transactions.length
+    : transactions.length === PAGE_SIZE;
+  // Idem para "Próxima": sem total, avança enquanto a página vier cheia.
+  const podeAvancar = totalConhecido
+    ? offset + PAGE_SIZE < total
+    : transactions.length === PAGE_SIZE;
 
   const filtered = transactions.filter(
     (t) =>
@@ -362,6 +391,9 @@ export default function Transactions() {
 
       {/* Filtros e relatório em uma única superfície */}
       <div className="glass overflow-hidden p-4 sm:p-5">
+        {serverError && !open && (
+          <p className="text-danger text-xs pb-3">{serverError}</p>
+        )}
         <div className="inset-panel mb-4 flex flex-col gap-3 p-4 sm:flex-row">
           <div className="relative flex-1 sm:max-w-xs">
             <Search size={16} className="absolute left-3 top-2.5 text-content-3" />
@@ -536,18 +568,28 @@ export default function Transactions() {
           ))}
         </div>
 
+        {/* Independente do resultado ter vindo vazio: a busca só olha a página
+            carregada, então "poucos resultados" é tão enganoso quanto "zero". */}
+        {search && haMaisPaginas && (
+          <p className="pt-2 text-center text-xs text-content-3">
+            A busca cobre só as transações desta página. Pode haver mais resultados em outras páginas.
+          </p>
+        )}
+
         {filtered.length === 0 && (
           <div className="text-center py-12 text-content-3 text-sm">
-            {search && haMaisPaginas
-              ? "Nenhuma transação encontrada nesta página. A busca cobre só as transações já carregadas."
-              : "Nenhuma transação encontrada."}
+            Nenhuma transação encontrada.
           </div>
         )}
 
-        {total > PAGE_SIZE && (
+        {(haMaisPaginas || offset > 0) && (
           <div className="flex items-center justify-between gap-4 pt-2">
             <p className="text-sm text-content-2 tnum">
-              {offset + 1}–{Math.min(offset + PAGE_SIZE, total)} de {total}
+              {search
+                ? "Busca ativa: contagem total oculta"
+                : totalConhecido
+                  ? `${offset + 1}–${Math.min(offset + PAGE_SIZE, total)} de ${total}`
+                  : `${offset + 1}–${offset + transactions.length}`}
             </p>
             <div className="flex gap-2">
               <Button
@@ -561,7 +603,7 @@ export default function Transactions() {
               </Button>
               <Button
                 variant="ghost"
-                disabled={offset + PAGE_SIZE >= total}
+                disabled={!podeAvancar}
                 onClick={() =>
                   load(filterType ? { type: filterType } : {}, offset + PAGE_SIZE)
                 }

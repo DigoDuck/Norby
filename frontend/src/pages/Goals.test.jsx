@@ -90,7 +90,7 @@ describe("Goals", () => {
     renderGoals();
 
     fireEvent.click(await screen.findByRole("button", { name: /editar meta/i }));
-    const dialog = await screen.findByRole("dialog");
+    await screen.findByRole("dialog");
 
     fireEvent.change(screen.getByLabelText(/nome/i), {
       target: { value: "Reserva nova" },
