@@ -93,10 +93,17 @@ export default function Goals() {
   }
 
   // Abre o dialog em modo edição, pré-preenchido com nome e valor-alvo.
+  // `type` também é preservado: não é enviado no PUT, mas o rótulo do campo
+  // de valor ("Valor-alvo" vs "Teto mensal") depende dele.
   function abrirEdicao(goal) {
     setEditing(goal);
     setServerError(null);
-    reset({ ...EMPTY_FORM, name: goal.name, target_amount: Number(goal.target_amount) });
+    reset({
+      ...EMPTY_FORM,
+      name: goal.name,
+      target_amount: Number(goal.target_amount),
+      type: goal.type,
+    });
     setOpen(true);
   }
 

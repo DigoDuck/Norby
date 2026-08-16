@@ -31,6 +31,19 @@ const META = {
   created_at: "2026-08-01T00:00:00Z",
 };
 
+const META_BUDGET = {
+  id: "2",
+  name: "Mercado",
+  type: "BUDGET",
+  target_amount: "600.00",
+  current_amount: "150.00",
+  category: "Alimentação",
+  deadline: null,
+  progress_pct: 25,
+  remaining: "450.00",
+  created_at: "2026-08-01T00:00:00Z",
+};
+
 function renderGoals() {
   render(
     <MemoryRouter>
@@ -109,5 +122,19 @@ describe("Goals", () => {
     await waitFor(() => expect(goalsApi.update).toHaveBeenCalled());
     const [, payload] = goalsApi.update.mock.calls[0];
     expect(Object.keys(payload).sort()).toEqual(["name", "target_amount"]);
+  });
+
+  it("mostra o rótulo 'Teto mensal' ao editar uma meta do tipo BUDGET", async () => {
+    // reset() do abrirEdicao precisa preservar goal.type: EMPTY_FORM.type é
+    // "SAVINGS", e sem isso o rótulo do campo de valor mostra "Valor-alvo"
+    // mesmo editando uma meta BUDGET.
+    goalsApi.list.mockResolvedValue({ data: [META_BUDGET] });
+    renderGoals();
+
+    fireEvent.click(await screen.findByRole("button", { name: /editar meta/i }));
+    await screen.findByRole("dialog");
+
+    expect(screen.getByLabelText(/teto mensal/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/valor-alvo/i)).not.toBeInTheDocument();
   });
 });
