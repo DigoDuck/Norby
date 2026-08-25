@@ -89,8 +89,15 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: npm audit (high/critical only)
-        run: npm audit --audit-level=high
+      # --omit=dev keeps this symmetric with the backend, which audits
+      # requirements.lock (production only) and never requirements-dev.lock.
+      # The dev tree here is vite/vitest/eslint: it never reaches the bundle
+      # Vercel serves, and gating merges on it would block this repo on a
+      # major vitest upgrade that has nothing to do with what ships.
+      # Dependabot (.github/dependabot.yml) still raises those upgrades, it
+      # just does not hold the pipeline red while they wait.
+      - name: npm audit (production deps, high/critical only)
+        run: npm audit --omit=dev --audit-level=high
 
   lighthouse:
     name: Lighthouse budget (production)
