@@ -1,0 +1,124 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  backend:
+    name: Backend tests + audit
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: norby_user
+          POSTGRES_PASSWORD: norby_pass
+          POSTGRES_DB: norby_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      mongodb:
+        image: mongo:7.0
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --eval 'db.adminCommand(\"ping\")'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql+asyncpg://norby_user:norby_pass@localhost:5432/norby_test
+      MONGODB_URL: mongodb://localhost:27017
+      SECRET_KEY: ci-only-secret-key-not-used-in-production
+      GEMINI_API_KEY: ci-only-dummy-key-not-called-in-tests
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.lock
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.lock
+
+      - name: Run tests
+        run: pytest
+
+      - name: pip-audit
+        # PYSEC-2026-1325 is an accepted exception documented in AGENTS.md:
+        # python-jose pulls ecdsa, and Settings.algorithm only allows HS256,
+        # so the vulnerable ECDSA/ECDH signing path is unreachable.
+        run: pip-audit -r requirements.lock --ignore-vuln PYSEC-2026-1325
+
+  frontend:
+    name: Frontend lint + test + build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm run test
+
+      - name: Build
+        run: npm run build
+
+      # Audits the whole tree, dev included. The dev-only advisories that made
+      # this red on the first run are gone: vitest 2 was pinning its own
+      # vite 5 next to the app's vite 8, and that duplicate copy carried them.
+      - name: npm audit (high/critical only)
+        run: npm audit --audit-level=high
+
+  lighthouse:
+    name: Lighthouse budget (production)
+    runs-on: ubuntu-latest
+    # The audited URL is the deployed Vercel frontend, not this checkout's
+    # code — checking it on every PR would just re-test whatever is already
+    # live and not what the PR changes. Only push-to-main (post-deploy) is
+    # meaningful; even then there's a race with Vercel's own redeploy time.
+    if: github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v5
+
+      # Thresholds calibrated 2026-08-25 against this same URL, 3 runs, Edge
+      # headless with Lighthouse's default mobile emulation: performance
+      # 0.89/0.94/0.94, accessibility 0.96 on all three. Accessibility is
+      # deterministic, so 0.95 is a real budget. Performance is not, and a
+      # GitHub runner is slower than the machine that measured it, so 0.85
+      # keeps headroom for runner variance while still catching a regression
+      # that 0.70 would have waved through. Re-tighten once the first runs on
+      # main show what the runner actually scores.
+      - name: Run Lighthouse CI
+        uses: treosh/lighthouse-ci-action@v12
+        with:
+          urls: |
+            https://norby-finance.vercel.app/
+          configPath: .github/lighthouse/lighthouserc.json
+          uploadArtifacts: true
+          temporaryPublicStorage: true

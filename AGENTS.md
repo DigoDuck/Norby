@@ -190,33 +190,83 @@ recarga. Mitigações no lugar: CSP restritiva no `vercel.json`, access token de
 **Pré-requisito para migrar:** domínio próprio com API e frontend no mesmo site
 registrável (`norby.app` + `api.norby.app`) — aí o cookie vira `SameSite=Lax`.
 
-**Rate limit atrás do proxy — decisão consciente (2026-07-21):** o uvicorn só
-honra `X-Forwarded-For` quando o peer é `127.0.0.1` (default de
-`forwarded_allow_ips`), e o proxy do Railway não é loopback; `FORWARDED_ALLOW_IPS`
-não existe naquele ambiente, então `request.client.host` devolve o IP do proxy
-para todo mundo. **Não** ligar `--forwarded-allow-ips="*"`: nessa versão do
-uvicorn o `always_trust` faz o middleware usar o *primeiro* item do
-`X-Forwarded-For`, que é o que o cliente controla, e o rate limit de login
-viraria spoofável. Em vez disso, as rotas **autenticadas** usam `user_key` em
-`app/limiter.py`, chaveando pelo id do usuário: `/ai/*` e, desde 2026-08-15,
-`DELETE /auth/me` (antes um atacante podia encher o balde por IP e impedir
-qualquer usuário de excluir a própria conta).
+**Rate limit atrás do proxy — reescrito em 2026-08-16 (issue #22, fix round 1
+incluído):** o uvicorn só honra `X-Forwarded-For` quando o peer é
+`127.0.0.1` (default de `forwarded_allow_ips`), e o proxy do Railway não é
+loopback; `FORWARDED_ALLOW_IPS` não existe naquele ambiente, então
+`request.client.host` devolve o IP do proxy para todo mundo. **Não** ligar
+`--forwarded-allow-ips="*"`: nessa versão do uvicorn o `always_trust` faz o
+middleware usar o *primeiro* item do `X-Forwarded-For`, que é o que o
+cliente controla — o rate limit viraria spoofável. Railway também não
+documenta onde fica o IP real nesse header (o próprio suporte deles se
+contradiz), então `app/routers/auth.py` loga o header cru (`_log_xff`) nas 4
+rotas de auth pra decidir com dado — temporário, remover depois de ler os
+logs de produção por algumas semanas.
 
-Login e cadastro são anônimos e seguem por IP, com o balde compartilhado como
-dívida aceita. **Revisado em 2026-08-15, e o custo é maior do que "colateral"
-como este texto dizia antes:** como o `get_remote_address` devolve o mesmo proxy
-para todo mundo e os limites são pequenos (10/min e 5/min), um atacante mantém
-os dois baldes cheios a custo quase zero e produz negação **global** de
-autenticação. A defesa contra força bruta vira um interruptor público de
-disponibilidade. Continua aceito porque a alternativa é desenho novo, não
-correção: limite por identificador de conta protegido por HMAC no login, mais
-teto global, e verificação de e-mail ou desafio antiabuso no cadastro. Se o
-cadastro for divulgado, isso deixa de ser dívida e vira bloqueante.
+Rotas **autenticadas** usam `user_key` em `app/limiter.py`, chaveando pelo id
+do usuário: `/ai/*` e, desde 2026-08-15, `DELETE /auth/me`.
+
+Login e cadastro (anônimos) **não seguem mais por IP.** Desde 2026-08-16 usam
+atraso progressivo **por conta**: a chave é o HMAC-SHA256 do email
+normalizado (lower + trim) com o `secret_key` do servidor — o email cru nunca
+é gravado (`app/services/throttle_service.py`, tabela `login_throttles`,
+migrations `1c1a72a15b9e` + `764bc1132df0`). Curva: as 3 primeiras falhas não
+esperam nada; da 3a falha acumulada em diante, a próxima tentativa exige
+`min(2**(n-3), 60)` segundos desde a última falha (1s, 2s, 4s, 8s, 16s, 32s,
+60s, 60s...). Sucesso reseta o contador. O contador incrementa IDÊNTICO
+exista ou não o email — preserva o tempo constante do login (`_DUMMY_HASH`)
+e impede que o próprio rate limit vire oráculo de enumeração. `check_throttle`
+nunca segura a requisição com `sleep` nem bloqueia pra sempre: responde 429
+com `Retry-After`. O incremento é um upsert atômico do Postgres (`ON CONFLICT
+DO UPDATE`), não um read-modify-write em Python — a versão anterior perdia
+incremento sob concorrência e podia estourar 500 na primeira falha simultânea
+de uma chave nova (fix round 1).
+
+Cadastro compartilha o balde do login (mesma chave, o email). Tentativas
+repetidas de "email já cadastrado" (dívida aceita abaixo) também encostam na
+curva. As comparações de email em `/auth/login`, `/auth/register` e
+`PUT /auth/me` são por `func.lower(User.email)`, com índice único funcional
+em `lower(email)` no banco (fix round 1: a comparação sensível a caixa
+permitia criar uma conta-sombra — `Joao@x.com` ao lado de `joao@x.com` — que,
+ao logar com sucesso, resetava o balde da vítima, já que a chave HMAC do
+throttle normaliza a caixa mas a checagem de duplicidade não normalizava).
+
+Tetos globais (só flood protection, bem acima do pico legítimo, não são mais
+a defesa principal): login 200/min, cadastro 60/min, refresh 600/min, logout
+120/min. `/auth/refresh` só tinha teto (20/min) por ser CAPACIDADE, não
+defesa: com access token de 15min, ~100 usuários ativos já geram ~20/min no
+pico, e o teto antigo derrubava sessão sem nenhum atacante — o que protege o
+refresh é o token opaco de 256 bits com rotação e detecção de reuso, não o
+contador. `/auth/logout` derruba TODAS as sessões ao receber um token já
+rotacionado, então tem DOIS limites empilhados: por hash do token
+apresentado (não IP — um token velho da vítima não esgota o balde de outra
+sessão) **e** por IP (fix round 1: chavear só pelo token deixava o teto sem
+efeito nenhum contra flood, já que um token aleatório novo a cada chamada
+nunca esgota o próprio balde).
+
+**Duas dívidas aceitas nesta reescrita, não pendências esquecidas:**
+- **A vítima pode levar 429 mesmo digitando a senha certa.** `check_throttle`
+  roda ANTES de verificar a credencial — é isso que faz o atraso bloquear de
+  verdade (checar a senha primeiro e só depois atrasar não defende contra
+  força bruta, só atrasa a resposta depois que o custo real já foi pago).
+  Consequência: um atacante que erra a senha da vítima 1x por minuto nega o
+  login dela indefinidamente. A saída da vítima seria recuperação de senha,
+  que não existe (depende de domínio próprio, issue #41).
+- **O teto global de login continua chaveado no IP do proxy**, o mesmo balde
+  pra todo mundo atrás do Railway. Ficou 20x mais caro que antes
+  (10/min → 200/min), não foi eliminado: ~3,3 req/s sustentados ainda negam
+  login pra base inteira. A defesa de verdade é o atraso por conta; o teto
+  global é só o freio de flood que sobrou de antes. **O teto por IP do
+  `/auth/logout` tem exatamente a mesma limitação**: é o balde do proxy, então
+  ele freia flood mas também pode negar logout pra base inteira. Aceito pelo
+  mesmo motivo — o que protege o logout é a chave por token, não o teto.
 
 **Outras dívidas assumidas** (decisões, não pendências esquecidas):
-- `POST /auth/register` responde "Email já cadastrado" (enumeração por essa via
-  é possível, limitada a 5/min). Mensagem genérica destruiria a usabilidade; o
-  login já tem tempo constante, que era o vetor medível.
+- `POST /auth/register` responde "Email já cadastrado" (enumeração por essa
+  via é possível). Mensagem genérica destruiria a usabilidade; o login já tem
+  tempo constante, que era o vetor medível. Desde 2026-08-16 essa enumeração
+  também esbarra na curva de atraso por conta (teto global subiu de 5/min
+  para 60/min, mas cada tentativa repetida no mesmo email entra na fila).
 - Exclusão de conta apaga o Mongo antes do Postgres, sem transação distribuída.
   Falha no commit do SQL deixaria a conta viva sem os dados de IA.
 - `/docs` fica público: todos os endpoints por trás dele exigem autenticação, e

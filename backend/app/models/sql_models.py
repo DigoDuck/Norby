@@ -6,7 +6,7 @@ from typing import Optional, List
 
 from sqlalchemy import (
     String, DateTime, Date, Numeric, ForeignKey,
-    Enum, Integer, Boolean, CheckConstraint
+    Enum, Integer, Boolean, CheckConstraint, Index, text
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -30,6 +30,22 @@ class GoalType(str, PyEnum):
 
 class User(Base):
     __tablename__= "users"
+
+    # Fix round 1 (issue #22): login/cadastro comparam email por
+    # func.lower(User.email) pra não deixar "Joao@x.com" e "joao@x.com"
+    # virarem contas distintas (isso permitia contornar o throttle: a
+    # conta-sombra podia logar com sucesso e resetar o balde da vítima, cuja
+    # chave HMAC já normalizava a caixa). O índice único funcional garante o
+    # invariante no banco também, não só na query — ver migration correspondente.
+    # O unique=True do campo `email` abaixo ficou REDUNDANTE (unicidade em
+    # lower(email) já implica unicidade em email) e não é usado por nenhuma
+    # consulta, já que todas passam por func.lower. Mantido de propósito:
+    # derrubá-lo custa uma migration em produção e economiza uma escrita de
+    # índice num INSERT que acontece uma vez por usuário. Quem enxerga o
+    # invariante hoje é o índice funcional, não ele.
+    __table_args__ = (
+        Index("ix_users_email_lower", text("lower(email)"), unique=True),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
@@ -63,6 +79,29 @@ class RefreshToken(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     user: Mapped["User"] = relationship("User", back_populates="refresh_tokens")
+
+class LoginThrottle(Base):
+    """Atraso progressivo por conta (issue #22), independente de IP.
+
+    Atrás do proxy do Railway `get_remote_address` devolve o mesmo IP pra todo
+    mundo (ver "Rate limit atrás do proxy" no AGENTS.md), então login e
+    cadastro usam esta tabela em vez do IP: a chave é o HMAC-SHA256 do email
+    normalizado (lower + trim) com o secret_key do servidor — o email cru
+    NUNCA é gravado. Ver app/services/throttle_service.py para a curva de
+    espera e a purga de linhas com mais de 24h.
+    """
+    __tablename__ = "login_throttles"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    key_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
+    failure_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # Fix round 1: indexado porque a purga (DELETE ... WHERE last_failure_at <
+    # cutoff, ver throttle_service._purge_expired) roda em TODA falha de
+    # login. Sem índice, cada falha varre a tabela inteira — o mecanismo de
+    # defesa amplificando o próprio ataque em volume.
+    last_failure_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow, index=True
+    )
 
 class Wallet(Base):
     __tablename__= "wallets"

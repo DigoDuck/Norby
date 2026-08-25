@@ -40,6 +40,10 @@ async def setup_database():
     yield
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
+    # Não chamar test_engine.dispose() aqui: o engine usa NullPool (acima) e
+    # NullPool.dispose() é um `pass`. É o próprio NullPool que torna seguro
+    # reusar este engine em N event loops — ele não guarda conexão entre
+    # testes, então não há estado preso a um loop morto para soltar.
 
 
 def _override_get_db():

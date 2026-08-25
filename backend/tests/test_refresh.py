@@ -76,15 +76,102 @@ async def test_logout_is_rate_limited(client):
     # Token desconhecido serve: o que se mede aqui é o balde, não a revogação.
     from app.limiter import limiter
 
-    # A fixture global desliga o limiter; religamos só para este teste.
+    # Teto atual: 120/min (issue #22). A fixture global desliga o limiter;
+    # religamos só para este teste.
     limiter.reset()
     limiter.enabled = True
     try:
-        for _ in range(20):
+        for _ in range(120):
             res = await client.post("/auth/logout", json={"refresh_token": "nao-existe"})
             assert res.status_code == 204
         estourou = await client.post("/auth/logout", json={"refresh_token": "nao-existe"})
         assert estourou.status_code == 429
+    finally:
+        limiter.enabled = False
+        limiter.reset()
+
+
+@pytest.mark.asyncio
+async def test_logout_bucket_is_keyed_by_the_refresh_token_not_ip(client):
+    # Issue #22: logout derruba TODAS as sessões de quem é dono do token, então
+    # a chave principal não pode ser o IP (atrás do proxy, o balde seria
+    # compartilhado por todo mundo). Dois tokens diferentes não podem esgotar
+    # o mesmo balde POR TOKEN.
+    from httpx import AsyncClient, ASGITransport
+
+    from app.limiter import limiter
+    from app.main import app
+
+    limiter.reset()
+    limiter.enabled = True
+    try:
+        for _ in range(120):
+            res = await client.post("/auth/logout", json={"refresh_token": "token-a"})
+            assert res.status_code == 204
+        estourou = await client.post("/auth/logout", json={"refresh_token": "token-a"})
+        assert estourou.status_code == 429
+
+        # Fix round 3: aqui havia um limiter.reset() antes da chamada com
+        # "token-b", e ele zerava OS DOIS baldes empilhados — o teste passaria
+        # igual se a chave fosse o IP, ou seja, não provava nada. Em vez de
+        # resetar, trocamos de IP: o balde por IP nasce limpo e o balde por
+        # token continua saturado, então os dois asserts abaixo separam as
+        # duas chaves.
+        de_outro_ip = ASGITransport(app=app, client=("10.0.0.2", 1234))
+        async with AsyncClient(transport=de_outro_ip, base_url="http://test") as outro_ip:
+            mesmo_token = await outro_ip.post(
+                "/auth/logout", json={"refresh_token": "token-a"}
+            )
+            assert mesmo_token.status_code == 429  # IP novo não livra o token saturado
+
+            outro_token = await outro_ip.post(
+                "/auth/logout", json={"refresh_token": "token-b"}
+            )
+            assert outro_token.status_code == 204  # token diferente = balde diferente
+    finally:
+        limiter.enabled = False
+        limiter.reset()
+
+
+@pytest.mark.asyncio
+async def test_logout_has_an_ip_wide_flood_ceiling(client):
+    # Fix round 1 (issue #22 review): chavear só pelo token deixava o teto
+    # sem efeito nenhum contra flood — um token aleatório novo em toda
+    # chamada nunca esgota o PRÓPRIO balde. O teto por IP empilhado (chave
+    # padrão do slowapi) estoura mesmo com um token diferente a cada chamada.
+    import uuid as uuid_mod
+
+    from app.limiter import limiter
+
+    limiter.reset()
+    limiter.enabled = True
+    try:
+        for _ in range(120):
+            token = uuid_mod.uuid4().hex
+            res = await client.post("/auth/logout", json={"refresh_token": token})
+            assert res.status_code == 204
+        estourou = await client.post(
+            "/auth/logout", json={"refresh_token": uuid_mod.uuid4().hex}
+        )
+        assert estourou.status_code == 429
+    finally:
+        limiter.enabled = False
+        limiter.reset()
+
+
+@pytest.mark.asyncio
+async def test_refresh_no_longer_throttles_at_20_per_minute(client):
+    # Issue #22: 20/min era um teto de capacidade, não uma defesa — com token
+    # de acesso de 15min, usuários ativos legítimos já batiam nele. Novo teto
+    # é 600/min; 25 chamadas seguidas não podem estourar.
+    from app.limiter import limiter
+
+    limiter.reset()
+    limiter.enabled = True
+    try:
+        for _ in range(25):
+            res = await client.post("/auth/refresh", json={"refresh_token": "nao-existe"})
+            assert res.status_code == 401
     finally:
         limiter.enabled = False
         limiter.reset()
