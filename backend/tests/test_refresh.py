@@ -97,7 +97,10 @@ async def test_logout_bucket_is_keyed_by_the_refresh_token_not_ip(client):
     # a chave principal não pode ser o IP (atrás do proxy, o balde seria
     # compartilhado por todo mundo). Dois tokens diferentes não podem esgotar
     # o mesmo balde POR TOKEN.
+    from httpx import AsyncClient, ASGITransport
+
     from app.limiter import limiter
+    from app.main import app
 
     limiter.reset()
     limiter.enabled = True
@@ -108,14 +111,23 @@ async def test_logout_bucket_is_keyed_by_the_refresh_token_not_ip(client):
         estourou = await client.post("/auth/logout", json={"refresh_token": "token-a"})
         assert estourou.status_code == 429
 
-        # Fix round 1: o endpoint também tem um teto por IP empilhado (ver
-        # test_logout_has_an_ip_wide_flood_ceiling), e as 120 chamadas acima
-        # já o saturaram (mesmo IP simulado nos testes). Resetamos aqui pra
-        # isolar exatamente o que este teste prova: a chave por TOKEN é
-        # independente entre tokens diferentes, não que o IP nunca estoura.
-        limiter.reset()
-        outro = await client.post("/auth/logout", json={"refresh_token": "token-b"})
-        assert outro.status_code == 204
+        # Fix round 3: aqui havia um limiter.reset() antes da chamada com
+        # "token-b", e ele zerava OS DOIS baldes empilhados — o teste passaria
+        # igual se a chave fosse o IP, ou seja, não provava nada. Em vez de
+        # resetar, trocamos de IP: o balde por IP nasce limpo e o balde por
+        # token continua saturado, então os dois asserts abaixo separam as
+        # duas chaves.
+        de_outro_ip = ASGITransport(app=app, client=("10.0.0.2", 1234))
+        async with AsyncClient(transport=de_outro_ip, base_url="http://test") as outro_ip:
+            mesmo_token = await outro_ip.post(
+                "/auth/logout", json={"refresh_token": "token-a"}
+            )
+            assert mesmo_token.status_code == 429  # IP novo não livra o token saturado
+
+            outro_token = await outro_ip.post(
+                "/auth/logout", json={"refresh_token": "token-b"}
+            )
+            assert outro_token.status_code == 204  # token diferente = balde diferente
     finally:
         limiter.enabled = False
         limiter.reset()

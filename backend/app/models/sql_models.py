@@ -37,6 +37,12 @@ class User(Base):
     # conta-sombra podia logar com sucesso e resetar o balde da vítima, cuja
     # chave HMAC já normalizava a caixa). O índice único funcional garante o
     # invariante no banco também, não só na query — ver migration correspondente.
+    # O unique=True do campo `email` abaixo ficou REDUNDANTE (unicidade em
+    # lower(email) já implica unicidade em email) e não é usado por nenhuma
+    # consulta, já que todas passam por func.lower. Mantido de propósito:
+    # derrubá-lo custa uma migration em produção e economiza uma escrita de
+    # índice num INSERT que acontece uma vez por usuário. Quem enxerga o
+    # invariante hoje é o índice funcional, não ele.
     __table_args__ = (
         Index("ix_users_email_lower", text("lower(email)"), unique=True),
     )

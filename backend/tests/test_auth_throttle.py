@@ -163,6 +163,34 @@ async def test_login_is_case_insensitive_on_email(client):
 
 
 @pytest.mark.asyncio
+async def test_update_me_rejects_an_email_already_taken_in_another_case(client):
+    # Terceiro site de lookup de email do fix round 1 (cadastro e login estão
+    # cobertos acima; este era o único sem rede). Joao é cadastrado com a
+    # caixa que digitou — users.email grava como veio — e Maria tenta migrar
+    # para o mesmo endereço em minúsculas: sem a comparação insensível a
+    # caixa, esse SELECT não acha nada e a troca passa pela porta dos fundos.
+    # DUAS camadas defendem o invariante e o teste cobre o resultado das
+    # duas: a query por func.lower e, atrás dela, o índice único funcional
+    # (que sozinho devolveria 500 se o catch de IntegrityError sumisse).
+    await client.post("/auth/register", json={
+        "name": "Joao", "email": "Joao@test.com",
+        "password": "secret123", "accept_privacy": True,
+    })
+    maria = await client.post("/auth/register", json={
+        "name": "Maria", "email": "maria@test.com",
+        "password": "secret123", "accept_privacy": True,
+    })
+    auth = {"Authorization": f"Bearer {maria.json()['access_token']}"}
+
+    res = await client.put("/auth/me", json={"email": "joao@test.com"}, headers=auth)
+    assert res.status_code == 400
+
+    # E a recusa não pode deixar rastro: o email de Maria continua o dela.
+    atual = await client.get("/auth/me", headers=auth)
+    assert atual.json()["email"] == "maria@test.com"
+
+
+@pytest.mark.asyncio
 async def test_shadow_account_cannot_reset_victims_throttle(client):
     # Fecha a rota de ataque descrita no fix round 1: sem a conta-sombra (bloqueada
     # pelo teste de duplicidade insensível a caixa acima), não existe login
@@ -239,11 +267,46 @@ async def test_wait_is_capped_at_60_seconds(client, db_session):
 
 
 @pytest.mark.asyncio
-async def test_repeated_429_does_not_extend_the_wait(client):
+async def test_retry_after_stays_capped_when_the_clock_walks_backwards(client, db_session):
+    # Fix round 3: `remaining = wait - elapsed` só respeita o teto enquanto
+    # elapsed >= 0. Um last_failure_at no futuro (relógio do host ajustado
+    # pra trás, ou host e banco fora de sincronia) faz elapsed negativo e o
+    # Retry-After passa dos 60s anunciados. Aqui o futuro é simulado direto
+    # na linha, que é o mesmo estado que o relógio torto produziria.
+    from datetime import datetime, timedelta, timezone
+
+    from app.models.sql_models import LoginThrottle
+    from app.services.throttle_service import _key_hash
+
+    email = "relogio-torto@test.com"
+    db_session.add(LoginThrottle(
+        key_hash=_key_hash(email),
+        failure_count=20,
+        last_failure_at=datetime.now(timezone.utc) + timedelta(minutes=5),
+    ))
+    await db_session.commit()
+
+    res = await _fail_login(client, email)
+    assert res.status_code == 429
+    assert int(res.headers["Retry-After"]) <= 60
+
+
+@pytest.mark.asyncio
+async def test_repeated_429_does_not_extend_the_wait(client, db_session):
+    # Fix round 3: com apenas 3 falhas a espera é de 1s, menor que a própria
+    # janela do teste — um segundo de lentidão entre as duas tentativas fazia
+    # a segunda voltar 401 e o teste falhava sem bug nenhum. Semeando o
+    # contador alto a espera vai pro teto (60s) e a janela deixa de importar.
+    from datetime import datetime, timezone
+
+    from app.models.sql_models import LoginThrottle
+    from app.services.throttle_service import _key_hash
+
     email = "sempre-bloqueado@test.com"
-    for _ in range(3):
-        res = await _fail_login(client, email)
-        assert res.status_code == 401
+    db_session.add(LoginThrottle(
+        key_hash=_key_hash(email), failure_count=10, last_failure_at=datetime.now(timezone.utc),
+    ))
+    await db_session.commit()
 
     first_block = await _fail_login(client, email)
     assert first_block.status_code == 429

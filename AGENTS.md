@@ -256,7 +256,10 @@ nunca esgota o próprio balde).
   pra todo mundo atrás do Railway. Ficou 20x mais caro que antes
   (10/min → 200/min), não foi eliminado: ~3,3 req/s sustentados ainda negam
   login pra base inteira. A defesa de verdade é o atraso por conta; o teto
-  global é só o freio de flood que sobrou de antes.
+  global é só o freio de flood que sobrou de antes. **O teto por IP do
+  `/auth/logout` tem exatamente a mesma limitação**: é o balde do proxy, então
+  ele freia flood mas também pode negar logout pra base inteira. Aceito pelo
+  mesmo motivo — o que protege o logout é a chave por token, não o teto.
 
 **Outras dívidas assumidas** (decisões, não pendências esquecidas):
 - `POST /auth/register` responde "Email já cadastrado" (enumeração por essa

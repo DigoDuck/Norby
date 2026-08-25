@@ -53,7 +53,12 @@ async def check_throttle(email: str, db: AsyncSession) -> int | None:
         return None
     elapsed = (datetime.now(timezone.utc) - row.last_failure_at).total_seconds()
     remaining = wait - elapsed
-    return math.ceil(remaining) if remaining > 0 else None
+    if remaining <= 0:
+        return None
+    # Cap defensivo (fix round 3): `remaining` nunca deveria passar de `wait`,
+    # mas basta o relógio do host andar pra trás entre a gravação e a leitura
+    # para `elapsed` ficar negativo e o Retry-After estourar o teto anunciado.
+    return min(math.ceil(remaining), _MAX_WAIT_SECONDS)
 
 
 async def record_failure(email: str, db: AsyncSession) -> None:
