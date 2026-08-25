@@ -168,6 +168,39 @@ async def test_register_persists_consent_timestamp(client, db_session):
 
 
 @pytest.mark.asyncio
+async def test_register_grants_a_seven_day_ai_trial(client, db_session):
+    # ADR 0001: o trial é conceito do Norby, não Subscription do Stripe — senão
+    # todo cadastro criaria Customer e Subscription lá, inclusive de quem nunca
+    # paga. Assertivo no banco pelo mesmo motivo do teste de consentimento
+    # acima: o campo não é exposto no UserResponse, e expor agora pré-decidiria
+    # a issue #20, que é quem escolhe como o frontend descobre o plano.
+    from datetime import datetime, timedelta, timezone
+
+    from sqlalchemy import select
+    from app.models.sql_models import User
+
+    antes = datetime.now(timezone.utc)
+    res = await client.post(
+        "/auth/register",
+        json={
+            "name": "Dani",
+            "email": "dani@test.com",
+            "password": "secret123",
+            "accept_privacy": True,
+        },
+    )
+    assert res.status_code == 201, res.text
+
+    user = (
+        await db_session.execute(select(User).where(User.email == "dani@test.com"))
+    ).scalar_one()
+    # Janela em vez de igualdade exata: o cadastro roda bcrypt no meio.
+    assert antes + timedelta(days=7) <= user.ai_trial_ends_at <= datetime.now(timezone.utc) + timedelta(days=7)
+    # E o trial não pode vazar para o teto de carteiras.
+    assert user.premium_until is None
+
+
+@pytest.mark.asyncio
 async def test_register_rejects_password_over_72_bytes(client):
     # bcrypt trunca em 72 bytes. Sem o teto, o sufixo seria ignorado e a senha
     # longa se comportaria como uma senha de 72 bytes disfarçada.

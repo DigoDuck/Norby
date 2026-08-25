@@ -21,6 +21,7 @@ from app.services.auth_service import (
     _DUMMY_HASH,
 )
 from app.services.account_service import delete_account, export_data
+from app.services.plan_service import AI_TRIAL
 from app.services.throttle_service import check_throttle, record_failure, record_success
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
@@ -79,11 +80,18 @@ async def register(
     # bcrypt é CPU-bound e síncrono (~100-300ms). Rodar direto na rota async
     # travaria o event loop; offload para thread, como já é feito com o Gemini.
     password_hash = await asyncio.to_thread(hash_password, payload.password)
+    # ADR 0001: o trial de IA é conceito do Norby, não Subscription do Stripe —
+    # aquela alternativa criaria Customer e Subscription lá para TODO cadastro,
+    # inclusive de quem nunca vai pagar, e acoplaria o registro a uma chamada
+    # externa que pode falhar. Concede só IA: o teto de 2 carteiras continua
+    # valendo durante o trial (premium_until segue NULL).
+    agora = datetime.now(timezone.utc)
     user = User(
         name=payload.name,
         email=payload.email,
         password_hash=password_hash,
-        privacy_accepted_at=datetime.now(timezone.utc),
+        privacy_accepted_at=agora,
+        ai_trial_ends_at=agora + AI_TRIAL,
     )
     db.add(user)
     try:

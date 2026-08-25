@@ -58,6 +58,40 @@ class User(Base):
         DateTime(timezone=True), nullable=True
     )
 
+    # --- Plano e assinatura (ADR 0001, issue #19) ----------------------------
+    # premium_until é O PORTÃO: o current_period_end do Stripe, e a única coluna
+    # que a autorização lê. O Stripe não move essa data quando o cartão falha —
+    # ele retenta DENTRO do período já pago — então ela sozinha responde "tem
+    # acesso agora", e webhook perdido só consegue expirar acesso, nunca
+    # conceder. As quatro faixas estão em app/services/plan_service.py.
+    premium_until: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
+    # Trial de IA de 7 dias, gravado no cadastro. Concede SÓ IA: quem está em
+    # trial continua com teto de 2 carteiras. NULL significa "sem trial", que é
+    # o que a migration deixa em todo usuário pré-v2 — o "sem grandfathering"
+    # da decisão travada sai de graça, sem backfill.
+    ai_trial_ends_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    stripe_customer_id: Mapped[Optional[str]] = mapped_column(
+        String(255), unique=True, nullable=True
+    )
+    stripe_subscription_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    # String crua do Stripe, SÓ exibição. Nenhum portão lê isto: autorizar por um
+    # vocabulário que o Stripe pode estender sem avisar faria um status novo cair
+    # no else de algum gate e virar concessão ou negação silenciosa.
+    subscription_status: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    cancel_at_period_end: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("false"), nullable=False
+    )
+    # `created` do último evento aplicado. O Stripe NÃO garante ordem de entrega,
+    # e dois customer.subscription.updated invertidos empurrariam premium_until
+    # para trás ou ressuscitariam um cancel_at_period_end velho.
+    stripe_event_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
     # passive_deletes=True: as FKs já têm ondelete="CASCADE", mas sem isto o
     # SQLAlchemy ignora o banco, CARREGA todos os filhos na sessão e emite um
     # DELETE por linha. A conta de demo tem ~170 transações, então DELETE
@@ -189,3 +223,40 @@ class Goal(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     user: Mapped["User"] = relationship("User", back_populates="goals")
+class StripeWebhookEvent(Base):
+    """Projeção dos campos que o handler usa — NUNCA o payload cru (ADR 0001).
+
+    Guardar o evento inteiro em JSONB colocaria PII fora do alcance do
+    `delete_account`: o `checkout.session.completed` traz
+    `customer_details.email`, e o LGPD.md trata exclusão como direito, não
+    cortesia. Guardando só o que o handler lê, não existe nada a apagar depois.
+
+    Nada de real se perde. O replay que o payload cru permitiria é redundante
+    com a reconciliação preguiçosa (issue #48), que consulta o Stripe ao vivo —
+    recuperação melhor do que reprocessar cópia velha. E o painel do Stripe já
+    guarda todo evento por 30 dias com botão de reenviar.
+
+    A idempotência mora na PK: `event_id` repetido conflita, e o handler
+    responde 200 sem reprocessar.
+    """
+
+    __tablename__ = "stripe_webhook_events"
+
+    event_id: Mapped[str] = mapped_column(String(255), primary_key=True)
+    type: Mapped[str] = mapped_column(String(64), nullable=False)
+    # `created` do evento no Stripe, não a hora em que chegou aqui: é ele que
+    # ordena os eventos entre si quando a entrega vem fora de ordem.
+    stripe_created: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    customer_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+    subscription_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    current_period_end: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    status: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    cancel_at_period_end: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    received_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+    processed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
