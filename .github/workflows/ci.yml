@@ -41,6 +41,9 @@ jobs:
       MONGODB_URL: mongodb://localhost:27017
       SECRET_KEY: ci-only-secret-key-not-used-in-production
       GEMINI_API_KEY: ci-only-dummy-key-not-called-in-tests
+      # O teste de webhook assina as fixtures com este segredo. Não é
+      # credencial: nenhuma chamada sai para o Stripe na suíte.
+      STRIPE_WEBHOOK_SECRET: whsec_ci_only_fixture_signing_secret
     steps:
       - uses: actions/checkout@v7
 

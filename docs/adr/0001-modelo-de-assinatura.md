@@ -152,18 +152,35 @@ precisa do `event_id` único.
   por IP aqui deixaria qualquer pessoa derrubar as entregas do Stripe. É o bug
   que a Onda 2 inteira existiu para matar; não reintroduzir numa rota nova.
 
-Três eventos consumidos:
+Quatro eventos consumidos:
 
 | evento | por quê |
 |---|---|
-| `checkout.session.completed` | primeira compra; amarra customer e subscription ao usuário via `client_reference_id` |
+| `checkout.session.completed` | primeira compra; amarra customer e subscription ao usuário via `client_reference_id`. **Não traz período nenhum** |
+| `customer.subscription.created` | é ele que abre o portão na primeira compra |
 | `customer.subscription.updated` | renovação, cancelamento agendado e pagamento falhado — o cavalo de batalha |
 | `customer.subscription.deleted` | fim da assinatura |
+
+> **Correção de 2026-08-25 (issue #45), eram três.** A lista original tinha
+> `checkout.session.completed`, `updated` e `deleted`, e não cobria a primeira
+> assinatura: o payload de `checkout.session.completed` em modo subscription
+> traz `client_reference_id`, `customer` e `subscription`, mas **não**
+> `current_period_end` — quem carrega o período de uma assinatura nova é o
+> `customer.subscription.created`, não o `updated`. Com a lista antiga, o
+> `premium_until` da primeira compra só apareceria na primeira renovação, um mês
+> depois. O conserto custa zero lógica: `created` e `updated` caem no mesmo
+> handler, porque os dois trazem o objeto completo da assinatura.
 
 `invoice.paid` e `invoice.payment_failed` **não** são consumidos: renovação paga
 já dispara `subscription.updated` com o `current_period_end` novo, e cartão
 recusado já dispara `subscription.updated` com `status=past_due`. São o mesmo
 fato chegando por outra porta.
+
+**No `customer.subscription.deleted`, o portão vai para `ended_at`, não para
+`current_period_end`.** Num cancelamento imediato o Stripe manda `ended_at`
+agora e o `current_period_end` ainda apontando para o futuro; usar o período ali
+deixaria acesso pago em pé depois do fim da assinatura. Cai para o período
+quando o Stripe omite o `ended_at`.
 
 Fluxo, inline e sem fila:
 
