@@ -11,7 +11,7 @@ python-jose[cryptography]==3.5.0
 # AGENTS.md exige o pip-audit limpo.
 cryptography==50.0.0
 passlib[bcrypt]==1.7.4
-python-dotenv==1.2.2
+python-dotenv==1.2.3
 pydantic-settings==2.6.1
 google-generativeai==0.8.3
 email-validator==2.1.1
