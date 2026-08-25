@@ -1,9 +1,9 @@
-fastapi==0.139.2
+fastapi==0.141.1
 uvicorn[standard]==0.30.6
 sqlalchemy[asyncio]==2.0.36
 asyncpg==0.30.0
-alembic==1.13.3
-motor==3.6.0
+alembic==1.19.1
+motor==3.7.1
 python-jose[cryptography]==3.5.0
 # Pin de transitiva por seguranca: o python-jose puxa cryptography, e a 49.0.0
 # tem PYSEC-2026-3552 (oraculo em decrypt PKCS7). O Norby nao usa PKCS7 e o JWT
@@ -11,8 +11,8 @@ python-jose[cryptography]==3.5.0
 # AGENTS.md exige o pip-audit limpo.
 cryptography==50.0.0
 passlib[bcrypt]==1.7.4
-python-dotenv==1.2.2
-pydantic-settings==2.6.1
+python-dotenv==1.2.3
+pydantic-settings==2.15.0
 google-generativeai==0.8.3
 email-validator==2.1.1
 bcrypt==3.2.2

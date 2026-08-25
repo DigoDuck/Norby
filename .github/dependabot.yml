@@ -1,5 +1,11 @@
 version: 2
 updates:
+  # Atenção ao mergear estes: o Dependabot toca SÓ o requirements.txt, e quem
+  # é instalado de verdade é o requirements.lock (Dockerfile) — ele não conhece
+  # o formato .lock do uv. Um merge direto deixa os dois discordando e o
+  # container seguindo na versão antiga. O passo "Locks match the requirement
+  # files" da CI barra isso; o caminho certo é reproduzir o bump localmente e
+  # regenerar os dois locks com `uv pip compile`.
   - package-ecosystem: pip
     directory: /backend
     schedule:
@@ -11,6 +17,13 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    ignore:
+      # Tailwind 4 troca o formato de configuração inteiro e este repo tem
+      # tokens fechados no DESIGN.md — é migração com sessão de design, não
+      # bump de dependência. O PR #59 já provou o ponto: reprovou no job de
+      # frontend. Quando for a hora, abrir um ticket próprio e remover isto.
+      - dependency-name: tailwindcss
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /

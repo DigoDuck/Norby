@@ -79,7 +79,12 @@ npm run test     # Vitest
 - Dependências: `requirements.txt` é **só produção**; pytest e afins vivem em
   `requirements-dev.txt`. Os arquivos `.lock` fixam também as transitivas usadas
   pelo Docker; regenerá-los após alterar os arquivos-fonte. Rodar o comando de
-  audit acima antes de cada release.
+  audit acima antes de cada release. **A CI barra a deriva**: o passo "Locks
+  match the requirement files" roda `backend/scripts/check_locks.py`, que
+  reprova quando um pin do `requirements*.txt` não está refletido no `.lock`.
+  Existe porque quem instala é o `.lock` — bumpar só o `.txt` deixa o container
+  na versão antiga com a CI verde. É exatamente o que os PRs de pip do
+  Dependabot fazem: eles não sabem regenerar lock de `uv`.
 - Exceção do audit: `python-jose` traz `ecdsa`, afetado por
   `PYSEC-2026-1325` sem versão corrigida. `Settings.algorithm` aceita somente
   `HS256`, então o caminho vulnerável de assinatura ECDSA/ECDH não é alcançável.
