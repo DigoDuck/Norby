@@ -2,7 +2,7 @@ fastapi==0.139.2
 uvicorn[standard]==0.30.6
 sqlalchemy[asyncio]==2.0.36
 asyncpg==0.30.0
-alembic==1.13.3
+alembic==1.19.1
 motor==3.6.0
 python-jose[cryptography]==3.5.0
 # Pin de transitiva por seguranca: o python-jose puxa cryptography, e a 49.0.0
