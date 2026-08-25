@@ -220,6 +220,7 @@ requests==2.34.2
     #   cachecontrol
     #   google-api-core
     #   pip-audit
+    #   stripe
 rich==15.0.0
     # via pip-audit
 rsa==4.9.1
@@ -238,6 +239,8 @@ sqlalchemy==2.0.36
     #   alembic
 starlette==1.3.1
     # via fastapi
+stripe==15.5.1
+    # via -r requirements.txt
 tomli==2.4.1
     # via pip-audit
 tomli-w==1.2.0
@@ -257,6 +260,7 @@ typing-extensions==4.16.0
     #   pydantic-core
     #   sqlalchemy
     #   starlette
+    #   stripe
     #   typing-inspection
 typing-inspection==0.4.2
     # via

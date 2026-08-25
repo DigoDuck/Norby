@@ -20,6 +20,14 @@ class Settings(BaseSettings):
     # CORS — origens permitidas (separadas por vírgula). Default cobre o dev local.
     cors_origins: str = "http://localhost:5173"
 
+    # Stripe (ADR 0001). Default "" DE PROPÓSITO, ao contrário de gemini_api_key:
+    # torná-los obrigatórios derrubaria a produção no instante do merge, já que
+    # as variáveis ainda não existem no Railway. Quem recusa segredo vazio é o
+    # endpoint (503), não o boot — assim o app sobe e o billing fica desligado
+    # até o #26 provisionar a conta.
+    stripe_secret_key: str = ""
+    stripe_webhook_secret: str = ""
+
     model_config = SettingsConfigDict(env_file="../.env", extra="ignore")
 
     @property
