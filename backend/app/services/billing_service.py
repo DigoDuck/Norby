@@ -12,6 +12,8 @@ import logging
 import uuid
 from datetime import datetime, timezone
 
+import stripe
+
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -176,3 +178,21 @@ async def _marcar_processado(event_id: str, db: AsyncSession) -> None:
     if linha is not None:
         linha.processed_at = datetime.now(timezone.utc)
     await db.commit()
+
+
+class GatewayCancelFailed(Exception):
+    """O gateway recusou o cancelamento. Quem traduz para HTTP é o router —
+    service neste repo não conhece HTTP."""
+
+
+async def cancel_subscription(subscription_id: str) -> None:
+    """Cancela a assinatura no Stripe.
+
+    Única saída para o Stripe neste ticket, e é ela que os testes stubam. Usa
+    a API assíncrona do SDK em vez de `asyncio.to_thread`: a versão síncrona
+    faria uma chamada HTTP bloqueante travar o event loop.
+    """
+    try:
+        await stripe.Subscription.cancel_async(subscription_id)
+    except Exception as erro:  # noqa: BLE001 — rede, credencial ou 4xx do Stripe
+        raise GatewayCancelFailed(str(erro)) from erro
