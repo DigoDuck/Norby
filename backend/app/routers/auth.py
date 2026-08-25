@@ -21,6 +21,7 @@ from app.services.auth_service import (
     _DUMMY_HASH,
 )
 from app.services.account_service import delete_account, export_data
+from app.services.billing_service import GatewayCancelFailed
 from app.services.plan_service import AI_TRIAL
 from app.services.throttle_service import check_throttle, record_failure, record_success
 
@@ -278,4 +279,17 @@ async def delete_my_account(
     if not password_ok:
         raise HTTPException(status_code=401, detail="Senha incorreta")
 
-    await delete_account(current_user, db)
+    try:
+        await delete_account(current_user, db)
+    except GatewayCancelFailed as erro:
+        # Assinatura viva e o Stripe recusou o cancelamento: NADA é apagado.
+        # Falha de exclusão é recuperável (a pessoa tenta de novo); cartão
+        # cobrado por conta inexistente não é.
+        logger.error("falha ao cancelar assinatura no gateway: %s", erro)
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "Não foi possível cancelar sua assinatura agora, então nada foi "
+                "excluído. Tente novamente em alguns minutos."
+            ),
+        )

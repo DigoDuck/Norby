@@ -276,7 +276,12 @@ nunca esgota o próprio balde).
   também esbarra na curva de atraso por conta (teto global subiu de 5/min
   para 60/min, mas cada tentativa repetida no mesmo email entra na fila).
 - Exclusão de conta apaga o Mongo antes do Postgres, sem transação distribuída.
-  Falha no commit do SQL deixaria a conta viva sem os dados de IA.
+  Falha no commit do SQL deixaria a conta viva sem os dados de IA. Desde a
+  issue #47 são **três** sistemas: o Stripe vem primeiro e recusa dele **aborta
+  a exclusão inteira** (502, nada apagado). A ordem vem da assimetria das
+  falhas — exclusão que falhou é recuperável, cartão cobrado por conta que não
+  existe mais vira chargeback sem botão de cancelar. A janela entre Mongo e
+  Postgres continua aberta e continua aceita.
 - `/docs` fica público: todos os endpoints por trás dele exigem autenticação, e
   a documentação navegável é um ativo para o portfólio.
 - Usuários criados antes da migration `b2c3d4e5f6a7` têm `privacy_accepted_at`

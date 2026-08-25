@@ -15,6 +15,7 @@ from app.database import ai_insights_collection, chat_history_collection
 from app.models.sql_models import (
     User, Wallet, Transaction, RecurringTransaction, Goal,
 )
+from app.services.billing_service import cancel_subscription
 
 
 def _row_to_dict(obj) -> dict:
@@ -28,11 +29,25 @@ async def _scoped(db: AsyncSession, model, user_id) -> list[dict]:
 
 
 async def delete_account(user: User, db: AsyncSession) -> None:
-    """Apaga DE VERDADE todos os dados do usuário (Postgres + Mongo).
+    """Apaga DE VERDADE todos os dados do usuário (Stripe + Postgres + Mongo).
 
-    Ordem: Mongo primeiro (sem cascade), Postgres por último (cascade cuida das
-    tabelas filhas, incluindo refresh_tokens — sessões ficam invalidadas).
+    Ordem: **Stripe primeiro**, e recusa dele aborta a exclusão INTEIRA; depois
+    Mongo (sem cascade); Postgres por último (cascade cuida das tabelas filhas,
+    incluindo refresh_tokens — sessões ficam invalidadas).
+
+    A ordem vem da assimetria dos modos de falha, não de gosto: exclusão que
+    falhou é recuperável, basta tentar de novo. Cartão sendo cobrado por uma
+    conta que não existe mais NÃO é — vira chargeback e a pessoa não tem nem
+    onde clicar para cancelar. A LGPD dá direito à exclusão, e uma falha
+    temporária com mensagem honesta não fere isso; continuar cobrando em
+    silêncio, sim.
+
+    Levanta GatewayCancelFailed quando o Stripe recusa. Quem traduz para HTTP
+    é o router.
     """
+    if user.stripe_subscription_id:
+        await cancel_subscription(user.stripe_subscription_id)
+
     user_id = str(user.id)
     await ai_insights_collection.delete_many({"user_id": user_id})
     await chat_history_collection.delete_many({"user_id": user_id})
