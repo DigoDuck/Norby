@@ -16,7 +16,7 @@ pydantic-settings==2.15.0
 google-generativeai==0.8.3
 email-validator==2.1.1
 bcrypt==3.2.2
-slowapi==0.1.9
+slowapi==0.1.10
 # Billing (ADR 0001). O SDK entra por causa da verificação de assinatura do
 # webhook: ela precisa ser timing-safe e checar a tolerância de timestamp
 # contra replay, e isso não é lugar para HMAC feito à mão.
