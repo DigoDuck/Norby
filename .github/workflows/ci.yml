@@ -106,6 +106,14 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # Thresholds calibrated 2026-08-25 against this same URL, 3 runs, Edge
+      # headless with Lighthouse's default mobile emulation: performance
+      # 0.89/0.94/0.94, accessibility 0.96 on all three. Accessibility is
+      # deterministic, so 0.95 is a real budget. Performance is not, and a
+      # GitHub runner is slower than the machine that measured it, so 0.85
+      # keeps headroom for runner variance while still catching a regression
+      # that 0.70 would have waved through. Re-tighten once the first runs on
+      # main show what the runner actually scores.
       - name: Run Lighthouse CI
         uses: treosh/lighthouse-ci-action@v12
         with:
