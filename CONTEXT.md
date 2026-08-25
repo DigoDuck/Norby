@@ -29,6 +29,27 @@ Os dois portões, escritos por extenso:
 - **IA:** `ai_trial_ends_at > now OR premium_until > now`
 - **Teto de carteiras aplica:** `premium_until IS NULL OR now >= premium_until + 72h`
 
+## Aplicação do paywall
+
+Resolvido pelo [ADR 0002](docs/adr/0002-onde-o-paywall-e-aplicado.md) (issue #20).
+
+| Termo | Significa |
+|---|---|
+| **carteira bloqueada** | Carteira acima do teto. Visível e legível, mas não recebe escrita. As 2 mais antigas (`order by created_at, id`) nunca são bloqueadas |
+| **drenar** | Tirar valor de uma carteira bloqueada — mover transação para fora, ou excluí-la. **Permitido**, porque a alternativa seria escolher entre pagar e destruir histórico |
+| **gerar** (IA) | `GET /ai/insight` e `POST /ai/chat`, as duas rotas que custam token. São as únicas bloqueadas; ler histórico não é |
+| **`paywall_enabled`** | Flag de rollout. Desligado, o app se comporta como antes da v2 **e os booleanos do `plan` reportam liberado** |
+| **`plan`** | Objeto aninhado no `UserResponse`. `ai_allowed` e `wallet_cap_applies` são a autoridade; o resto é exibição |
+
+Códigos de recusa, `403` com `detail` em objeto. **`code` é contrato e nunca é
+reescrito; `message` é livre.**
+
+| código | quando |
+|---|---|
+| `WALLET_LIMIT_REACHED` | criar carteira além do teto |
+| `WALLET_READ_ONLY` | qualquer escrita numa carteira bloqueada, inclusive como destino |
+| `AI_REQUIRES_PREMIUM` | gerar IA sem trial e sem assinatura |
+
 ### Termos que este glossário evita de propósito
 
 | Não usar | Usar | Por quê |
@@ -38,3 +59,5 @@ Os dois portões, escritos por extenso:
 | `subscription_status` para decidir acesso | `premium_until` | O status existe **só para exibição**. Autorizar por ele move a decisão para um vocabulário que o Stripe pode estender sem avisar |
 | "assinante" para quem já pagou um dia | premium (ativo) ou vencido | "Assinante" apaga a diferença que o teto de carteiras depende de enxergar |
 | "trial" para período pago | trial de IA | O trial nunca concede carteira. Confundir os dois inverte o teto |
+| "carteira desativada" ou "arquivada" | carteira bloqueada | Ela não some nem para de contar nos totais: só não recebe escrita |
+| mensagem de erro como identificador | o `code` da recusa | `message` muda quando o texto melhora; quem o frontend testa é o `code` |
