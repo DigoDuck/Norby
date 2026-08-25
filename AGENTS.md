@@ -71,8 +71,11 @@ npm run test     # Vitest
   `data-theme` no `<html>`. Cor **só** por token semântico (`bg-surface`,
   `text-content-2`, `--glass-bg`…) — hex fixo em componente e o namespace
   `norby-*` não existem mais. Ver [DESIGN.md](DESIGN.md).
-- Specs e planos vivem no Second Brain (Obsidian), **não** no repo (`docs/` está
-  no `.gitignore`).
+- Specs e planos vivem no Second Brain (Obsidian), **não** no repo (`docs/*`
+  está no `.gitignore`). Duas exceções, essas versionadas: `docs/agents/`
+  (config das engineering skills) e `docs/adr/` (decisões de arquitetura). O
+  vocabulário de domínio fica no [CONTEXT.md](CONTEXT.md) da raiz e cresce por
+  decisão, não de uma vez.
 - Dependências: `requirements.txt` é **só produção**; pytest e afins vivem em
   `requirements-dev.txt`. Os arquivos `.lock` fixam também as transitivas usadas
   pelo Docker; regenerá-los após alterar os arquivos-fonte. Rodar o comando de
