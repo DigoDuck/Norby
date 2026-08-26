@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.dependencies import get_db, get_current_user
+from app.dependencies import get_db, get_current_user, require_ai_access
 from app.limiter import limiter, user_key
 from app.models.sql_models import User
 from app.services.ai_service import get_or_generate_insight, chat_with_ai
@@ -27,7 +27,7 @@ CHAT_SESSIONS_LIMIT = 20  # nº de sessões de chat recentes listadas
 @limiter.limit("30/minute", key_func=user_key)
 async def get_dashboard_insight(
     request: Request,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_ai_access),
     db: AsyncSession = Depends(get_db),
 ):
     try:
@@ -53,7 +53,7 @@ async def get_dashboard_insight(
 async def chat(
     request: Request,
     payload: ChatMessage,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_ai_access),
     db: AsyncSession = Depends(get_db),
 ): # Chat com o Gemini que lê os dados financeiros do usuário
     session_id = str(payload.session_id) if payload.session_id else str(uuid4())
