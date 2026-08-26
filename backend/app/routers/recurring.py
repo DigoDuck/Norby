@@ -7,6 +7,7 @@ from app.dependencies import get_db, get_current_user
 from app.models.sql_models import User, Wallet, RecurringTransaction
 from app.schemas.recurring import RecurringCreate, RecurringUpdate, RecurringResponse
 from app.services.recurring_service import compute_initial_next_run, materialize_due_recurring
+from app.services.wallet_service import get_owned_wallet
 
 router = APIRouter(prefix="/recurring", tags=["Recurring"])
 
@@ -25,15 +26,6 @@ async def _get_owned_recurring(
         raise HTTPException(status_code=404, detail="Recorrência não encontrada")
     return rec
 
-
-async def _get_owned_wallet(wallet_id: UUID, user: User, db: AsyncSession) -> Wallet:
-    """Carteira do usuário, ou 404. Sem lock: aqui só validamos ownership."""
-    wallet = (await db.execute(
-        select(Wallet).where(Wallet.id == wallet_id, Wallet.user_id == user.id)
-    )).scalar_one_or_none()
-    if not wallet:
-        raise HTTPException(status_code=404, detail="Carteira não encontrada")
-    return wallet
 
 
 
@@ -60,7 +52,7 @@ async def create_recurring(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    await _get_owned_wallet(payload.wallet_id, current_user, db)
+    await get_owned_wallet(payload.wallet_id, current_user, db, for_write=True)
 
     next_run = compute_initial_next_run(
         payload.frequency, payload.day_of_month, payload.weekday

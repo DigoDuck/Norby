@@ -5,18 +5,9 @@ from uuid import UUID
 from app.dependencies import get_db, get_current_user
 from app.models.sql_models import User, Wallet
 from app.schemas.wallet import WalletCreate, WalletUpdate, WalletResponse
+from app.services.wallet_service import ensure_can_create_wallet, get_owned_wallet
 
 router = APIRouter(prefix="/wallets", tags=["Wallets"])
-
-
-async def _get_owned_wallet(wallet_id: UUID, user: User, db: AsyncSession) -> Wallet:
-    """Carteira do usuário, ou 404. Mesmo molde de `_get_owned_goal` em goals.py."""
-    wallet = (await db.execute(
-        select(Wallet).where(Wallet.id == wallet_id, Wallet.user_id == user.id)
-    )).scalar_one_or_none()
-    if not wallet:
-        raise HTTPException(status_code=404, detail="Carteira não encontrada")
-    return wallet
 
 
 @router.get("/", response_model=list[WalletResponse]) 
@@ -41,6 +32,7 @@ async def create_wallet(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    await ensure_can_create_wallet(current_user, db)
     wallet = Wallet(user_id=current_user.id, **payload.model_dump())
     db.add(wallet)
     await db.commit()
@@ -54,7 +46,7 @@ async def update_wallet(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    wallet = await _get_owned_wallet(wallet_id, current_user, db)
+    wallet = await get_owned_wallet(wallet_id, current_user, db, for_write=True)
 
     for field, value in payload.model_dump(exclude_none=True).items():
         setattr(wallet, field, value)
@@ -69,7 +61,10 @@ async def delete_wallet(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    wallet = await _get_owned_wallet(wallet_id, current_user, db)
+    # Sem for_write: excluir carteira bloqueada é PERMITIDO de propósito. É a
+    # única saída de quem tem 5 carteiras e virou free — recusar transformaria o
+    # teto numa armadilha em vez de um limite (ADR 0002).
+    wallet = await get_owned_wallet(wallet_id, current_user, db)
 
     await db.delete(wallet)
     await db.commit()

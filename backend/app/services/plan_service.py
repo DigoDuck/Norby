@@ -11,6 +11,7 @@ produção omite e pega o relógio.
 
 from datetime import datetime, timedelta, timezone
 
+from app.config import get_settings
 from app.models.sql_models import User
 
 # 72 horas EXATAS a partir de `premium_until`, não dias de calendário:
@@ -48,3 +49,37 @@ def wallet_cap_applies(user: User, now: datetime | None = None) -> bool:
     if user.premium_until is None:
         return True
     return now >= user.premium_until + GRACE
+
+
+class PlanRefused(Exception):
+    """Uma regra de plano recusou a operação.
+
+    Carrega o `code` do contrato do ADR 0002 — `WALLET_LIMIT_REACHED`,
+    `WALLET_READ_ONLY`, `AI_REQUIRES_PREMIUM`. Quem traduz para 403 é o handler
+    registrado no main; service neste repo não conhece HTTP.
+
+    O `code` é contrato e NUNCA é reescrito; `message` é livre.
+    """
+
+    def __init__(self, code: str, message: str):
+        self.code = code
+        self.message = message
+        super().__init__(message)
+
+
+# --- Os dois helpers de enforcement -----------------------------------------
+# São os ÚNICOS lugares que leem `paywall_enabled`. Com o flag desligado eles
+# reportam liberado, e é de propósito: eles precisam dizer o que a API VAI
+# FAZER, não o que a tabela de faixas diz. Se reportassem a faixa real com o
+# paywall apagado, a tela bloquearia IA e carteiras que o backend aceita — um
+# paywall que atrapalha o usuário sem cobrar de ninguém.
+
+
+def ai_gate_open(user: User, now: datetime | None = None) -> bool:
+    """IA liberada de verdade, considerando o flag de rollout."""
+    return not get_settings().paywall_enabled or ai_allowed(user, now)
+
+
+def wallet_cap_active(user: User, now: datetime | None = None) -> bool:
+    """Teto de carteiras valendo de verdade, considerando o flag de rollout."""
+    return get_settings().paywall_enabled and wallet_cap_applies(user, now)

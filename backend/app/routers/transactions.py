@@ -8,6 +8,7 @@ from app.dependencies import get_db, get_current_user
 from app.models.sql_models import User, Transaction, TransactionType, Wallet
 from app.schemas.transaction import TransactionCreate, TransactionUpdate, TransactionResponse
 from app.services.transaction_service import apply_delta, revert_delta
+from app.services.wallet_service import get_owned_wallet
 from app.services.goal_service import current_month_range
 
 router = APIRouter(prefix="/transactions", tags=["Transactions"])
@@ -22,29 +23,6 @@ router = APIRouter(prefix="/transactions", tags=["Transactions"])
 # com um update movendo transação de B para A.
 # Se isso aparecer em produção, ordenar os locks de carteira por UUID nos DOIS
 # caminhos — ordenar só aqui não desfaz o ciclo.
-async def _get_owned_wallet(
-    wallet_id: UUID,
-    user: User,
-    db: AsyncSession,
-    *,
-    for_update: bool = False,
-    required: bool = True,
-) -> Optional[Wallet]:
-    """Carteira do usuário, com lock opcional (with_for_update) p/ mutar saldo.
-
-    Espelha o padrão de `_get_owned_goal` em goals.py. Com required=True (padrão)
-    levanta 404 se não for do usuário; required=False devolve None (usado para a
-    carteira de origem no update, cujo efeito antigo é revertido de forma tolerante).
-    """
-    stmt = select(Wallet).where(Wallet.id == wallet_id, Wallet.user_id == user.id)
-    if for_update:
-        stmt = stmt.with_for_update()
-    wallet = (await db.execute(stmt)).scalar_one_or_none()
-    if wallet is None and required:
-        raise HTTPException(status_code=404, detail="Carteira não encontrada")
-    return wallet
-
-
 async def _get_owned_transaction(transaction_id: UUID, user: User, db: AsyncSession) -> Transaction:
     """Transação do usuário, sempre com lock (FOR UPDATE).
 
@@ -124,7 +102,9 @@ async def create_transaction(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    wallet = await _get_owned_wallet(payload.wallet_id, current_user, db, for_update=True)
+    wallet = await get_owned_wallet(
+        payload.wallet_id, current_user, db, for_update=True, for_write=True
+    )
     apply_delta(wallet, payload.type, payload.amount)
 
     transaction = Transaction(user_id=current_user.id, **payload.model_dump())
@@ -156,15 +136,28 @@ async def update_transaction(
 
     # Carteira de origem (onde o efeito antigo está aplicado). Tolerante a None:
     # preserva o comportamento defensivo anterior.
-    old_wallet = await _get_owned_wallet(
-        transaction.wallet_id, current_user, db, for_update=True, required=False
+    #
+    # `for_write` depende de a transação FICAR ou SAIR (ADR 0002): continuar numa
+    # carteira bloqueada é escrever nela, e é recusado; sair dela é drenar, e é
+    # permitido. Sem essa saída, quem virou free escolheria entre pagar e
+    # destruir histórico, já que excluir carteira apaga as transações por cascade.
+    mesma_carteira = new_wallet_id == transaction.wallet_id
+    old_wallet = await get_owned_wallet(
+        transaction.wallet_id,
+        current_user,
+        db,
+        for_update=True,
+        required=False,
+        for_write=mesma_carteira,
     )
 
-    # Carteira de destino (pode ser a mesma)
-    if new_wallet_id == transaction.wallet_id:
+    # Carteira de destino (pode ser a mesma). Destino é SEMPRE escrita.
+    if mesma_carteira:
         new_wallet = old_wallet
     else:
-        new_wallet = await _get_owned_wallet(new_wallet_id, current_user, db, for_update=True)
+        new_wallet = await get_owned_wallet(
+            new_wallet_id, current_user, db, for_update=True, for_write=True
+        )
 
     # 1) Reverte o efeito antigo (usa os valores AINDA não alterados da transação)
     if old_wallet:
@@ -191,7 +184,9 @@ async def delete_transaction(
 ):
     transaction = await _get_owned_transaction(transaction_id, current_user, db)
 
-    wallet = await _get_owned_wallet(
+    # Sem for_write: apagar transação de dentro de carteira bloqueada drena, e
+    # drenar é permitido (ADR 0002).
+    wallet = await get_owned_wallet(
         transaction.wallet_id, current_user, db, for_update=True, required=False
     )
     if wallet:

@@ -8,6 +8,8 @@ from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from app.routers import auth, wallets, transactions, ai, recurring, goals, dashboard, billing
+from app.services.plan_service import PlanRefused
+from app.services.wallet_service import WalletNotFound
 from app.config import get_settings
 from app.limiter import limiter
 
@@ -42,6 +44,26 @@ app = FastAPI(
 # Rate limiting (anti brute-force). Respostas 429 passam pelo CORS normalmente.
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+# ADR 0002: os services não conhecem HTTP (nenhum levanta HTTPException). Estes
+# dois handlers são a única tradução, num lugar só — assim qualquer chamador
+# futuro do wallet_service já recebe o status certo sem try/except por router.
+@app.exception_handler(PlanRefused)
+async def _plan_refused_handler(request: Request, exc: PlanRefused) -> JSONResponse:
+    # `detail` em objeto de propósito: o frontend faz switch no `code`, que é
+    # contrato e nunca é reescrito. Header próprio exigiria expose_headers no
+    # CORS — a armadilha que este repo já pisou com o X-Total-Count.
+    return JSONResponse(
+        status_code=403, content={"detail": {"code": exc.code, "message": exc.message}}
+    )
+
+
+@app.exception_handler(WalletNotFound)
+async def _wallet_not_found_handler(request: Request, exc: WalletNotFound) -> JSONResponse:
+    # Inexistente e "de outro dono" respondem igual: distinguir viraria oráculo
+    # de ids alheios.
+    return JSONResponse(status_code=404, content={"detail": "Carteira não encontrada"})
 
 
 # Request-id + captura de exceções não tratadas. Registrado ANTES do CORS para que

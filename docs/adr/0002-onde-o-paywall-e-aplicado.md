@@ -52,8 +52,16 @@ carteira junto.
 
 ### A posição sai da mesma consulta
 
-`row_number() over (order by created_at, id)` na consulta que já resolve a
-carteira. Custo: zero viagem a mais.
+A posição sai da consulta que já resolve a carteira. Custo: zero viagem a mais.
+
+> **Correção de 2026-08-26 (issue #86), era `row_number()`.** O Postgres recusa
+> `FOR UPDATE` junto de window function — "FOR UPDATE is not allowed with window
+> functions", verificado no banco — e a carteira **precisa** de lock quando o
+> saldo vai mudar. A intenção (posição na mesma consulta, mesmo desempate)
+> continua; o mecanismo virou uma **subquery escalar correlacionada** contando
+> quantas carteiras do mesmo dono são mais antigas, que convive com o lock e
+> entrega a mesma informação. `anteriores < 2` significa "está entre as 2 mais
+> antigas".
 
 O `, id` no desempate não é enfeite. `wallets.created_at` **empata** — o seed de
 demo cria carteiras na mesma transação — e ordem instável faria o conjunto

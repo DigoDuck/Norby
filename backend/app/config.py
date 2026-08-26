@@ -28,6 +28,12 @@ class Settings(BaseSettings):
     stripe_secret_key: str = ""
     stripe_webhook_secret: str = ""
 
+    # Flag de rollout do paywall (ADR 0002). Default DESLIGADO: o merge não muda
+    # nada em produção, e o paywall acende por variável de ambiente quando o
+    # dono decidir. Lido SÓ dentro dos helpers de enforcement — um `if` num
+    # lugar não dá pra esquecer, oito dão.
+    paywall_enabled: bool = False
+
     model_config = SettingsConfigDict(env_file="../.env", extra="ignore")
 
     @property
