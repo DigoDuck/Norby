@@ -6,6 +6,7 @@ from sqlalchemy import select
 from jose import JWTError, jwt
 from app.database import AsyncSessionLocal
 from app.models.sql_models import User
+from app.services.billing_service import reconcile_subscription
 from app.services.plan_service import PlanRefused, ai_gate_open
 from app.config import get_settings
 
@@ -48,6 +49,15 @@ async def get_current_user( # Autenticação
     user = result.scalar_one_or_none()
     if user is None:
         raise credentials_exception
+
+    # Reconciliação preguiçosa (issue #48): pega carona na requisição, como o
+    # `materialize_due_recurring` — este projeto não tem agendador e este
+    # ticket não adiciona um. Aqui, e não nos leitores de plano, porque este é
+    # o único ponto por onde a linha do usuário entra numa requisição
+    # autenticada: os leitores (`ai_gate_open`, `wallet_cap_active`, o objeto
+    # `plan`) são funções puras, sem sessão. No caso comum é uma comparação de
+    # colunas já carregadas, sem rede: quem não tem assinatura não paga nada.
+    await reconcile_subscription(user, db)
     return user
 
 async def require_ai_access(current_user: User = Depends(get_current_user)) -> User:

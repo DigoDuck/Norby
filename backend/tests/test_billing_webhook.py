@@ -318,3 +318,27 @@ async def test_checkout_arriving_first_does_not_block_the_subscription_that_open
 
     await db_session.refresh(user)
     assert user.premium_until == datetime.fromtimestamp(fim, timezone.utc)
+
+
+@pytest.mark.asyncio
+async def test_the_period_end_is_read_from_the_item_when_it_is_not_at_the_top(
+    client, db_session
+):
+    """A versão de API que o SDK 15 fixa (2026-07-29.dahlia) NÃO tem mais
+    `current_period_end` no topo da assinatura — o campo mora em cada item.
+
+    Ler só o topo devolveria None e apagaria o `premium_until` de quem paga, que
+    é o portão inteiro do ADR 0001. O topo continua sendo lido primeiro porque
+    conta com versão antiga fixada no endpoint ainda manda ali.
+    """
+    user = await _usuario_com_customer(client, db_session, email="itens@test.com")
+    fim = AGORA_TS + 30 * 86400
+
+    evento = _evento_assinatura(event_id="evt_itens")
+    del evento["data"]["object"]["current_period_end"]
+    evento["data"]["object"]["items"] = {"data": [{"id": "si_1", "current_period_end": fim}]}
+
+    assert (await _postar(client, evento)).status_code == 200
+
+    await db_session.refresh(user)
+    assert user.premium_until == datetime.fromtimestamp(fim, timezone.utc)
