@@ -10,7 +10,7 @@ quatro pontos de acoplamento que o ADR nomeia.
 
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import stripe
 
@@ -18,6 +18,7 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import get_settings
 from app.models.sql_models import StripeWebhookEvent, User
 
 logger = logging.getLogger("norby.billing")
@@ -41,6 +42,38 @@ def _instante(epoch: int | None) -> datetime | None:
     return datetime.fromtimestamp(epoch, timezone.utc) if epoch else None
 
 
+def _chave() -> str:
+    """A chave secreta, lida a cada chamada e não no import.
+
+    Nada no app configurava `stripe.api_key`: ele estava `None`, então a
+    primeira chamada real ao gateway falharia por autenticação. Isso já valia
+    para o `cancel_subscription` — quem tivesse assinatura não conseguiria
+    excluir a conta, porque a recusa do gateway ABORTA a exclusão de propósito.
+    """
+    return get_settings().stripe_secret_key
+
+
+def _periodo_fim(obj: dict) -> datetime | None:
+    """Até quando está pago.
+
+    O campo SAIU do topo da assinatura: na versão de API que o SDK 15 fixa
+    (2026-07-29.dahlia) `current_period_end` mora em cada ITEM. Ler só o topo
+    devolveria None e apagaria o `premium_until` de quem paga — o portão
+    inteiro do ADR 0001. O topo vem primeiro porque conta com versão antiga
+    fixada no endpoint ainda manda ali, e `max` porque assinatura com vários
+    itens (que a nossa não tem) está paga até o item que vai mais longe.
+    """
+    topo = obj.get("current_period_end")
+    if topo:
+        return _instante(topo)
+    fins = [
+        item.get("current_period_end")
+        for item in ((obj.get("items") or {}).get("data") or [])
+        if item.get("current_period_end")
+    ]
+    return _instante(max(fins)) if fins else None
+
+
 def _projecao(evento: dict) -> dict:
     """Só os campos que este handler lê — nunca o payload cru.
 
@@ -55,7 +88,7 @@ def _projecao(evento: dict) -> dict:
         "stripe_created": _instante(evento.get("created")),
         "customer_id": obj.get("customer"),
         "subscription_id": obj.get("subscription") if tipo == EVENTO_CHECKOUT else obj.get("id"),
-        "current_period_end": _instante(obj.get("current_period_end")),
+        "current_period_end": _periodo_fim(obj),
         "status": obj.get("status"),
         "cancel_at_period_end": obj.get("cancel_at_period_end"),
         "received_at": datetime.now(timezone.utc),
@@ -193,6 +226,104 @@ async def cancel_subscription(subscription_id: str) -> None:
     faria uma chamada HTTP bloqueante travar o event loop.
     """
     try:
-        await stripe.Subscription.cancel_async(subscription_id)
+        await stripe.Subscription.cancel_async(subscription_id, api_key=_chave())
     except Exception as erro:  # noqa: BLE001 — rede, credencial ou 4xx do Stripe
         raise GatewayCancelFailed(str(erro)) from erro
+
+
+# --- Reconciliação preguiçosa (issue #48) ------------------------------------
+# O modelo já falha FECHADO: evento perdido só deixa acesso vencer, nunca
+# concede. Isto não é proteção de receita — existe para a única direção que
+# machuca quem paga: pagou, o evento se perdeu, e o app diz que não é premium.
+
+# Depois destes o Stripe não tem mais nada a dizer sobre a assinatura, então
+# perguntar de novo só gastaria rede.
+STATUS_TERMINAIS = frozenset({"canceled", "incomplete_expired"})
+
+# Janela entre duas consultas sobre a MESMA pessoa. Sem ela, quem está em
+# `past_due` com o período já vencido casa com o gatilho para sempre e carrega
+# uma chamada de rede em toda requisição.
+# ponytail: cache em processo, que basta para um worker de uvicorn (ver
+# start.sh). Vira coluna `plan_synced_at` no dia em que rodar com --workers > 1
+# ou mais de uma instância.
+JANELA_CONSULTA = timedelta(minutes=15)
+_ULTIMA_CONSULTA: dict[uuid.UUID, datetime] = {}
+
+
+async def fetch_subscription(subscription_id: str) -> dict:
+    """Lê a assinatura no gateway. Saída de rede, e é ela que os testes stubam.
+
+    Devolve dict puro: o resto do módulo trata evento como dado, não como
+    objeto do SDK, e é isso que mantém a troca de gateway localizada.
+    """
+    sub = await stripe.Subscription.retrieve_async(subscription_id, api_key=_chave())
+    return dict(sub)
+
+
+def precisa_reconciliar(user: User, now: datetime | None = None) -> bool:
+    """Gatilho estreito de propósito.
+
+    Reconciliar em toda requisição colocaria o Stripe no caminho quente de
+    todo mundo, e reconciliar quem não tem assinatura seria uma chamada que só
+    pode voltar vazia. `premium_until` NULO entra junto do vencido: é o caso do
+    `customer.subscription.created` perdido, em que a pessoa pagou e ficaria
+    travada para sempre — o ticket dizia só `<= now`, e essa é uma ampliação
+    deliberada.
+    """
+    if not user.stripe_subscription_id:
+        return False
+    if user.subscription_status in STATUS_TERMINAIS:
+        return False
+    return user.premium_until is None or user.premium_until <= (
+        now or datetime.now(timezone.utc)
+    )
+
+
+async def reconcile_subscription(user: User, db: AsyncSession) -> bool:
+    """Pergunta ao gateway e atualiza as colunas. Nunca levanta.
+
+    Falha do Stripe é registrada e a requisição segue com o estado que temos:
+    reconciliação que dá 500 é PIOR que coluna velha, porque a coluna velha já
+    está na direção segura.
+    """
+    if not precisa_reconciliar(user):
+        return False
+
+    agora = datetime.now(timezone.utc)
+    for antigo in [k for k, v in _ULTIMA_CONSULTA.items() if agora - v >= JANELA_CONSULTA]:
+        del _ULTIMA_CONSULTA[antigo]
+    if user.id in _ULTIMA_CONSULTA:
+        return False
+    _ULTIMA_CONSULTA[user.id] = agora
+
+    try:
+        sub = await fetch_subscription(user.stripe_subscription_id)
+    except Exception as erro:  # noqa: BLE001 — rede, credencial ou 4xx do Stripe
+        logger.warning(
+            "stripe: reconciliação falhou para o usuário %s: %s", user.id, erro
+        )
+        return False
+
+    # O mesmo `_aplicar` do webhook, e não uma segunda escrita paralela: duas
+    # rotas escrevendo as mesmas colunas divergem, e a divergência aqui é
+    # acesso pago errado. O tipo sintetizado escolhe o ramo certo — assinatura
+    # terminada tem `ended_at`, que é a única data que vale num cancelamento
+    # imediato.
+    tipo = (
+        "customer.subscription.deleted"
+        if sub.get("status") in STATUS_TERMINAIS
+        else "customer.subscription.updated"
+    )
+    evento = {"id": f"reconcile:{user.stripe_subscription_id}", "type": tipo,
+              "data": {"object": sub}}
+    _aplicar(user, evento, _projecao(evento))
+
+    # `stripe_event_at` NÃO se move aqui. Ela é a marca d'água de ORDEM dos
+    # eventos, e carimbá-la com o nosso relógio faria um webhook legítimo que
+    # chegasse logo depois entrar como atrasado por diferença de relógio. O
+    # preço é o inverso: um evento antigo entregue depois desta leitura ainda
+    # pode sobrescrevê-la — mas só na direção segura, e a requisição seguinte
+    # reconcilia de novo.
+    await db.commit()
+    logger.info("stripe: assinatura de %s reconciliada (%s)", user.id, sub.get("status"))
+    return True

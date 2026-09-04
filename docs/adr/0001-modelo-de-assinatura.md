@@ -41,6 +41,17 @@ que sim, e a seção "Acoplamento" abaixo diz exatamente o que muda se não for.
 `users.premium_until` guarda o `current_period_end` do Stripe e é **a única
 coluna que a autorização lê**.
 
+> **Correção de 2026-09-04 (issue #48): o campo mudou de lugar no Stripe.**
+> Na versão de API que o SDK 15 fixa (`2026-07-29.dahlia`) `current_period_end`
+> **não existe mais no topo da assinatura** — ele mora em cada item
+> (`items.data[].current_period_end`). O código lia só o topo, então uma conta
+> com versão moderna devolveria `None` e **apagaria o `premium_until` de quem
+> paga**: o portão nunca abriria. Isso estava em `main` desde o #45 e passou
+> despercebido porque as fixtures de teste foram escritas na forma antiga.
+> A leitura agora tenta o topo primeiro (conta com versão antiga fixada no
+> endpoint ainda manda ali) e cai para os itens. Fica num helper só, o mesmo
+> que o webhook e a reconciliação usam.
+
 O Stripe não move `current_period_end` quando o cartão falha — ele continua
 tentando cobrar dentro do período já pago. Logo a data, sozinha, já responde
 "essa pessoa tem acesso agora". Três consequências caem de graça:
@@ -201,6 +212,14 @@ para trás.
 
 ### Chamadas de saída ao Stripe — três
 
+> **Correção de 2026-09-04 (issue #48): a chave nunca chegava ao SDK.**
+> Nada no app atribuía `stripe.api_key`, que ficava `None` — a primeira chamada
+> real de saída falharia por autenticação. O `stripe_secret_key` existia no
+> `Settings` e não era usado por ninguém. O efeito mais grave não era nesta
+> feature: **quem tivesse assinatura não conseguiria excluir a conta**, porque
+> a recusa do gateway aborta a exclusão de propósito (ver a seção abaixo). As
+> saídas passam a receber `api_key` explicitamente, por chamada.
+
 - criar sessão de **Checkout hospedado** (`client_reference_id = user.id`)
 - criar sessão de **Customer Portal**
 - cancelar assinatura — só a área de admin (#23)
@@ -245,6 +264,33 @@ Não existe scheduler neste projeto; o padrão é o mesmo do
 desenho já falha fechado, a reconciliação não existe para proteger receita —
 existe para consertar a única direção que machuca cliente pagante: pagou, o
 webhook se perdeu, e o app diz que ele não é premium.
+
+> **Ajustes de 2026-09-04, na implementação (issue #48).** Três, todos com
+> teste:
+>
+> 1. **`premium_until` NULO entra no gatilho**, não só o vencido. É o caso do
+>    `customer.subscription.created` perdido: o checkout amarrou os ids e o
+>    período nunca chegou. Sem isso, quem pagou ficaria travado para sempre —
+>    exatamente a dor que a reconciliação existe para curar.
+> 2. **Status terminal não é consultado de novo.** `canceled` e
+>    `incomplete_expired` casariam com o gatilho para sempre (vencido, com
+>    `subscription_id` preenchido) e fariam uma chamada de rede em **toda**
+>    requisição daquela pessoa. A própria reconciliação grava o status que a
+>    desliga, então ela se auto-limita.
+> 3. **Uma janela de 15 minutos por usuário**, porque `past_due` com período
+>    vencido não é terminal e cairia na mesma repetição durante todo o
+>    cronograma de retry do Stripe. É cache em processo, o que basta para um
+>    worker de uvicorn; vira coluna `plan_synced_at` no dia em que rodar com
+>    mais de um.
+>
+> Onde ela dispara: no `get_current_user`, e não nos leitores de plano. Eles
+> (`ai_gate_open`, `wallet_cap_active`, o objeto `plan`) são funções puras sem
+> sessão, e o `get_current_user` é o único ponto por onde a linha do usuário
+> entra numa requisição autenticada.
+>
+> A marca d'água `stripe_event_at` **não se move** na reconciliação: carimbá-la
+> com o nosso relógio faria um webhook legítimo chegando logo depois entrar
+> como atrasado por diferença de relógio.
 
 ### Testes de billing sem falar com o Stripe
 
