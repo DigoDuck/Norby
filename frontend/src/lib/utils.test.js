@@ -28,6 +28,30 @@ describe("apiErrorMessage", () => {
     expect(typeof apiErrorMessage(err, "fallback")).toBe("string");
   });
 
+  it("shows the message of an object detail, which is how a paywall refusal arrives", () => {
+    // Contrato do ADR 0002: 403 com detail em objeto. Antes deste ramo a
+    // mensagem sumia e toda recusa de plano virava erro genérico.
+    const err = {
+      response: {
+        data: {
+          detail: {
+            code: "WALLET_READ_ONLY",
+            message: "Esta carteira está em somente-leitura no plano gratuito.",
+          },
+        },
+      },
+    };
+    expect(apiErrorMessage(err, "fallback")).toBe(
+      "Esta carteira está em somente-leitura no plano gratuito."
+    );
+  });
+
+  it("never returns the code as if it were the message", () => {
+    // A `message` é o que se lê; o `code` é identificador e não vai para a tela.
+    const err = { response: { data: { detail: { code: "AI_REQUIRES_PREMIUM" } } } };
+    expect(apiErrorMessage(err, "fallback")).toBe("fallback");
+  });
+
   it("falls back when there is no response (network failure)", () => {
     expect(apiErrorMessage(new Error("boom"), "sem conexão")).toBe("sem conexão");
     expect(apiErrorMessage({ response: { data: {} } }, "fallback")).toBe("fallback");

@@ -69,6 +69,11 @@ export function apiErrorMessage(err, fallback) {
   if (Array.isArray(detail) && detail.length) {
     return "Verifique os dados informados: algum valor é inválido ou longo demais.";
   }
+  // Recusa de plano (ADR 0002): {"code": ..., "message": ...}. Sem este ramo o
+  // objeto cai no fallback e a tela mostra um erro genérico no lugar do motivo.
+  // O `code` é o contrato, para a UI decidir o que oferecer; a `message` é o
+  // que se lê, e nunca serve como identificador — ela pode ser reescrita.
+  if (typeof detail?.message === "string" && detail.message) return detail.message;
   return fallback;
 }
 
