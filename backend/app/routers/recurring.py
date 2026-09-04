@@ -5,7 +5,9 @@ from uuid import UUID
 
 from app.dependencies import get_db, get_current_user
 from app.models.sql_models import User, Wallet, RecurringTransaction
-from app.schemas.recurring import RecurringCreate, RecurringUpdate, RecurringResponse
+from app.schemas.recurring import (
+    RecurringCreate, RecurringUpdate, RecurringResponse, RecurringRunResponse,
+)
 from app.services.recurring_service import compute_initial_next_run, materialize_due_recurring
 from app.services.wallet_service import get_owned_wallet
 
@@ -95,10 +97,10 @@ async def delete_recurring(
     await db.commit()
 
 
-@router.post("/run", response_model=dict[str, int])
+@router.post("/run", response_model=RecurringRunResponse)
 async def run_recurring(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    generated = await materialize_due_recurring(db, current_user)
-    return {"generated": generated}
+    resultado = await materialize_due_recurring(db, current_user)
+    return {"generated": resultado.generated, "skipped": resultado.skipped}

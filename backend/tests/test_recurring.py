@@ -84,7 +84,7 @@ async def test_materialize_generates_due_and_updates_balance(db_session):
     db_session.add(rec)
     await db_session.commit()
 
-    generated = await materialize_due_recurring(db_session, user)
+    generated, _ = await materialize_due_recurring(db_session, user)
 
     assert generated >= 3  # 3 semanas vencidas (catch-up)
     txs = (await db_session.execute(
@@ -109,8 +109,8 @@ async def test_materialize_is_idempotent(db_session):
     db_session.add(rec)
     await db_session.commit()
 
-    first = await materialize_due_recurring(db_session, user)
-    second = await materialize_due_recurring(db_session, user)
+    first, _ = await materialize_due_recurring(db_session, user)
+    second, _ = await materialize_due_recurring(db_session, user)
     assert first >= 1
     assert second == 0
 
@@ -126,7 +126,7 @@ async def test_materialize_skips_inactive(db_session):
     )
     db_session.add(rec)
     await db_session.commit()
-    assert await materialize_due_recurring(db_session, user) == 0
+    assert (await materialize_due_recurring(db_session, user)).generated == 0
 
 
 # ---------------------------------------------------------------------------
