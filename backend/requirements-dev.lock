@@ -8,6 +8,7 @@ annotated-types==0.7.0
     # via pydantic
 anyio==4.14.2
     # via
+    #   google-genai
     #   httpx
     #   starlette
     #   watchfiles
@@ -38,7 +39,6 @@ colorama==0.4.6 ; sys_platform == 'win32'
     # via
     #   click
     #   pytest
-    #   tqdm
     #   uvicorn
 cryptography==50.0.0
     # via
@@ -51,6 +51,8 @@ defusedxml==0.7.1
     # via py-serializable
 deprecated==1.3.1
     # via limits
+distro==1.9.0
+    # via google-genai
 dnspython==2.8.0
     # via
     #   email-validator
@@ -63,57 +65,24 @@ fastapi==0.141.1
     # via -r requirements.txt
 filelock==3.32.0
     # via cachecontrol
-google-ai-generativelanguage==0.6.15
-    # via google-generativeai
-google-api-core==2.25.2 ; python_full_version >= '3.14'
-    # via
-    #   google-ai-generativelanguage
-    #   google-api-python-client
-    #   google-generativeai
-google-api-core==2.32.0 ; python_full_version < '3.14'
-    # via
-    #   google-ai-generativelanguage
-    #   google-api-python-client
-    #   google-generativeai
-google-api-python-client==2.198.0
-    # via google-generativeai
 google-auth==2.56.2
-    # via
-    #   google-ai-generativelanguage
-    #   google-api-core
-    #   google-api-python-client
-    #   google-auth-httplib2
-    #   google-generativeai
-google-auth-httplib2==0.4.0
-    # via google-api-python-client
-google-generativeai==0.8.6
+    # via google-genai
+google-genai==2.22.0
     # via -r requirements.txt
-googleapis-common-protos==1.75.0
-    # via
-    #   google-api-core
-    #   grpcio-status
 greenlet==3.5.3
     # via sqlalchemy
-grpcio==1.82.1
-    # via
-    #   google-api-core
-    #   grpcio-status
-grpcio-status==1.71.2
-    # via google-api-core
 h11==0.16.0
     # via
     #   httpcore
     #   uvicorn
 httpcore==1.0.9
     # via httpx
-httplib2==0.32.0
-    # via
-    #   google-api-python-client
-    #   google-auth-httplib2
 httptools==0.8.0
     # via uvicorn
-httpx==0.27.2
-    # via -r requirements-dev.txt
+httpx==0.28.1
+    # via
+    #   -r requirements-dev.txt
+    #   google-genai
 idna==3.18
     # via
     #   anyio
@@ -160,18 +129,6 @@ platformdirs==4.11.0
     # via pip-audit
 pluggy==1.6.0
     # via pytest
-proto-plus==1.28.1
-    # via
-    #   google-ai-generativelanguage
-    #   google-api-core
-protobuf==5.29.6
-    # via
-    #   google-ai-generativelanguage
-    #   google-api-core
-    #   google-generativeai
-    #   googleapis-common-protos
-    #   grpcio-status
-    #   proto-plus
 py-serializable==2.1.0
     # via cyclonedx-python-lib
 pyasn1==0.6.4
@@ -186,7 +143,7 @@ pycparser==3.0 ; implementation_name != 'PyPy'
 pydantic==2.13.4
     # via
     #   fastapi
-    #   google-generativeai
+    #   google-genai
     #   pydantic-settings
 pydantic-core==2.46.4
     # via pydantic
@@ -197,9 +154,7 @@ pygments==2.20.0
 pymongo==4.9.2
     # via motor
 pyparsing==3.3.2
-    # via
-    #   httplib2
-    #   pip-requirements-parser
+    # via pip-requirements-parser
 pytest==8.3.3
     # via
     #   -r requirements-dev.txt
@@ -218,7 +173,8 @@ pyyaml==6.0.3
 requests==2.34.2
     # via
     #   cachecontrol
-    #   google-api-core
+    #   google-auth
+    #   google-genai
     #   pip-audit
     #   stripe
 rich==15.0.0
@@ -230,7 +186,7 @@ six==1.17.0
 slowapi==0.1.10
     # via -r requirements.txt
 sniffio==1.3.1
-    # via httpx
+    # via google-genai
 sortedcontainers==2.4.0
     # via cyclonedx-python-lib
 sqlalchemy==2.0.36
@@ -241,20 +197,19 @@ starlette==1.3.1
     # via fastapi
 stripe==15.5.1
     # via -r requirements.txt
+tenacity==9.1.4
+    # via google-genai
 tomli==2.4.1
     # via pip-audit
 tomli-w==1.2.0
     # via pip-audit
-tqdm==4.69.0
-    # via google-generativeai
 typing-extensions==4.16.0
     # via
     #   alembic
     #   anyio
     #   cyclonedx-python-lib
     #   fastapi
-    #   google-generativeai
-    #   grpcio
+    #   google-genai
     #   limits
     #   pydantic
     #   pydantic-core
@@ -267,8 +222,6 @@ typing-inspection==0.4.2
     #   fastapi
     #   pydantic
     #   pydantic-settings
-uritemplate==4.2.0
-    # via google-api-python-client
 urllib3==2.7.0
     # via requests
 uvicorn==0.30.6
@@ -278,6 +231,8 @@ uvloop==0.22.1 ; platform_python_implementation != 'PyPy' and sys_platform != 'c
 watchfiles==1.2.0
     # via uvicorn
 websockets==16.1.1
-    # via uvicorn
+    # via
+    #   google-genai
+    #   uvicorn
 wrapt==2.2.2
     # via deprecated

@@ -3,16 +3,20 @@ from decimal import Decimal
 
 import pytest
 
+from google.genai import chats as genai_chats
+
 import app.services.ai_service as ai
 from app.limiter import limiter
 from app.models.sql_models import User, Wallet
 
 
-class _FakeChat:
-    def send_message(self, _message):
-        class _Resp:
-            text = "resposta ok"
-        return _Resp()
+def _chat_que_registra(recebido: list):
+    """Stub da saída de rede do chat. Guarda o histórico que chegou, que é o
+    que este teste precisa inspecionar."""
+    async def _responder(historico, _mensagem):
+        recebido.extend(historico)
+        return "resposta ok"
+    return _responder
 
 
 @pytest.mark.asyncio
@@ -25,11 +29,15 @@ async def test_chat_survives_malformed_history_message(db_session, monkeypatch):
     await db_session.commit()
 
     # Não bate na API real do Gemini.
-    monkeypatch.setattr(ai.model, "start_chat", lambda history: _FakeChat())
+    recebido = []
+    monkeypatch.setattr(ai, "_responder_chat", _chat_que_registra(recebido))
 
     history = [{"foo": "bar"}, {"role": "user", "content": "oi"}]  # 1ª é malformada
     resp = await ai.chat_with_ai(db_session, str(user.id), "olá", history)
     assert resp == "resposta ok"
+    # A malformada foi pulada, e não virou uma Content vazia.
+    assert len(recebido) == 1
+    assert recebido[0].parts[0].text == "oi"
 
 
 class _FakeInsights:
@@ -60,10 +68,10 @@ async def test_insight_score_is_deterministic_not_from_llm(db_session, monkeypat
     monkeypatch.setattr(ai, "_get_user_financial_summary", _fake_summary)
     monkeypatch.setattr(ai, "ai_insights_collection", _FakeInsights())
 
-    class _Resp:
-        text = '{"summary_text": "a|b|c", "suggested_action": "faça X"}'
+    async def _resposta(_prompt):
+        return '{"summary_text": "a|b|c", "suggested_action": "faça X"}'
 
-    monkeypatch.setattr(ai.model, "generate_content", lambda _p, **_kw: _Resp())
+    monkeypatch.setattr(ai, "_gerar_json", _resposta)
 
     result = await ai.get_or_generate_insight(db_session, "user-1")
     assert result["score"] == 90
@@ -89,10 +97,10 @@ async def test_insight_returns_score_when_llm_text_fails(db_session, monkeypatch
     monkeypatch.setattr(ai, "_get_user_financial_summary", _fake_summary)
     monkeypatch.setattr(ai, "ai_insights_collection", _FakeInsights())
 
-    class _BadResp:
-        text = "desculpe, não consegui"
+    async def _nao_e_json(_prompt):
+        return "desculpe, não consegui"
 
-    monkeypatch.setattr(ai.model, "generate_content", lambda _p, **_kw: _BadResp())
+    monkeypatch.setattr(ai, "_gerar_json", _nao_e_json)
 
     result = await ai.get_or_generate_insight(db_session, "user-1")
     assert result["score"] == 90
@@ -118,10 +126,10 @@ async def test_insight_returns_score_when_llm_call_raises(db_session, monkeypatc
     monkeypatch.setattr(ai, "_get_user_financial_summary", _fake_summary)
     monkeypatch.setattr(ai, "ai_insights_collection", _FakeInsights())
 
-    def _boom(_p, **_kw):
+    async def _boom(_prompt):
         raise RuntimeError("gemini down")
 
-    monkeypatch.setattr(ai.model, "generate_content", _boom)
+    monkeypatch.setattr(ai, "_gerar_json", _boom)
 
     result = await ai.get_or_generate_insight(db_session, "user-1")
     assert result["score"] == 90
@@ -165,10 +173,10 @@ async def test_insight_recomputes_score_on_cache_hit(db_session, monkeypatch):
         ai, "ai_insights_collection", _FakeInsightsCacheHit(ai._summary_fingerprint(summary))
     )
     # Se reaproveitar o cache, o Gemini nem é chamado.
-    def _boom(_p, **_kw):
+    async def _boom(_prompt):
         raise AssertionError("não deve chamar o Gemini quando o fingerprint bate")
 
-    monkeypatch.setattr(ai.model, "generate_content", _boom)
+    monkeypatch.setattr(ai, "_gerar_json", _boom)
 
     result = await ai.get_or_generate_insight(db_session, "user-1")
     assert result["score"] == 90
@@ -214,10 +222,10 @@ async def test_insight_regenerates_text_when_data_changes(db_session, monkeypatc
     monkeypatch.setattr(ai, "_get_user_financial_summary", _fake_summary)
     monkeypatch.setattr(ai, "ai_insights_collection", fake)
 
-    class _Resp:
-        text = '{"summary_text": "novo|texto|fresco", "suggested_action": "nova ação"}'
+    async def _resposta(_prompt):
+        return '{"summary_text": "novo|texto|fresco", "suggested_action": "nova ação"}'
 
-    monkeypatch.setattr(ai.model, "generate_content", lambda _p, **_kw: _Resp())
+    monkeypatch.setattr(ai, "_gerar_json", _resposta)
 
     result = await ai.get_or_generate_insight(db_session, "user-1")
     assert result["score"] == 100
@@ -281,3 +289,53 @@ async def test_ai_rate_limit_is_per_user_not_per_ip(make_auth_client, monkeypatc
     finally:
         limiter.enabled = False
         limiter.reset()
+
+
+@pytest.mark.asyncio
+async def test_both_gemini_calls_carry_an_output_ceiling(monkeypatch):
+    """Nenhuma das duas chamadas limitava o tamanho da resposta, então uma
+    chamada sozinha não tinha teto de custo.
+
+    Independente do teto DIÁRIO em desenho no #21: aquele limita quanto a
+    pessoa gasta por dia, este limita o quão ruim UMA chamada consegue ser.
+    """
+    from types import SimpleNamespace
+
+    capturado = {}
+
+    async def _fake_generate(*, model, contents, config):
+        capturado["insight"] = config.max_output_tokens
+        return SimpleNamespace(text='{"summary_text": "a", "suggested_action": "b"}')
+
+    async def _fake_send(self, _mensagem, config=None):
+        capturado["chat"] = config.max_output_tokens
+        return SimpleNamespace(text="ok")
+
+    # `client.aio.chats` é uma property que devolve objeto NOVO a cada acesso,
+    # então stubar a instância pegaria uma cópia descartável. Stubando a classe,
+    # o `chats.create` de verdade roda e ainda valida o histórico tipado.
+    monkeypatch.setattr(ai.client.aio.models, "generate_content", _fake_generate)
+    monkeypatch.setattr(genai_chats.AsyncChat, "send_message", _fake_send)
+
+    assert await ai._gerar_json("prompt") == '{"summary_text": "a", "suggested_action": "b"}'
+    assert await ai._responder_chat([], "oi") == "ok"
+
+    assert capturado["insight"] == ai.MAX_TOKENS_INSIGHT > 0
+    assert capturado["chat"] == ai.MAX_TOKENS_CHAT > 0
+
+
+@pytest.mark.asyncio
+async def test_an_empty_chat_answer_raises_instead_of_being_stored(monkeypatch):
+    """O SDK antigo levantava quando a resposta vinha vazia ou bloqueada; este
+    devolve None. Sem a guarda, o "" chegaria à rota, seria GRAVADO no
+    histórico como mensagem da IA e viraria uma bolha vazia — em vez do 503
+    claro que a rota já sabe dar."""
+    from types import SimpleNamespace
+
+    async def _vazia(self, _mensagem, config=None):
+        return SimpleNamespace(text=None)
+
+    monkeypatch.setattr(genai_chats.AsyncChat, "send_message", _vazia)
+
+    with pytest.raises(ValueError):
+        await ai._responder_chat([], "oi")
