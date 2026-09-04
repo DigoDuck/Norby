@@ -1,4 +1,5 @@
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from datetime import datetime, timezone
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,7 +9,6 @@ from app.services.dashboard_service import _income_expense, top_expense_categori
 from app.services.goal_service import current_month_range
 from app.services.score_service import compute_financial_score
 from app.config import get_settings
-import asyncio
 import hashlib
 import json
 import logging
@@ -19,8 +19,56 @@ logger = logging.getLogger(__name__)
 MAX_CHAT_HISTORY_MESSAGES = 10
 
 settings = get_settings()
-genai.configure(api_key=settings.gemini_api_key)
-model = genai.GenerativeModel("models/gemini-3.5-flash-lite")
+
+# SDK MANTIDO (issue #40). O `google-generativeai` foi arquivado em novembro de
+# 2025, sem correção de bug nem de segurança, e o modelo daqui é posterior a
+# essa data. A troca também ENCOLHE o código: este cliente fala async nativo,
+# então os dois `asyncio.to_thread` que existiam para não travar o event loop
+# saíram junto.
+client = genai.Client(api_key=settings.gemini_api_key)
+MODELO = "gemini-3.5-flash-lite"
+
+# Teto de saída POR CHAMADA. Sem ele uma única chamada não tem limite de custo.
+# É outra coisa do teto diário em desenho no #21: aquele limita quanto a pessoa
+# gasta por dia, este limita o quão ruim UMA chamada consegue ser. Os valores
+# são folgados de propósito — o JSON do insight tem ~100 tokens e a resposta do
+# chat é curta —, porque truncar a saída só troca custo por resposta quebrada.
+MAX_TOKENS_INSIGHT = 512
+MAX_TOKENS_CHAT = 1024
+
+
+async def _gerar_json(prompt: str) -> str:
+    """Saída de rede da geração de insight. É ela que os testes stubam.
+
+    `response_mime_type` força JSON puro (sem cercas de markdown), o que torna
+    o parse confiável mesmo num modelo pequeno como o Lite.
+    """
+    resposta = await client.aio.models.generate_content(
+        model=MODELO,
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            response_mime_type="application/json",
+            max_output_tokens=MAX_TOKENS_INSIGHT,
+        ),
+    )
+    return resposta.text or ""
+
+
+async def _responder_chat(historico: list, mensagem: str) -> str:
+    """Saída de rede do chat. A outra que os testes stubam."""
+    chat = client.aio.chats.create(model=MODELO, history=historico)
+    resposta = await chat.send_message(
+        mensagem,
+        config=types.GenerateContentConfig(max_output_tokens=MAX_TOKENS_CHAT),
+    )
+    if not resposta.text:
+        # Vazia, bloqueada por safety filter ou truncada antes do primeiro
+        # token. Levantar preserva o 503 claro da rota: devolver "" gravaria
+        # uma bolha VAZIA no histórico como se a IA tivesse respondido. O SDK
+        # antigo levantava sozinho aqui; este devolve None, então a guarda
+        # passa a ser nossa.
+        raise ValueError("resposta vazia do Gemini")
+    return resposta.text
 
 async def _get_user_financial_summary(db: AsyncSession, user_id: str) -> dict:
     """Resumo do mês corrente, reusando os agregados do dashboard.
@@ -115,24 +163,17 @@ async def get_or_generate_insight(db: AsyncSession, user_id: str) -> dict:
     # A IA pode falhar na chamada (API/rede/quota) ou devolver texto não-JSON,
     # vazio ou bloqueado por safety filter — qualquer uma dessas falhas não
     # pode derrubar o score determinístico já calculado.
-    response = None
+    bruto = ""
     try:
-        # Chamada bloqueante do SDK -> offload p/ thread pra não travar o event loop
-        # response_mime_type força JSON puro na saída (sem cercas de markdown),
-        # o que torna o parse confiável mesmo num modelo pequeno como o Lite.
-        response = await asyncio.to_thread(
-            model.generate_content,
-            prompt,
-            generation_config={"response_mime_type": "application/json"},
-        )
-        data = json.loads(response.text)
+        bruto = await _gerar_json(prompt)
+        data = json.loads(bruto)
         summary_text = data["summary_text"]
         suggested_action = data["suggested_action"]
     except Exception:
         # Nunca logar o texto cru: ele é a leitura financeira do usuário e pode
         # conter valores e categorias. Tipo da exceção + tamanho bastam para
         # diagnosticar um parse quebrado.
-        raw_len = len(getattr(response, "text", "") or "")
+        raw_len = len(bruto)
         logger.exception(
             "Resposta da IA inválida ao gerar insight (user=%s, chars=%d)",
             user_id, raw_len,
@@ -197,11 +238,6 @@ async def chat_with_ai(db: AsyncSession, user_id: str, message: str, history: li
         if not content:
             continue
         role = "user" if msg.get("role") == "user" else "model"
-        chat_history.append({"role": role, "parts": [content]})
-        
-    chat = model.start_chat(history=chat_history)
-    # Chamada bloqueante do SDK -> offload p/ thread
-    response = await asyncio.to_thread(
-        chat.send_message, f"{system_context}\n\nUsuário: {message}"
-    )
-    return response.text
+        chat_history.append(types.Content(role=role, parts=[types.Part(text=content)]))
+
+    return await _responder_chat(chat_history, f"{system_context}\n\nUsuário: {message}")
