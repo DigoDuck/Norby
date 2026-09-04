@@ -51,3 +51,18 @@ class RecurringResponse(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class RecurringSkipped(BaseModel):
+    """Uma recorrência que a rodada NÃO materializou, e por quê (ADR 0002)."""
+
+    recurring_id: UUID
+    wallet_id: UUID
+    code: str
+
+
+class RecurringRunResponse(BaseModel):
+    generated: int
+    # Lista, não contador: a tela precisa dizer QUAL recorrência parou e em qual
+    # carteira. Um número só transformaria o aviso em enigma.
+    skipped: list[RecurringSkipped] = []

@@ -1,4 +1,5 @@
 from datetime import datetime, timezone, timedelta
+from typing import NamedTuple
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,6 +8,8 @@ from app.models.sql_models import (
     User, Wallet, RecurringTransaction, RecurrenceFrequency, Transaction
 )
 from app.services.transaction_service import apply_delta
+from app.services.plan_service import PlanRefused
+from app.services.wallet_service import get_owned_wallet
 
 
 def add_one_month(d: datetime) -> datetime:
@@ -40,7 +43,18 @@ def compute_initial_next_run(frequency, day_of_month, weekday, now=None) -> date
     return candidate
 
 
-async def materialize_due_recurring(db: AsyncSession, user: User) -> int:
+class Materializacao(NamedTuple):
+    """O que a rodada fez, e o que ela deixou de fazer.
+
+    `skipped` existe porque parar em silêncio é pior que vazar o paywall: seria
+    a pessoa descobrindo em março que o aluguel não é lançado desde janeiro.
+    """
+
+    generated: int
+    skipped: list[dict]
+
+
+async def materialize_due_recurring(db: AsyncSession, user: User) -> Materializacao:
     now = datetime.now(timezone.utc)
     templates = (await db.execute(
         select(RecurringTransaction).where(
@@ -51,12 +65,29 @@ async def materialize_due_recurring(db: AsyncSession, user: User) -> int:
     )).scalars().all()
 
     generated = 0
+    skipped: list[dict] = []
     for tpl in templates:
-        wallet = (await db.execute(
-            select(Wallet).where(
-                Wallet.id == tpl.wallet_id, Wallet.user_id == user.id
-            ).with_for_update()
-        )).scalar_one_or_none()
+        # Passa pelo helper do ADR 0002 em vez de reimplementar a regra: assim
+        # existe UM lugar decidindo o que é carteira bloqueada, e a recorrência
+        # não pode divergir das escritas manuais. `required=False` preserva a
+        # tolerância antiga a carteira sumida.
+        try:
+            wallet = await get_owned_wallet(
+                tpl.wallet_id, user, db, for_update=True, required=False, for_write=True
+            )
+        except PlanRefused as recusa:
+            # O template NÃO é desativado nem apagado. Quem assinar, ou drenar e
+            # apagar uma carteira, volta a materializar sozinho — e as ocorrências
+            # puladas entram na próxima rodada, porque a materialização é guiada
+            # por data, não por execução.
+            skipped.append(
+                {
+                    "recurring_id": str(tpl.id),
+                    "wallet_id": str(tpl.wallet_id),
+                    "code": recusa.code,
+                }
+            )
+            continue
 
         while tpl.next_run_date <= now:
             db.add(Transaction(
@@ -74,4 +105,4 @@ async def materialize_due_recurring(db: AsyncSession, user: User) -> int:
             generated += 1
 
     await db.commit()
-    return generated
+    return Materializacao(generated=generated, skipped=skipped)
