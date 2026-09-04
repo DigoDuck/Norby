@@ -6,6 +6,7 @@ from sqlalchemy import select
 from jose import JWTError, jwt
 from app.database import AsyncSessionLocal
 from app.models.sql_models import User
+from app.services.plan_service import PlanRefused, ai_gate_open
 from app.config import get_settings
 
 settings = get_settings()
@@ -48,3 +49,26 @@ async def get_current_user( # Autenticação
     if user is None:
         raise credentials_exception
     return user
+
+async def require_ai_access(current_user: User = Depends(get_current_user)) -> User:
+    """Portão da IA (ADR 0002). Substitui o `get_current_user` nas rotas que GERAM.
+
+    Dependency, e não checagem dentro da rota, por dois motivos. O primeiro é de
+    desenho: a checagem só precisa do usuário, que é o que dependency faz bem, e
+    é onde este app já coloca autorização. O segundo é concreto e vale registrar
+    — o `/ai/insight` embrulha o corpo inteiro num `except Exception` que degrada
+    para 200 com "IA temporariamente indisponível". Uma recusa levantada lá
+    dentro seria ENGOLIDA e o usuário free veria um erro de indisponibilidade em
+    vez do motivo real. Dependency roda antes do corpo, então escapa disso.
+
+    Dentro do `ai_service` também não: o service passaria a conhecer plano, e
+    qualquer chamador futuro que não passe por aquela função fura o portão sem
+    ninguém notar.
+    """
+    if not ai_gate_open(current_user):
+        raise PlanRefused(
+            "AI_REQUIRES_PREMIUM",
+            "A IA do Norby faz parte do plano pago. Seus dados e seu histórico "
+            "continuam aqui.",
+        )
+    return current_user
