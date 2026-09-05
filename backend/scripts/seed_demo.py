@@ -11,7 +11,7 @@ schemas, escopo por usuário) e o mesmo script serve local e prod trocando
 SEED_API_URL. Escrever no banco duplicaria a regra dos routers e ia derivar.
 
     docker exec norby_backend python scripts/seed_demo.py
-    SEED_API_URL=https://norby-production.up.railway.app python scripts/seed_demo.py
+    SEED_API_URL=https://api.norby.com.br python scripts/seed_demo.py
 
     python scripts/seed_demo.py --check   # valida os dados gerados, sem servidor
 
