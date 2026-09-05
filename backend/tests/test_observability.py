@@ -44,6 +44,19 @@ async def test_request_id_is_echoed_when_provided(client):
 
 
 @pytest.mark.asyncio
+async def test_a_long_request_id_from_the_client_is_truncated(client):
+    """O valor vem do cliente e vai para o log de TODA requisição.
+
+    Quebra de linha o parser de HTTP já barra, então o que sobra é tamanho:
+    sem teto, um header gordo infla o log a cada chamada. Truncar preserva a
+    correlação (o prefixo continua identificando a requisição) e tira o
+    incentivo.
+    """
+    res = await client.get("/health", headers={"X-Request-ID": "a" * 500})
+    assert res.headers.get("x-request-id") == "a" * 64
+
+
+@pytest.mark.asyncio
 async def test_responses_carry_security_headers(client):
     res = await client.get("/health")
     assert res.status_code == 200

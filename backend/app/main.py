@@ -104,7 +104,10 @@ app.add_middleware(
 # preflights OPTIONS que o CORSMiddleware responde sem chamar request_context.
 @app.middleware("http")
 async def response_headers(request: Request, call_next):
-    rid = request.headers.get("X-Request-ID") or uuid.uuid4().hex
+    # Fatiado em 64: o valor vem do CLIENTE e vai para o log de toda
+    # requisição. O parser de HTTP já barra quebra de linha, então o que sobra
+    # é tamanho — sem teto, um header gordo infla o log a cada chamada.
+    rid = (request.headers.get("X-Request-ID") or "")[:64] or uuid.uuid4().hex
     request.state.request_id = rid
     response = await call_next(request)
 

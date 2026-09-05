@@ -155,7 +155,11 @@ async def portal_session(
 
 
 @router.post("/confirm-checkout")
-@limiter.limit("20/minute", key_func=user_key)
+# 5/min e não 20: a checagem de dono não pode vir antes da consulta ao Stripe,
+# porque é a sessão que diz de quem ela é. Então todo `session_id` inventado
+# vira uma chamada de saída ao gateway do qual a cobrança inteira depende, e o
+# teto é o único controle. Uma compra chama isto UMA vez.
+@limiter.limit("5/minute", key_func=user_key)
 async def confirm_checkout_route(
     request: Request,
     payload: ConfirmCheckout,

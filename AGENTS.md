@@ -165,6 +165,17 @@ Start em produção: `backend/start.sh` roda `alembic upgrade head` + uvicorn na
 `$PORT` do provedor (o `CMD` do `backend/Dockerfile`; o `docker-compose.yml` de
 dev sobrescreve com `--reload`).
 
+**Reembolso são DUAS ações, sempre (2026-09-05):** estornar a cobrança no
+painel do Stripe **não cancela a assinatura**. Os quatro eventos que o webhook
+assina não incluem nada de estorno, então só devolver o dinheiro deixa
+`premium_until` intacto, o acesso pago em pé até o fim do período **e a
+renovação cobrando de novo no mês seguinte** — a pessoa que exerceu o direito de
+arrependimento leva uma segunda cobrança, o oposto exato do que os Termos de Uso
+prometem. O procedimento é: **(1)** cancelar a assinatura no painel, o que
+dispara `customer.subscription.deleted` e fecha o portão pelo `ended_at`, e
+**(2)** estornar a cobrança. Nessa ordem, porque o cancelamento é o que a
+aplicação enxerga. Achado na revisão do #29, sem ocorrência real até aqui.
+
 **Sessão:** access token de 15 min (`ACCESS_TOKEN_EXPIRE_MINUTES`), refresh de 7
 dias com rotação e detecção de reuso. O logout revoga só o refresh — um access
 token roubado vale até 15 min. Revogação imediata exigiria denylist de `jti`
@@ -178,15 +189,22 @@ por 7 dias. Como o logout passou a ter o mesmo poder do refresh, ganhou o mesmo
 teto (20/min); sem ele, um refresh antigo viraria um botão de derrubar sessão
 replicável para sempre.
 
-**Hash de senha — migração em andamento (2026-08-15):** `bcrypt_sha256` para
-hashes novos, `bcrypt` mantido no `CryptContext` só para verificar os antigos,
-que são regravados no próximo login de cada usuário (`verify_and_upgrade`).
-Motivo: o bcrypt cru trunca em 72 **bytes** em silêncio, então qualquer sufixo
-depois disso autenticava igual. O cadastro agora recusa senha acima de 72 bytes.
+**Hash de senha (2026-08-15, reescrito sem passlib em 2026-09-05):**
+`bcrypt_sha256` para hashes novos, `bcrypt` cru ainda verificado para os
+antigos, que são regravados no próximo login (`verify_and_upgrade`). Motivo da
+migração: o bcrypt cru trunca em 72 **bytes** em silêncio, então qualquer sufixo
+depois disso autenticava igual. O cadastro recusa senha acima de 72 bytes.
+
+O `passlib` **não existe mais aqui** (#102): ele parou em 2020, quebrava no
+import com bcrypt 5 e importava o `crypt`, removido no Python 3.13. Os dois
+esquemas são implementados em `app/services/password_service.py`, e os testes
+carregam hashes-testemunha gerados pelo passlib antes da troca — são eles que
+provam que ninguém precisa redefinir senha.
+
 ⚠️ **Esta mudança não é revertível sozinha.** Depois que um usuário loga, o hash
-dele vira `$bcrypt-sha256$`, formato que o código anterior (`schemes=["bcrypt"]`)
-não sabe verificar — reverter o commit tranca esses usuários para fora com a
-senha correta. Em rollback, manter `bcrypt_sha256` na lista de schemes.
+dele vira `$bcrypt-sha256$`, formato que o código anterior a 2026-08-15 não sabe
+verificar — reverter tranca esses usuários para fora com a senha correta. Em
+qualquer rollback, `bcrypt_sha256` tem de continuar sendo verificado.
 
 **Tokens no navegador — decisão consciente (2026-07-21):** access e refresh
 ficam no `localStorage` (Zustand persist). A correção canônica seria refresh em
