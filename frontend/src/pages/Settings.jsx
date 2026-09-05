@@ -16,6 +16,7 @@ import { accountApi } from "@/api/account";
 import { apiErrorMessage, shadcnInputCls } from "@/lib/utils";
 import ThemeToggle from "@/components/shared/ThemeToggle";
 import Avatar from "@/components/shared/Avatar";
+import PlanCard from "@/components/shared/PlanCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -273,6 +274,10 @@ export default function Settings() {
           <Save size={15} /> {saved ? "Salvo!" : "Salvar alterações"}
         </Button>
       </div>
+
+      {/* Plano e assinatura (#46). Some sozinho quando não há nada a dizer nem
+          a oferecer, que é o estado com o paywall desligado. */}
+      <PlanCard />
 
       {/* Segurança */}
       <div className="glass p-6">
