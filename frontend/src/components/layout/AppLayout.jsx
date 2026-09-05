@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Outlet } from "react-router-dom";
 import { recurringApi } from "@/api/recurring";
 import { accountApi } from "@/api/account";
+import { authApi } from "@/api/auth";
 import { useAuthStore } from "@/store/authStore";
 import Sidebar from "./Sidebar";
 import MobileNav from "./MobileNav";
@@ -20,6 +21,24 @@ export default function AppLayout() {
   // na sessão. Um ponto de chamada, as duas entradas cobertas.
   useEffect(() => {
     recurringApi.run().catch(() => {});
+  }, []);
+
+  // Recarrega o usuário a cada entrada na área autenticada.
+  //
+  // O `user` (com o `plan` dentro) é gravado no localStorage no login e, sem
+  // isto, NUNCA mais era atualizado. O ADR 0002 aceitou o plano ficar velho
+  // numa direção — a tela oferecer o que o backend recusa, que custa um 403
+  // com mensagem clara. Mas a direção INVERSA não é aceitável e foi o que
+  // aconteceu: quem já estava logado quando o paywall acendeu passava a levar
+  // 403 e a tela não mostrava como resolver, porque o plano guardado dizia
+  // "liberado" para sempre. Uma chamada por carga do app conserta isso.
+  useEffect(() => {
+    authApi
+      .me()
+      .then(({ data }) => useAuthStore.getState().updateUser(data))
+      // Silencioso: token expirado já é tratado pelo interceptor do axios, e
+      // falha de rede não pode derrubar a área autenticada inteira.
+      .catch(() => {});
   }, []);
 
   // Baixa a foto de perfil UMA vez por versão (issue #35).
