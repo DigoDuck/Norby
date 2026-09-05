@@ -240,10 +240,13 @@ async def test_new_passwords_use_bcrypt_sha256(client, db_session):
 
 
 def test_verify_and_upgrade_rehashes_legacy_bcrypt():
-    from passlib.hash import bcrypt
+    import bcrypt
+
     from app.services.auth_service import verify_and_upgrade
 
-    legacy = bcrypt.using(rounds=12).hash("secret123")
+    # bcrypt direto, sem passlib (#102). Continua gerando o MESMO formato
+    # legado que existe no banco, que é o ponto do teste.
+    legacy = bcrypt.hashpw(b"secret123", bcrypt.gensalt(12)).decode("ascii")
     ok, upgraded = verify_and_upgrade("secret123", legacy)
     assert ok is True
     assert upgraded is not None and upgraded.startswith("$bcrypt-sha256$")
@@ -255,13 +258,14 @@ def test_verify_and_upgrade_rehashes_legacy_bcrypt():
 
 @pytest.mark.asyncio
 async def test_login_persists_upgraded_legacy_bcrypt_hash(client, db_session):
-    from passlib.hash import bcrypt
+    import bcrypt
+
     from app.models.sql_models import User
 
     user = User(
         name="Gus",
         email="gus@test.com",
-        password_hash=bcrypt.using(rounds=12).hash("secret123"),
+        password_hash=bcrypt.hashpw(b"secret123", bcrypt.gensalt(12)).decode("ascii"),
     )
     db_session.add(user)
     await db_session.commit()
