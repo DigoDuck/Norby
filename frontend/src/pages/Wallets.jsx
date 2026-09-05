@@ -39,6 +39,10 @@ export default function Wallets() {
   }
 
   useEffect(() => {
+    // Falso positivo: `load` só chama setState DEPOIS do await, então nada
+    // é síncrono aqui. Buscar dados no mount é o padrão do React quando não
+    // há biblioteca de data fetching, e este projeto não tem uma.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
   }, []);
 

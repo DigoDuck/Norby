@@ -105,6 +105,10 @@ export default function Transactions() {
     walletsApi.list().then((r) => {
       setWallets(r.data);
     });
+    // Falso positivo: `load` só chama setState DEPOIS do await. Buscar no
+    // mount é o padrão do React sem biblioteca de data fetching, e este
+    // projeto não tem uma.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
   }, []);
 
@@ -122,6 +126,11 @@ export default function Transactions() {
   useEffect(() => {
     const preset = location.state?.newType;
     if (preset !== "INCOME" && preset !== "EXPENSE") return;
+    // Aqui a regra está tecnicamente certa: são setStates síncronos e custam
+    // uma renderização a mais. Fica assim porque a fonte do dado é EXTERNA (o
+    // state da rota), que é justamente o que efeito existe para sincronizar, e
+    // roda uma vez só, no mount, antes de o dialog abrir.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setEditing(null);
     setServerError(null);
     reset({ ...emptyForm(), type: preset, category: categoriesFor(preset)[0] });
@@ -259,6 +268,11 @@ export default function Transactions() {
               </DialogTitle>
             </DialogHeader>
 
+            {/* eslint-disable-next-line react-hooks/refs -- falso positivo
+                contra o react-hook-form: `handleSubmit(onSubmit)` devolve um
+                handler, e os refs internos só são lidos quando ele é chamado
+                no submit, nunca durante a renderização. É o uso documentado
+                da biblioteca. */}
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-3 mt-2">
               {/* Tipo */}
               <Field label="Tipo" error={errors.type?.message}>

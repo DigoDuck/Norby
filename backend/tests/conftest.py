@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, Asyn
 from app.main import app
 from app.database import Base
 from app.dependencies import get_db
+from app.config import get_settings
 from app.limiter import limiter
 
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", "..", ".env"), encoding="utf-8")
@@ -30,6 +31,26 @@ def disable_rate_limit():
     limiter.enabled = False
     yield
     limiter.enabled = True
+
+
+@pytest.fixture(autouse=True)
+def paywall_no_padrao_de_producao():
+    """Toda a suíte começa com o paywall DESLIGADO, o default de produção.
+
+    Sem isto os testes herdavam o `PAYWALL_ENABLED` do `.env` de quem estivesse
+    rodando, e ligar o flag para testar assinatura à mão deixava 5 testes
+    vermelhos que pareciam regressão e não eram — inclusive os quatro chamados
+    `test_with_the_flag_off_*`, que afirmam exatamente o comportamento que o
+    ambiente estava contradizendo.
+
+    Os arquivos que precisam do paywall ligado têm a própria fixture e a
+    aplicam depois desta, porque autouse roda primeiro no mesmo escopo.
+    """
+    settings = get_settings()
+    antes = settings.paywall_enabled
+    settings.paywall_enabled = False
+    yield
+    settings.paywall_enabled = antes
 
 
 @pytest_asyncio.fixture(autouse=True)
