@@ -28,3 +28,9 @@ PersonName = Annotated[str, Field(min_length=2, max_length=100)]
 
 # Espelha String(500) da coluna description.
 LongText = Annotated[str, Field(max_length=500)]
+
+# Slug do banco escolhido para a carteira (issue #34). O catalogo de bancos vive
+# no FRONTEND, porque marca e cor sao apresentacao: manter a lista aqui exigiria
+# deploy do backend para acrescentar um banco, e o backend nao tem opiniao sobre
+# quais existem. O que ele garante e que o valor e um token curto e seguro.
+BankSlug = Annotated[str, Field(min_length=1, max_length=20, pattern=r"^[a-z0-9-]+$")]

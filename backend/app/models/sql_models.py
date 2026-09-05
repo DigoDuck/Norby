@@ -158,6 +158,10 @@ class Wallet(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"))
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     balance: Mapped[Decimal] = mapped_column(Numeric(15,2), default=Decimal("0.00"))
+    # Banco escolhido (issue #34). NULO = carteira criada antes desta coluna, ou
+    # sem banco definido — e o front cai no comportamento antigo. Guarda o slug,
+    # nao o nome: o rotulo e a marca sao apresentacao e vivem no frontend.
+    bank: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     
     user: Mapped["User"] = relationship("User", back_populates="wallets")

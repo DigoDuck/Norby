@@ -85,3 +85,47 @@ async def test_rejects_negative_initial_balance(make_auth_client):
     ac = await make_auth_client("Alice")
     res = await ac.post("/wallets/", json={"name": "Cofre", "balance": "-50.00"})
     assert res.status_code == 422
+
+
+# --- Banco da carteira (issue #34) -------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_bank_round_trips(make_auth_client):
+    ac = await make_auth_client("Alice")
+    res = await ac.post("/wallets/", json={"name": "Conta", "bank": "nubank"})
+    assert res.status_code == 201, res.text
+    assert res.json()["bank"] == "nubank"
+
+    listado = (await ac.get("/wallets/")).json()
+    assert listado[0]["bank"] == "nubank"
+
+
+@pytest.mark.asyncio
+async def test_bank_is_optional_and_comes_back_null(make_auth_client):
+    # É o estado de toda carteira criada antes desta coluna: o front cai no
+    # comportamento antigo, e nenhuma migração de dado foi necessária.
+    ac = await make_auth_client("Alice")
+    w = await make_wallet(ac)
+    assert w["bank"] is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("slug", ["Nubank", "nu bank", "nubank!", "", "x" * 21])
+async def test_rejects_a_slug_the_catalog_could_not_produce(make_auth_client, slug):
+    # O catálogo vive no frontend, então o backend não sabe QUAIS bancos
+    # existem — mas garante que o valor é um token curto e seguro, e não texto
+    # livre entrando numa coluna que a interface vai renderizar.
+    ac = await make_auth_client("Alice")
+    res = await ac.post("/wallets/", json={"name": "Conta", "bank": slug})
+    assert res.status_code == 422, res.text
+
+
+@pytest.mark.asyncio
+async def test_update_can_switch_banks(make_auth_client):
+    ac = await make_auth_client("Alice")
+    w = await make_wallet(ac)
+    res = await ac.put(f"/wallets/{w['id']}", json={"bank": "itau"})
+    assert res.status_code == 200, res.text
+    assert res.json()["bank"] == "itau"
+
