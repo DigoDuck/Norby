@@ -159,8 +159,9 @@ App no ar, deploy a partir da branch `main`:
   Railway. (Migrado do Render em 2026-07-16 — só config, zero código.)
 - **Postgres:** Neon (serverless, free). **Mongo:** Atlas M0 (free). Ficam fora do
   Railway — **não** anexar banco do próprio Railway (zeraria os dados).
-- **Frontend:** Vercel — `https://norby.com.br` (apex canônico; o `www` faz
-  308 para ele na borda, e a antiga `norby-finance.vercel.app` ainda serve).
+- **Frontend:** Vercel — `https://norby.com.br` (apex canônico; o `www` **e** a
+  antiga `norby-finance.vercel.app` fazem 308 para ele na borda, então nenhuma
+  requisição nasce mais naquela origem e ela saiu do `CORS_ORIGINS`).
   `VITE_API_URL` aponta pra API (**embutida no build** → mudou, tem que
   rebuildar).
 
@@ -226,9 +227,9 @@ recarga. Mitigações no lugar: CSP restritiva no `vercel.json`, access token de
 15 min e revogação de todas as sessões quando um refresh token é reusado.
 **Pré-requisito para migrar: CUMPRIDO em 2026-09-05.** `norby.com.br` foi
 adquirido, então API e frontend podem passar a viver no mesmo site registrável
-(`norby.com.br` + `api.norby.com.br`) e o cookie vira `SameSite=Lax`. A razão
-que segurava a correção canônica deixou de existir; falta apontar os domínios e
-fazer a migração.
+(`norby.com.br` + `api.norby.com.br`) e o cookie vira `SameSite=Lax`. Os dois
+domínios já estão no ar, então não sobrou passo de infraestrutura: falta só o
+código, rastreado no #110.
 
 **Rate limit atrás do proxy — reescrito em 2026-08-16 (issue #22, fix round 1
 incluído):** o uvicorn só honra `X-Forwarded-For` quando o peer é
@@ -326,8 +327,21 @@ nunca esgota o próprio balde).
 - `asyncpg` rejeita params libpq (`sslmode`, `channel_binding`) que o Neon manda
   na URL. `app/config.py` (`async_database_url` + `database_ssl_required`) e
   `alembic/env.py` removem esses params e ligam SSL via `connect_args`.
-- `CORS_ORIGINS` deve ter a URL da Vercel **sem barra final** (o `Origin` do
-  navegador nunca tem barra), separada por vírgula do `localhost`.
+- `CORS_ORIGINS` deve ter a origem do frontend **sem barra final** (o `Origin`
+  do navegador nunca tem barra), separada por vírgula do `localhost`. Hoje vale
+  `https://norby.com.br,http://localhost:5173`.
+- **IP blocking ligado no Brevo quebra a recuperação de senha em produção, e
+  quebra em silêncio.** O Railway Hobby não tem IP de egresso fixo (é recurso do
+  plano Pro), então autorizar IPs no Brevo recusa todo envio vindo de produção.
+  E como `/auth/forgot-password` responde 202 exista ou não a conta, a falha não
+  aparece para quem pediu o link: some no log do servidor. Manter DESLIGADO
+  enquanto o egresso não for estático. Teto do plano gratuito: 300 e-mails/dia.
+- **Ligar `PAYWALL_ENABLED` sem `VITE_FORNECEDOR_NOME` e `VITE_FORNECEDOR_CPF`
+  na Vercel é cobrar com Termos incompletos.** O Decreto 7.962/2013, art. 2º, I
+  exige nome e CPF/CNPJ do vendedor no site; sem as variáveis, a seção 2 dos
+  Termos mostra só o e-mail. Elas ficam fora do código porque o repositório é
+  público e histórico de git não se apaga, mas são **embutidas no build**: mudar
+  exige REDEPLOY, igual à `VITE_API_URL`.
 
 **`docker-compose.prod.yml` + `Caddyfile`:** rota **alternativa self-hosted (VPS)**,
 **não usada** pelo deploy atual no Railway. Sobem backend + Postgres + Mongo num
