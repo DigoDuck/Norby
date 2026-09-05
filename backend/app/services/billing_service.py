@@ -295,6 +295,9 @@ async def reconcile_subscription(user: User, db: AsyncSession) -> bool:
     if not precisa_reconciliar(user):
         return False
 
+    # ponytail: janela por PROCESSO. Com dois workers ou duas instâncias o
+    # teto vira 2x, e em silêncio — a conta chega pelo Stripe, não por erro.
+    # Escalando horizontal, mover para Redis ou para uma coluna no usuário.
     agora = datetime.now(timezone.utc)
     for antigo in [k for k, v in _ULTIMA_CONSULTA.items() if agora - v >= JANELA_CONSULTA]:
         del _ULTIMA_CONSULTA[antigo]
