@@ -25,7 +25,11 @@ def billing_configurado():
     antes = (settings.stripe_secret_key, settings.stripe_price_id, settings.app_base_url)
     settings.stripe_secret_key = "sk_test_x"
     settings.stripe_price_id = "price_123"
-    settings.app_base_url = "https://norby.app"
+    # `example.com` e nao um dominio parecido com o nosso: a RFC 2606 reserva
+    # este nome exatamente para exemplo e teste, entao ele nao pertence nem
+    # pode vir a pertencer a ninguem. O stub anterior era `norby.app`, que
+    # nunca foi nosso e pode ser de outra pessoa.
+    settings.app_base_url = "https://example.com"
     yield settings
     (settings.stripe_secret_key, settings.stripe_price_id, settings.app_base_url) = antes
 
@@ -75,8 +79,8 @@ async def test_checkout_carries_the_user_id_so_the_webhook_can_match(
     assert recebido["customer_id"] is None  # ainda não tem
     # A volta traz o id da sessão, que é o que fecha a corrida da 1ª compra.
     assert "{CHECKOUT_SESSION_ID}" in recebido["success_url"]
-    assert recebido["success_url"].startswith("https://norby.app")
-    assert recebido["cancel_url"].startswith("https://norby.app")
+    assert recebido["success_url"].startswith("https://example.com")
+    assert recebido["cancel_url"].startswith("https://example.com")
 
 
 @pytest.mark.asyncio
@@ -159,7 +163,7 @@ async def test_the_portal_returns_a_url_for_a_customer(
     assert res.status_code == 200
     assert res.json()["url"].startswith("https://billing.stripe.com/")
     assert recebido["customer_id"] == "cus_1"
-    assert recebido["return_url"].startswith("https://norby.app")
+    assert recebido["return_url"].startswith("https://example.com")
 
 
 # --- A volta do Checkout: a corrida da primeira compra -----------------------
@@ -317,8 +321,8 @@ async def test_the_payload_that_reaches_stripe_is_complete(monkeypatch):
         client_reference_id="abc-123",
         price_id="price_123",
         customer_id="cus_1",
-        success_url="https://norby.app/settings?s={CHECKOUT_SESSION_ID}",
-        cancel_url="https://norby.app/settings",
+        success_url="https://example.com/settings?s={CHECKOUT_SESSION_ID}",
+        cancel_url="https://example.com/settings",
     )
 
     assert url == "https://checkout.stripe.com/c/pay/cs_1"
@@ -349,8 +353,8 @@ async def test_a_first_time_buyer_sends_no_customer_at_all(monkeypatch):
         client_reference_id="abc-123",
         price_id="price_123",
         customer_id=None,
-        success_url="https://norby.app/settings",
-        cancel_url="https://norby.app/settings",
+        success_url="https://example.com/settings",
+        cancel_url="https://example.com/settings",
     )
 
     assert "customer" not in recebido
