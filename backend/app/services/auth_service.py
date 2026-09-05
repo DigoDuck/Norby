@@ -3,37 +3,34 @@ import secrets
 from datetime import datetime, timedelta, timezone
 
 from jose import jwt
-from passlib.context import CryptContext
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.models.sql_models import RefreshToken, User
+# Reexportados de propósito: todo o app já importa `hash_password` e
+# `verify_password` daqui, e a troca do passlib (#102) não precisa vazar para
+# os chamadores. Quem quiser o detalhe do esquema lê o password_service.
+from app.services.password_service import (  # noqa: F401
+    hash_password,
+    needs_update,
+    verify_password,
+)
 
 settings = get_settings()
-# bcrypt_sha256 aplica SHA-256 antes do bcrypt, então a senha inteira conta e o
-# limite de 72 bytes do bcrypt cru deixa de existir. "bcrypt" permanece para
-# verificar hashes antigos, que serão atualizados no próximo login.
-pwd_context = CryptContext(schemes=["bcrypt_sha256", "bcrypt"], deprecated="auto")
-
-def hash_password(password: str) -> str:
-    return pwd_context.hash(password) # Retorna a senha criptografada
-
-def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed) # Compara a senha com hash
 
 def verify_and_upgrade(plain: str, hashed: str) -> tuple[bool, str | None]:
     """Verifica a senha e devolve um hash novo quando o esquema está obsoleto."""
-    if not pwd_context.verify(plain, hashed):
+    if not verify_password(plain, hashed):
         return False, None
-    if pwd_context.needs_update(hashed):
-        return True, pwd_context.hash(plain)
+    if needs_update(hashed):
+        return True, hash_password(plain)
     return True, None
 
 # Hash descartável usado quando o e-mail não existe. Verificar contra ele custa
 # o mesmo que verificar contra um hash real, então o tempo de resposta do login
 # não revela se o e-mail está cadastrado. Calculado uma vez no import (~200ms).
-_DUMMY_HASH = pwd_context.hash("norby-dummy-password-nunca-usada")
+_DUMMY_HASH = hash_password("norby-dummy-password-nunca-usada")
 
 def create_access_token(user_id: str) -> str:
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.access_token_expire_minutes) # Define um tempo de expiração pro token
