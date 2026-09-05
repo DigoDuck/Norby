@@ -208,7 +208,12 @@ async def test_both_gateway_calls_carry_the_secret_key(monkeypatch):
 
     async def _retrieve(subscription_id, **kwargs):
         recebidas["retrieve"] = kwargs.get("api_key")
-        return {"id": subscription_id}
+        # StripeObject de verdade, não dict: o SDK 15 devolve um objeto que
+        # NÃO é mapping, e devolver dict aqui escondia o `dict(obj)` quebrado
+        # que só aparecia contra o Stripe real (ver test_billing_sdk_boundary).
+        return billing.stripe.Subscription.construct_from(
+            {"id": subscription_id}, "sk_test_dummy"
+        )
 
     async def _cancel(subscription_id, **kwargs):
         recebidas["cancel"] = kwargs.get("api_key")

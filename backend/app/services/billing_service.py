@@ -257,7 +257,13 @@ async def fetch_subscription(subscription_id: str) -> dict:
     objeto do SDK, e é isso que mantém a troca de gateway localizada.
     """
     sub = await stripe.Subscription.retrieve_async(subscription_id, api_key=_chave())
-    return dict(sub)
+    # `.to_dict()`, NÃO `dict(obj)`: no SDK 15 o StripeObject deixou de ser um
+    # mapping e `dict(obj)` levanta TypeError. Como os testes stubavam esta
+    # função com um dict, o erro só apareceria contra o Stripe de verdade — e
+    # apareceria como reconciliação "falhando" em silêncio, porque o TypeError
+    # cai no `except Exception` de quem chama. `to_dict()` é recursivo o
+    # bastante: os aninhados voltam como dict puro (verificado contra a conta).
+    return sub.to_dict()
 
 
 def precisa_reconciliar(user: User, now: datetime | None = None) -> bool:
@@ -410,9 +416,12 @@ async def fetch_checkout_session(session_id: str) -> dict:
         sessao = await stripe.checkout.Session.retrieve_async(
             session_id, api_key=_chave()
         )
+        # DENTRO do try, e com `.to_dict()`: `dict(obj)` levanta TypeError no
+        # SDK 15, e cá fora ele escapava do GatewayError e virava 500 na volta
+        # de toda primeira compra.
+        return sessao.to_dict()
     except Exception as erro:  # noqa: BLE001
         raise GatewayError(str(erro)) from erro
-    return dict(sessao)
 
 
 async def confirm_checkout(user: User, session_id: str, db: AsyncSession) -> None:
