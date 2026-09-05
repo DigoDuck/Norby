@@ -29,15 +29,17 @@ function RootRoute() {
 
 export default function App() {
   const token = useAuthStore((s) => s.token);
-  const [booting, setBooting] = useState(true);
+  // Sem token não há o que validar, então já nasce liberado. Antes isto era
+  // `useState(true)` mais um `setBooting(false)` dentro do efeito, o que
+  // gastava uma renderização extra em TODA visita anônima só para desfazer um
+  // estado que nunca precisou existir. A regra
+  // `react-hooks/set-state-in-effect` apontou isto, e estava certa.
+  const [booting, setBooting] = useState(() => Boolean(token));
 
   // No boot: se há token persistido, valida no backend antes de liberar as rotas.
   // Token expirado/inválido -> logout, evitando o "flash" de tela protegida.
   useEffect(() => {
-    if (!token) {
-      setBooting(false);
-      return;
-    }
+    if (!token) return;
     authApi
       .me()
       .then((res) => useAuthStore.getState().updateUser(res.data))
