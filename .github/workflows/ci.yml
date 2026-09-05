@@ -65,6 +65,22 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements-dev.lock
 
+      # The test database is built by `Base.metadata.create_all`, so the suite
+      # only ever sees the models and is blind by construction to a migration
+      # that has drifted from them. `alembic check` is the only thing that
+      # compares the two, and without it here three consecutive migrations had
+      # to hand-strip phantom operations out of their autogenerate output.
+      # Building from an empty database also proves the chain itself still runs
+      # end to end, which `alembic check` alone would not.
+      - name: Migrations match the models
+        env:
+          DATABASE_URL: postgresql+asyncpg://norby_user:norby_pass@localhost:5432/norby_migrations
+          PGPASSWORD: norby_pass
+        run: |
+          psql -h localhost -U norby_user -d postgres -c 'CREATE DATABASE norby_migrations'
+          alembic upgrade head
+          alembic check
+
       - name: Run tests
         run: pytest
 

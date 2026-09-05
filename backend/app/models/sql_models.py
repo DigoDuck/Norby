@@ -213,7 +213,13 @@ class RecurringTransaction(Base):
     day_of_month: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     weekday: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     next_run_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # `server_default` além do `default`: o banco tem DEFAULT true desde a
+    # criação da tabela, e sem declarar isso aqui o autogenerate propõe derrubá-lo
+    # em toda migration nova. Derrubar quebraria qualquer INSERT que omita a
+    # coluna, então quem estava certo era o banco.
+    active: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default=text("true"), nullable=False
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     user: Mapped["User"] = relationship("User", back_populates="recurring_transactions")
