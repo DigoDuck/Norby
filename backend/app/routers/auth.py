@@ -2,27 +2,31 @@ import asyncio
 import logging
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse, Response
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, select
+from app.config import get_settings
 from app.dependencies import get_db, get_current_user
-from app.limiter import limiter, user_key, refresh_token_key
+from app.limiter import limiter, user_key, refresh_token_key, reset_email_key
 from app.models.sql_models import User
 from app.schemas.user import (
     UserRegister, UserLogin, UserUpdate, Token, TokenPair, RefreshRequest,
-    DeleteAccountRequest, UserResponse,
+    DeleteAccountRequest, UserResponse, ForgotPassword, ResetPassword,
 )
 from app.services.auth_service import (
     hash_password, verify_password, verify_and_upgrade, create_access_token,
     create_refresh_token, rotate_refresh_token, revoke_refresh_token,
-    _DUMMY_HASH,
+    create_password_reset, reset_password, _DUMMY_HASH,
 )
 from app.services.account_service import delete_account, export_data
 from app.services.photo_service import MAX_BYTES, PhotoInvalid, PhotoTooLarge, processar_foto
 from app.services.billing_service import GatewayCancelFailed
+from app.services.email_service import (
+    EmailFailed, EmailNotConfigured, enviar_email, html_recuperacao,
+)
 from app.services.plan_service import AI_TRIAL
 from app.services.throttle_service import check_throttle, record_failure, record_success
 
@@ -403,3 +407,91 @@ async def delete_my_account(
                 "excluído. Tente novamente em alguns minutos."
             ),
         )
+
+
+# --- Recuperação de senha (issue #36) ---------------------------------------
+
+ROTA_REDEFINIR = "/redefinir-senha"
+
+
+async def _forgot_body(request: Request, payload: ForgotPassword) -> ForgotPassword:
+    # Carimba o e-mail antes do decorator do slowapi rodar — mesmo truque do
+    # _refresh_body, pelo mesmo motivo: o key_func é síncrono e não vê o corpo.
+    request.state.reset_email = payload.email
+    return payload
+
+
+async def _mandar_link(email: str, link: str) -> None:
+    """Roda DEPOIS da resposta, via BackgroundTasks. Não é otimização.
+
+    Enviando dentro da requisição, e-mail existente levaria o tempo do POST ao
+    Brevo e e-mail inexistente responderia na hora. Essa diferença é um oráculo
+    de enumeração de conta tão bom quanto uma mensagem diferente — só que
+    medido no relógio em vez de lido na tela. Respondendo antes de enviar, os
+    dois casos custam o mesmo.
+    """
+    try:
+        await enviar_email(
+            para=email,
+            assunto="Redefinir sua senha do Norby",
+            html=html_recuperacao(link),
+        )
+    except (EmailFailed, EmailNotConfigured):
+        # Já logado no service, e sem o endereço junto. Aqui não há para quem
+        # reclamar: a resposta já foi entregue, e tem de ser a mesma sempre.
+        pass
+
+
+@router.post("/forgot-password", status_code=status.HTTP_202_ACCEPTED)
+# Chave pelo e-mail, não pelo IP: atrás do proxy o balde por IP é compartilhado
+# por todo mundo (ver "Rate limit atrás do proxy" no AGENTS.md), e o que este
+# teto protege é a CAIXA DE ENTRADA do alvo. O segundo limite, por IP, é o
+# freio de flood — um e-mail diferente a cada chamada nunca esgota o próprio
+# balde, a mesma lição que o logout aprendeu no fix round 1.
+@limiter.limit("60/minute")
+@limiter.limit("3/hour", key_func=reset_email_key)
+async def forgot_password(
+    request: Request,
+    background: BackgroundTasks,
+    payload: ForgotPassword = Depends(_forgot_body),
+    db: AsyncSession = Depends(get_db),
+):
+    """Sempre 202, exista o e-mail ou não.
+
+    A resposta é idêntica de propósito: um 404 para e-mail desconhecido
+    transformaria esta rota num verificador de quem tem conta no Norby, que é
+    a mesma enumeração que o login evita com o `_DUMMY_HASH`.
+    """
+    if not get_settings().brevo_api_key:
+        # Recuperação não provisionada. Recusar alto é melhor que responder 202
+        # e nunca mandar nada: aqui não há atacante para proteger, há um dono
+        # que precisa saber que a variável não existe.
+        raise HTTPException(status_code=503, detail="Recuperação de senha indisponível")
+
+    user = await db.scalar(select(User).where(User.email == payload.email))
+    if user is not None:
+        raw = await create_password_reset(str(user.id), db)
+        base = get_settings().app_base_url.rstrip("/")
+        background.add_task(_mandar_link, user.email, f"{base}{ROTA_REDEFINIR}?token={raw}")
+
+    return {"detail": "Se este e-mail tiver conta, o link de redefinição chegou nele."}
+
+
+@router.post("/reset-password", status_code=status.HTTP_204_NO_CONTENT)
+# Sem chave por e-mail aqui: quem apresenta o token não informa e-mail nenhum.
+# O teto é contra força bruta no token, que tem 48 bytes de entropia e não cai
+# por tentativa — o limite existe para o custo, não para a segurança.
+@limiter.limit("20/minute")
+async def reset_password_route(
+    request: Request,
+    payload: ResetPassword,
+    db: AsyncSession = Depends(get_db),
+):
+    """Token inválido, expirado ou já usado respondem igual: 400.
+
+    Distinguir "expirou" de "não existe" diria a quem tem um token roubado se
+    ele um dia foi válido.
+    """
+    if not await reset_password(payload.token, payload.new_password, db):
+        raise HTTPException(status_code=400, detail="Link inválido ou expirado")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -88,4 +88,19 @@ describe("Auth", () => {
     ).toBeInTheDocument();
     expect(registerSpy).not.toHaveBeenCalled();
   });
+
+  it("leva à recuperação de senha, que deixou de ser 'em breve'", () => {
+    // Este link já foi um botão desabilitado com um chip "em breve", porque a
+    // rota não existia. Com o #36 ela existe, e um rótulo de estado que não
+    // corresponde mais ao estado é pior que rótulo nenhum.
+    render(
+      <MemoryRouter>
+        <Auth />
+      </MemoryRouter>,
+    );
+
+    const link = screen.getByRole("link", { name: /esqueceu a senha/i });
+    expect(link).toHaveAttribute("href", "/esqueci-senha");
+    expect(screen.queryByText("em breve")).not.toBeInTheDocument();
+  });
 });

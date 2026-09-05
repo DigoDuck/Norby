@@ -128,6 +128,30 @@ class RefreshToken(Base):
 
     user: Mapped["User"] = relationship("User", back_populates="refresh_tokens")
 
+class PasswordResetToken(Base):
+    """Token de recuperação de senha (#36).
+
+    Mesma forma do RefreshToken e pelo mesmo motivo: o token cru vai por e-mail
+    e NUNCA é gravado, só o sha256 dele. Vazamento do banco não entrega poder de
+    redefinir senha de ninguém.
+
+    `used_at` em vez de deletar a linha: uso único fica sendo um fato registrado,
+    e um token reapresentado é distinguível de um token que nunca existiu — o
+    que importa para investigar, e é a mesma escolha que `revoked` no refresh.
+    """
+
+    __tablename__ = "password_reset_tokens"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    used_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class LoginThrottle(Base):
     """Atraso progressivo por conta (issue #22), independente de IP.
 

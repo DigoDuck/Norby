@@ -58,3 +58,23 @@ def refresh_token_key(request: Request) -> str:
     if not token:
         return get_remote_address(request)
     return hashlib.sha256(token.encode()).hexdigest()
+
+
+def reset_email_key(request: Request) -> str:
+    """Chave de rate limit para POST /auth/forgot-password: hash do e-mail.
+
+    Pelo IP não serve, pela mesma razão do logout: atrás do proxy do Railway
+    todo mundo divide o balde. Chavear pelo e-mail faz o teto proteger a CAIXA
+    DE ENTRADA de quem está sendo alvo — sem isso, alguém dispara o formulário
+    contra o mesmo endereço e transforma o Norby em ferramenta de mailbomb.
+
+    O endereço cru nunca vira chave: só o sha256 dele, para o balde do slowapi
+    (em memória, mas ainda assim) não virar uma lista de e-mails cadastrados.
+
+    O router carimba request.state.reset_email numa dependency que roda antes
+    deste decorator, porque o key_func é síncrono e não vê o corpo parseado.
+    """
+    email = getattr(request.state, "reset_email", "")
+    if not email:
+        return get_remote_address(request)
+    return hashlib.sha256(email.lower().encode()).hexdigest()

@@ -7,7 +7,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
-from app.models.sql_models import RefreshToken, User
+from app.models.sql_models import PasswordResetToken, RefreshToken, User
 # Reexportados de propósito: todo o app já importa `hash_password` e
 # `verify_password` daqui, e a troca do passlib (#102) não precisa vazar para
 # os chamadores. Quem quiser o detalhe do esquema lê o password_service.
@@ -136,3 +136,79 @@ async def revoke_refresh_token(raw: str, db: AsyncSession) -> None:
 
     record.revoked = True
     await db.commit()
+
+
+# --- Recuperação de senha (issue #36) ---------------------------------------
+# Mesma forma dos refresh tokens acima, e de propósito: token opaco, só o
+# sha256 no banco, uso único. O que muda é o prazo, muito mais curto, porque
+# este chega por e-mail e caixa comprometida é o vetor que ele abre.
+
+RESET_TTL = timedelta(minutes=settings.password_reset_expire_minutes)
+
+
+async def create_password_reset(user_id: str, db: AsyncSession) -> str:
+    """Emite um token de recuperação e devolve o valor CRU, para o e-mail."""
+    raw = secrets.token_urlsafe(48)
+    db.add(
+        PasswordResetToken(
+            user_id=user_id,
+            token_hash=_hash_token(raw),
+            expires_at=datetime.now(timezone.utc) + RESET_TTL,
+        )
+    )
+    await db.commit()
+    return raw
+
+
+async def reset_password(raw: str, nova_senha: str, db: AsyncSession) -> bool:
+    """Consome o token e troca a senha. Devolve False para token inválido.
+
+    Tudo numa transação só. O `FOR UPDATE` serializa duas apresentações do
+    mesmo token: sem ele, duas requisições simultâneas leriam `used_at` nulo e
+    as duas trocariam a senha — a segunda sobrescrevendo a primeira, o que
+    deixaria a vítima com a senha do atacante.
+
+    Ao trocar a senha, TODA sessão do usuário cai. Quem redefine senha ou
+    esqueceu a antiga ou desconfia que alguém a tem; nos dois casos manter um
+    refresh token vivo de sete dias anularia o motivo de ter redefinido.
+    """
+    result = await db.execute(
+        select(PasswordResetToken)
+        .where(PasswordResetToken.token_hash == _hash_token(raw))
+        .with_for_update()
+    )
+    registro = result.scalar_one_or_none()
+    if registro is None:
+        return False
+
+    # Token já usado e token expirado respondem igual para fora, mas só o
+    # primeiro é sinal: alguém está reapresentando um link que já valeu.
+    if registro.used_at is not None:
+        return False
+    if registro.expires_at <= datetime.now(timezone.utc):
+        return False
+
+    user = await db.get(User, registro.user_id)
+    if user is None:
+        return False
+
+    registro.used_at = datetime.now(timezone.utc)
+    user.password_hash = hash_password(nova_senha)
+
+    # Os OUTROS links pendentes desta pessoa morrem junto. Pedir três e-mails e
+    # usar um não pode deixar dois links vivos numa caixa de entrada.
+    await db.execute(
+        update(PasswordResetToken)
+        .where(
+            PasswordResetToken.user_id == user.id,
+            PasswordResetToken.used_at.is_(None),
+        )
+        .values(used_at=datetime.now(timezone.utc))
+    )
+    await db.execute(
+        update(RefreshToken)
+        .where(RefreshToken.user_id == user.id, RefreshToken.revoked.is_(False))
+        .values(revoked=True)
+    )
+    await db.commit()
+    return True

@@ -13,6 +13,8 @@ import Recurring from "./pages/Recurring";
 import Goals from "./pages/Goals";
 import Privacidade from "./pages/Privacidade";
 import Termos from "./pages/Termos";
+import EsqueciSenha from "./pages/EsqueciSenha";
+import RedefinirSenha from "./pages/RedefinirSenha";
 
 function ProtectedRoute({ children }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -62,6 +64,10 @@ export default function App() {
         <Route path="/" element={<RootRoute />} />
         <Route path="/privacidade" element={<Privacidade />} />
         <Route path="/termos" element={<Termos />} />
+        {/* Públicas de propósito: quem esqueceu a senha não tem como estar
+            autenticado, e o link de redefinição chega por e-mail. */}
+        <Route path="/esqueci-senha" element={<EsqueciSenha />} />
+        <Route path="/redefinir-senha" element={<RedefinirSenha />} />
         <Route
           element={
             <ProtectedRoute>
