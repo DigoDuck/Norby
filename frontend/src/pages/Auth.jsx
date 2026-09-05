@@ -370,26 +370,17 @@ export default function Auth() {
                 </Field>
               )}
 
-              {/* Recuperação de senha ainda não tem rota no backend (/auth expõe
-                  register, login, refresh, logout, me e me/export). Fica
-                  desabilitada com o aviso visível ao lado: um link morto que
-                  não leva a lugar nenhum seria pior do que assumir a lacuna. */}
+              {/* Deixou de ser "em breve" com o #36: /auth/forgot-password
+                  existe. O botão desabilitado e o chip saíram junto — rótulo de
+                  estado que não corresponde mais ao estado é pior que nenhum. */}
               {mode === "login" && (
-                <div className="flex items-center justify-end gap-2 pt-0.5">
-                  <button
-                    type="button"
-                    disabled
-                    aria-describedby="reset-status"
-                    className="text-sm text-content-3"
+                <div className="flex justify-end pt-0.5">
+                  <Link
+                    to="/esqueci-senha"
+                    className="text-sm text-accent hover:underline"
                   >
                     Esqueceu a senha?
-                  </button>
-                  {/* .chip-neutral já é o rótulo de estado do projeto. O 11px
-                      com --content-3 que eu tinha usado media 4,16:1 no tema
-                      claro, abaixo do mínimo de 4,5:1 para texto normal. */}
-                  <span id="reset-status" className="chip-neutral">
-                    em breve
-                  </span>
+                  </Link>
                 </div>
               )}
 

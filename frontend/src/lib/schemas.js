@@ -45,3 +45,35 @@ export const recurringSchema = z
     message: "Selecione o dia da semana",
     path: ["weekday"],
   });
+
+// Recuperação de senha (#36). Espelha o `StrongPassword` do backend
+// (schemas/common.py): 8 a 128 caracteres, ao menos uma letra e um número, e
+// no máximo 72 BYTES — o bcrypt trunca ali e um acento ocupa mais de um byte.
+// Espelhar aqui não substitui a validação do servidor, que continua sendo a
+// que vale; serve para a pessoa descobrir o problema antes de gastar o link,
+// que é de uso único.
+const senhaForte = z
+  .string()
+  .min(8, "Mínimo de 8 caracteres")
+  .max(128, "Máximo de 128 caracteres")
+  .refine((v) => /[A-Za-z]/.test(v) && /\d/.test(v), {
+    message: "Use ao menos uma letra e um número",
+  })
+  .refine((v) => new TextEncoder().encode(v).length <= 72, {
+    message: "Máximo de 72 bytes (acentos contam 2)",
+  });
+
+export const forgotSchema = z.object({
+  email: z.string().min(1, "Informe o e-mail").email("E-mail inválido"),
+});
+
+export const resetSchema = z
+  .object({
+    password: senhaForte,
+    confirm: z.string().min(1, "Repita a senha"),
+  })
+  .refine((d) => d.password === d.confirm, {
+    message: "As senhas não conferem",
+    path: ["confirm"],
+  });
+

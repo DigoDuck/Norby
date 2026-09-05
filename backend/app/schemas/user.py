@@ -1,36 +1,17 @@
-import re
-
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 from uuid import UUID
 from datetime import datetime
 
-from app.schemas.common import PersonName
+from app.schemas.common import PersonName, StrongPassword
 from app.services.plan_service import ai_gate_open, wallet_cap_active
 
 class UserRegister(BaseModel):
     name: PersonName
     email: EmailStr
-    password: str = Field(min_length=8, max_length=128)
+    password: StrongPassword
     # LGPD: aceite explícito, registrado no servidor. O frontend já pedia o
     # checkbox, mas o valor não chegava aqui e nada era persistido.
     accept_privacy: bool
-
-    @field_validator("password")
-    @classmethod
-    def password_forte(cls, v: str) -> str:
-        # Regra mínima: pelo menos uma letra e um número (o min_length já garante 8+)
-        if not re.search(r"[A-Za-z]", v) or not re.search(r"\d", v):
-            raise ValueError("A senha deve ter ao menos 8 caracteres, incluindo uma letra e um número")
-        return v
-
-    @field_validator("password")
-    @classmethod
-    def cabe_no_bcrypt(cls, v: str) -> str:
-        # O bcrypt trunca em 72 bytes e ignora o resto sem avisar. O max_length
-        # do Field conta caracteres, enquanto um acento ocupa mais de um byte.
-        if len(v.encode("utf-8")) > 72:
-            raise ValueError("A senha deve ter no máximo 72 bytes (acentos contam 2)")
-        return v
 
     @field_validator("accept_privacy")
     @classmethod
@@ -130,3 +111,13 @@ class DeleteAccountRequest(BaseModel):
     # Step-up auth: exclusão é irreversível, então não basta ter o access token
     # — é preciso provar posse da senha atual.
     password: str = Field(min_length=1, max_length=128)
+
+
+class ForgotPassword(BaseModel):
+    email: EmailStr
+
+
+class ResetPassword(BaseModel):
+    # 128 cobre o token com folga; o piso evita gastar consulta com string vazia.
+    token: str = Field(min_length=16, max_length=128)
+    new_password: StrongPassword

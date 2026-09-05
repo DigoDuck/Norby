@@ -38,6 +38,17 @@ class Settings(BaseSettings):
     # como destino de redirect seria adivinhação.
     app_base_url: str = "http://localhost:5173"
 
+    # Brevo, e-mail transacional (#36). Mesmo raciocínio do Stripe: default ""
+    # para o merge não derrubar produção antes da variável existir no Railway.
+    # Vazio = recuperação de senha desligada, e o endpoint responde 503 em vez
+    # de fingir que enviou um e-mail que ninguém vai receber.
+    brevo_api_key: str = ""
+    brevo_sender_email: str = "nao-responda@norby.com.br"
+    brevo_sender_name: str = "Norby"
+    # Validade do link de recuperação. Curta de propósito: o link chega por
+    # e-mail, e caixa de e-mail comprometida é o vetor que este token abre.
+    password_reset_expire_minutes: int = 30
+
     # Flag de rollout do paywall (ADR 0002). Default DESLIGADO: o merge não muda
     # nada em produção, e o paywall acende por variável de ambiente quando o
     # dono decidir. Lido SÓ dentro dos helpers de enforcement — um `if` num
