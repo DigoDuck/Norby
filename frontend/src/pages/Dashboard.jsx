@@ -6,9 +6,6 @@ import {
   ArrowRight,
   ArrowUpRight,
   ArrowDownRight,
-  AlertTriangle,
-  Check,
-  Sparkles,
   CalendarDays,
 } from "lucide-react";
 import {
@@ -17,9 +14,6 @@ import {
   XAxis,
   Tooltip,
   ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
   CartesianGrid,
 } from "recharts";
 import { transactionsApi } from "@/api/transactions";
@@ -30,7 +24,6 @@ import { dashboardApi } from "@/api/dashboard";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import NorthStar from "@/components/shared/NorthStar";
-import AiOrb from "@/components/shared/AiOrb";
 import InsightCard from "@/components/dashboard/InsightCard";
 import CategoryDonut from "@/components/dashboard/CategoryDonut";
 import ChartTooltip from "@/components/dashboard/ChartTooltip";
