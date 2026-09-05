@@ -1,7 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import { createElement } from "react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { PRECO_MENSAL } from "@/lib/plano";
 import Privacidade from "./Privacidade";
@@ -93,6 +93,37 @@ describe("Termos de Uso: o que a cobrança obriga a informar", () => {
 
     expect(texto).toContain("Cancelar não apaga nada");
     expect(texto).toContain("72 horas");
+  });
+});
+
+// A identidade do fornecedor é a única parte destas páginas que NÃO vive no
+// código: o CPF vem do painel da Vercel, porque a lei o quer visível no site e
+// este repositório é público. Estes dois testes guardam as duas pontas.
+describe("Termos de Uso: a identidade do fornecedor vem do build", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("mostra nome e documento quando o build os traz", () => {
+    vi.stubEnv("VITE_FORNECEDOR_NOME", "Fulano de Tal");
+    vi.stubEnv("VITE_FORNECEDOR_CPF", "000.000.000-00");
+
+    const texto = renderPage(Termos).container.textContent;
+
+    expect(texto).toContain("Fulano de Tal");
+    expect(texto).toContain("000.000.000-00");
+  });
+
+  it("sem as variáveis, omite o fornecedor em vez de inventar um", () => {
+    // Este teste também é o guarda do repositório público: se alguém voltar a
+    // escrever o nome ou o CPF na unha dentro do componente, ele quebra aqui,
+    // porque o estado vazio deixaria de ser alcançável.
+    vi.stubEnv("VITE_FORNECEDOR_NOME", "");
+    vi.stubEnv("VITE_FORNECEDOR_CPF", "");
+
+    const texto = renderPage(Termos).container.textContent;
+
+    expect(texto).not.toContain("Fornecedor:");
+    expect(texto).not.toContain("CPF/CNPJ:");
+    expect(texto).toContain("contato@norby.com.br");
   });
 });
 
