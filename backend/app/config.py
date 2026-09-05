@@ -27,6 +27,16 @@ class Settings(BaseSettings):
     # até o #26 provisionar a conta.
     stripe_secret_key: str = ""
     stripe_webhook_secret: str = ""
+    # O preço recorrente criado no painel (#26). Vazio = billing não
+    # provisionado, e o endpoint de checkout recusa com 503 em vez de tentar
+    # criar sessão contra um preço que não existe.
+    stripe_price_id: str = ""
+
+    # Base pública do frontend, para onde o Stripe devolve a pessoa depois do
+    # Checkout e do Portal. Default do dev local: em produção vem do ambiente.
+    # Não dá para derivar do CORS — aquilo é uma LISTA, e escolher um item dela
+    # como destino de redirect seria adivinhação.
+    app_base_url: str = "http://localhost:5173"
 
     # Flag de rollout do paywall (ADR 0002). Default DESLIGADO: o merge não muda
     # nada em produção, e o paywall acende por variável de ambiente quando o
