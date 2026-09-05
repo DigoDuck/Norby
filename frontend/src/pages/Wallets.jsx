@@ -3,11 +3,13 @@ import { Plus, Pencil, Trash2, Wallet } from "lucide-react";
 import { walletsApi } from "@/api/wallets";
 import { apiErrorMessage, formatBRL, shadcnInputCls } from "@/lib/utils";
 import { CHART_SERIES, hashIndex } from "@/lib/palette";
+import { banco, OPCOES_BANCO } from "@/lib/bancos";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import Money from "@/components/shared/Money";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MoneyInput } from "@/components/ui/money-input";
+import { Select } from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -15,8 +17,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-// Cor do chip do ícone, determinística pelo nome da carteira (só apresentação).
-const chipColor = (name) => CHART_SERIES[hashIndex(name, CHART_SERIES.length)];
+// Cor do chip, determinística e só apresentação. Chaveada pelo BANCO quando
+// existe um, para que todas as carteiras do mesmo banco fiquem iguais entre si;
+// sem banco, cai no nome, que é como sempre foi. A paleta continua sendo a do
+// app: cor de marca seria hex fixo, e o DESIGN.md mede contraste sobre o vidro
+// nos DOIS temas — um hex passa num e reprova no outro.
+const chipColor = (chave) => CHART_SERIES[hashIndex(chave, CHART_SERIES.length)];
 
 export default function Wallets() {
   const [wallets, setWallets] = useState([]);
@@ -24,9 +30,10 @@ export default function Wallets() {
   const [editing, setEditing] = useState(null);
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ name: "", balance: "" });
+  const [form, setForm] = useState({ name: "", balance: "", bank: "" });
   const nomeId = useId();
   const saldoId = useId();
+  const bancoId = useId();
   // Qual botão abriu o diálogo. O Dialog é controlado por estado, sem
   // DialogTrigger, então o Base UI não tem para onde devolver o foco ao fechar
   // e o usuário de teclado caía no body.
@@ -52,16 +59,22 @@ export default function Wallets() {
     try {
       if (editing) {
         // Saldo não é editável: deriva das transações. Edita só o nome.
-        await walletsApi.update(editing.id, { name: form.name });
+        // `bank: null` seria descartado pelo `exclude_none` do backend, então
+        // "sem banco" só existe na criação. Trocar de banco funciona.
+        await walletsApi.update(editing.id, {
+          name: form.name,
+          ...(form.bank ? { bank: form.bank } : {}),
+        });
       } else {
         await walletsApi.create({
           name: form.name,
           balance: form.balance === "" ? 0 : form.balance,
+          ...(form.bank ? { bank: form.bank } : {}),
         });
       }
       setOpen(false);
       setEditing(null);
-      setForm({ name: "", balance: "" });
+      setForm({ name: "", balance: "", bank: "" });
       load();
     } catch (err) {
       setError(apiErrorMessage(err, "Não foi possível salvar a carteira."));
@@ -79,14 +92,14 @@ export default function Wallets() {
     ultimoGatilho.current = e?.currentTarget ?? null;
     setEditing(null);
     setError(null);
-    setForm({ name: "", balance: "" });
+    setForm({ name: "", balance: "", bank: "" });
     setOpen(true);
   }
 
   function openEdit(wallet, e) {
     ultimoGatilho.current = e?.currentTarget ?? null;
     setEditing(wallet);
-    setForm({ name: wallet.name, balance: wallet.balance });
+    setForm({ name: wallet.name, balance: wallet.balance, bank: wallet.bank || "" });
     setError(null);
     setOpen(true);
   }
@@ -163,6 +176,18 @@ export default function Wallets() {
                 className={shadcnInputCls}
               />
             </div>
+            <div>
+              <label htmlFor={bancoId} className="block text-xs font-medium text-content-2 mb-2">
+                Banco <span className="text-content-3">(opcional)</span>
+              </label>
+              <Select
+                id={bancoId}
+                value={form.bank}
+                placeholder="Sem banco"
+                options={OPCOES_BANCO}
+                onChange={(v) => setForm({ ...form, bank: v })}
+              />
+            </div>
             {!editing && (
               <div>
                 <label htmlFor={saldoId} className="block text-xs font-medium text-content-2 mb-2">
@@ -224,7 +249,8 @@ export default function Wallets() {
         )}
 
         {wallets.map((w) => {
-          const color = chipColor(w.name);
+          const b = banco(w.bank);
+          const color = chipColor(w.bank || w.name);
           return (
             <div
               key={w.id}
@@ -239,7 +265,7 @@ export default function Wallets() {
                     color,
                   }}
                 >
-                  {w.name?.[0]?.toUpperCase() || "?"}
+                  {b ? b.marca : w.name?.[0]?.toUpperCase() || "?"}
                 </div>
               </div>
 
