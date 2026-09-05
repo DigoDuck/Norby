@@ -246,3 +246,27 @@ async def test_the_email_carries_a_link_to_the_reset_page(client, enviados):
     # A pessoa precisa saber que o link morre, senão um link expirado parece
     # um link quebrado e vira chamado de suporte.
     assert "30 minutos" in html
+
+
+@pytest.mark.asyncio
+async def test_the_email_does_not_look_like_marketing(client, enviados):
+    """Medido, não suposto.
+
+    A primeira versão tinha um botão colorido com padding e uma segunda linha
+    repetindo a URL. O Gmail entregou em PROMOÇÕES, o que para recuperação de
+    senha é quase tão ruim quanto spam: quem está trancado para fora não
+    procura naquela aba. Um link em texto sinaliza correspondência; botão e
+    links repetidos sinalizam campanha.
+
+    O pixel de abertura e a reescrita de links que o Brevo injeta continuam
+    lá — não são desligáveis por mensagem na API, e por isso não são testáveis
+    aqui. Este teste guarda a parte que é nossa.
+    """
+    email, _ = await registrar(client)
+    await client.post("/auth/forgot-password", json={"email": email})
+    html = enviados[-1]["html"]
+
+    assert html.count("<a ") == 1, "mais de um link volta a parecer campanha"
+    assert "background:" not in html, "botao colorido e o sinal mais forte de promocao"
+    assert "<img" not in html
+

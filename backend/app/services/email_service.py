@@ -81,19 +81,31 @@ async def enviar_email(*, para: str, assunto: str, html: str) -> str:
 def html_recuperacao(link: str) -> str:
     """Corpo do e-mail de recuperação.
 
-    Texto curto de propósito. E-mail de recuperação é lido com pressa, muitas
-    vezes no celular, por alguém já irritado por não conseguir entrar: cada
-    frase a mais é uma chance de a pessoa não achar o botão.
+    ESCRITO PARA NÃO PARECER MARKETING, e isso foi medido, não suposto: a
+    primeira versão tinha um botão azul com padding e borda arredondada, mais
+    uma segunda linha repetindo a URL, e o Gmail entregou em PROMOÇÕES. Para
+    recuperação de senha isso é quase tão ruim quanto spam — quem está trancado
+    para fora não procura naquela aba.
 
-    O prazo aparece porque um link que morre calado parece um link quebrado, e
-    a linha final existe porque quem NÃO pediu precisa saber que não há nada a
-    fazer — sem ela, o e-mail assusta em vez de informar.
+    O que mudou e por quê:
+
+    - UM link, em texto, e não um botão. Botão colorido é sinal de campanha; um
+      link inline é sinal de correspondência.
+    - A URL aparece por extenso, então a linha "ou copie este endereço" saiu.
+      Ela dobrava a contagem de links sem acrescentar nada.
+    - Sem cor, sem imagem, sem CSS além do mínimo. Marcação leve pesa a favor.
+
+    O que NÃO dá para consertar aqui: o Brevo injeta pixel de abertura e
+    reescreve os links para rastrear clique, e isso não é desligável por
+    mensagem na API. É o sinal de promoção que sobra, e o preço da plataforma.
+
+    Texto curto de propósito. E-mail de recuperação é lido com pressa, muitas
+    vezes no celular, por alguém já irritado por não conseguir entrar.
     """
-    return f"""\
-<div style="font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#1a1a1a;line-height:1.6">
+    return f"""<div style="font-family:system-ui,-apple-system,Segoe UI,sans-serif;line-height:1.6">
   <p>Você pediu para redefinir sua senha do Norby.</p>
-  <p><a href="{link}" style="display:inline-block;padding:12px 20px;background:#0b5c73;color:#fff;text-decoration:none;border-radius:8px">Redefinir minha senha</a></p>
-  <p style="font-size:13px;color:#555">Ou copie este endereço: {link}</p>
-  <p style="font-size:13px;color:#555">O link vale por 30 minutos e só pode ser usado uma vez.</p>
-  <p style="font-size:13px;color:#555">Se não foi você que pediu, ignore este e-mail: sua senha continua a mesma.</p>
+  <p>Abra este endereço para criar uma nova senha:</p>
+  <p><a href="{link}">{link}</a></p>
+  <p>O link vale por 30 minutos e só pode ser usado uma vez.</p>
+  <p>Se não foi você que pediu, ignore este e-mail: sua senha continua a mesma.</p>
 </div>"""
