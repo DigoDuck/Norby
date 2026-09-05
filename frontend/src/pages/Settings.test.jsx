@@ -10,6 +10,8 @@ vi.mock("@/api/account", () => ({
   accountApi: {
     deleteAccount: vi.fn(),
     exportData: vi.fn(),
+    uploadPhoto: vi.fn(),
+    deletePhoto: vi.fn(),
   },
 }));
 
@@ -94,5 +96,77 @@ describe("Settings", () => {
       screen.getByLabelText("Digite EXCLUIR para confirmar"),
     ).toBeInTheDocument();
     expect(screen.getByLabelText("Sua senha atual")).toBeInTheDocument();
+  });
+});
+
+describe("Settings, foto de perfil", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useAuthStore.getState().login("access", "refresh", {
+      name: "Alice",
+      email: "alice@test.com",
+      photo_updated_at: null,
+    });
+  });
+
+  function escolher(file) {
+    fireEvent.change(screen.getByLabelText("Adicionar foto"), {
+      target: { files: [file] },
+    });
+  }
+
+  it("uploads the chosen file and records the new version on the user", async () => {
+    accountApi.uploadPhoto.mockResolvedValue({
+      data: { photo_updated_at: "2026-09-04T12:00:00Z" },
+    });
+    renderSettings();
+
+    const file = new File(["x"], "eu.png", { type: "image/png" });
+    escolher(file);
+
+    await waitFor(() => expect(accountApi.uploadPhoto).toHaveBeenCalledWith(file));
+    // A versão é o que o AppLayout observa para baixar a foto processada.
+    await waitFor(() =>
+      expect(useAuthStore.getState().user.photo_updated_at).toBe("2026-09-04T12:00:00Z"),
+    );
+  });
+
+  it("refuses a file over the cap without spending an upload", async () => {
+    renderSettings();
+
+    const gigante = new File([new Uint8Array(2 * 1024 * 1024 + 1)], "g.png", {
+      type: "image/png",
+    });
+    escolher(gigante);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("no máximo 2 MB");
+    expect(accountApi.uploadPhoto).not.toHaveBeenCalled();
+  });
+
+  it("shows the failure instead of pretending the upload worked", async () => {
+    accountApi.uploadPhoto.mockRejectedValue({
+      response: { data: { detail: "Formato de imagem não aceito" } },
+    });
+    renderSettings();
+
+    escolher(new File(["x"], "eu.txt", { type: "image/png" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Formato de imagem não aceito",
+    );
+    expect(useAuthStore.getState().user.photo_updated_at).toBeNull();
+  });
+
+  it("removes the photo and clears the version", async () => {
+    useAuthStore.getState().updateUser({ photo_updated_at: "2026-09-04T12:00:00Z" });
+    accountApi.deletePhoto.mockResolvedValue({});
+    renderSettings();
+
+    fireEvent.click(screen.getByRole("button", { name: "Remover" }));
+
+    await waitFor(() => expect(accountApi.deletePhoto).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(useAuthStore.getState().user.photo_updated_at).toBeNull(),
+    );
   });
 });

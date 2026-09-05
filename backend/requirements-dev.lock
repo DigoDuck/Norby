@@ -117,6 +117,8 @@ packaging==26.2
     #   pytest
 passlib==1.7.4
     # via -r requirements.txt
+pillow==12.3.0
+    # via -r requirements.txt
 pip==26.1.2
     # via pip-api
 pip-api==0.0.34
@@ -167,6 +169,8 @@ python-dotenv==1.2.3
     #   pydantic-settings
     #   uvicorn
 python-jose==3.5.0
+    # via -r requirements.txt
+python-multipart==0.0.32
     # via -r requirements.txt
 pyyaml==6.0.3
     # via uvicorn

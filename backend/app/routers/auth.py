@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.encoders import jsonable_encoder
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, select
@@ -21,6 +21,7 @@ from app.services.auth_service import (
     _DUMMY_HASH,
 )
 from app.services.account_service import delete_account, export_data
+from app.services.photo_service import MAX_BYTES, PhotoInvalid, PhotoTooLarge, processar_foto
 from app.services.billing_service import GatewayCancelFailed
 from app.services.plan_service import AI_TRIAL
 from app.services.throttle_service import check_throttle, record_failure, record_success
@@ -247,6 +248,115 @@ async def update_me(
         raise HTTPException(status_code=400, detail="Email já cadastrado")
     await db.refresh(current_user)
     return current_user
+
+
+# --- Foto de perfil (issue #35) ----------------------------------------------
+
+
+@router.put("/me/photo")
+# Processar imagem custa CPU, ao contrário das outras escritas deste router.
+# Chave por usuário porque atrás do proxy do Railway um teto por IP viraria um
+# balde único para todo mundo (ver "Rate limit atrás do proxy" no AGENTS.md).
+@limiter.limit("10/minute", key_func=user_key)
+async def upload_my_photo(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Recebe a imagem no corpo CRU, não em multipart.
+
+    O teto precisa valer ANTES de o servidor materializar o arquivo, e o
+    multipart do FastAPI só entrega o arquivo depois de já tê-lo despejado em
+    disco. Mesmo desenho do webhook do Stripe, pelo mesmo motivo. De quebra,
+    dispensa a dependência `python-multipart` e o frontend manda o File direto,
+    sem montar FormData.
+
+    O `Content-Type` declarado é ignorado de propósito: quem decide o formato é
+    o conteúdo, lido pelo Pillow.
+    """
+    declarado = request.headers.get("content-length")
+    if declarado and declarado.isdigit() and int(declarado) > MAX_BYTES:
+        raise HTTPException(status_code=413, detail="A imagem deve ter no máximo 2 MB")
+
+    # A segunda checagem cobre quem omite o header ou mente nele, e o
+    # `processar_foto` ainda repete o teto por ser função pública do service.
+    corpo = b""
+    async for pedaco in request.stream():
+        corpo += pedaco
+        if len(corpo) > MAX_BYTES:
+            raise HTTPException(status_code=413, detail="A imagem deve ter no máximo 2 MB")
+
+    try:
+        # Bloqueante (decodifica e reescala): vai para thread, como o bcrypt.
+        current_user.photo = await asyncio.to_thread(processar_foto, corpo)
+    except PhotoTooLarge as erro:
+        raise HTTPException(status_code=413, detail=str(erro))
+    except PhotoInvalid as erro:
+        raise HTTPException(status_code=400, detail=str(erro))
+
+    current_user.photo_updated_at = datetime.now(timezone.utc)
+    await db.commit()
+    return {"photo_updated_at": current_user.photo_updated_at}
+
+
+@router.get("/me/photo")
+async def get_my_photo(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Rota FECHADA, com token.
+
+    A tentação era abri-la, porque `<img src>` não manda header de autorização.
+    Mas foto de perfil é dado pessoal, e o frontend baixa uma vez com o token e
+    guarda como data URI — o que também evita mexer no `img-src` da CSP, que
+    `blob:` exigiria.
+    """
+    if not current_user.photo_updated_at:
+        raise HTTPException(status_code=404, detail="Sem foto de perfil")
+
+    # ETag pela DATA, não por hash dos bytes: ela já está carregada e muda a
+    # cada upload, que é exatamente quando o cache precisa cair. Hash exigiria
+    # LER o blob para responder 304, que é justamente o que o 304 evita.
+    # Microssegundos, não segundos: dois uploads no mesmo segundo gerariam o
+    # mesmo ETag e a pessoa continuaria vendo a foto antiga (o teste pegou).
+    etag = f'"{current_user.photo_updated_at.timestamp():.6f}"'
+    if request.headers.get("if-none-match") == etag:
+        # Sai ANTES de tocar no banco: o 304 é justamente a resposta que não
+        # deve custar a leitura do blob.
+        return Response(status_code=304, headers={"ETag": etag})
+
+    # SELECT só da coluna. Ler `current_user.photo` seria um lazy load do
+    # atributo deferido, e lazy load em sessão async estoura com MissingGreenlet
+    # — o `deferred` que evita carregar o blob em toda requisição obriga a
+    # buscá-lo explicitamente aqui.
+    foto = await db.scalar(select(User.photo).where(User.id == current_user.id))
+    if not foto:
+        raise HTTPException(status_code=404, detail="Sem foto de perfil")
+
+    return Response(
+        content=foto,
+        media_type="image/webp",
+        headers={
+            "ETag": etag,
+            # `private`: é foto de UMA pessoa, nenhum proxy compartilhado pode
+            # guardá-la. `must-revalidate` com max-age=0 troca o download por
+            # um 304 vazio quando nada mudou.
+            "Cache-Control": "private, max-age=0, must-revalidate",
+        },
+    )
+
+
+@router.delete("/me/photo", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_my_photo(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    # Idempotente: apagar quem já não tem foto também devolve 204.
+    current_user.photo = None
+    current_user.photo_updated_at = None
+    await db.commit()
+
 
 @router.get("/me/export")
 async def export_my_data(

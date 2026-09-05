@@ -74,6 +74,10 @@ class UserResponse(BaseModel):
     name: str
     email: str
     created_at: datetime
+    # Só a DATA da foto, nunca os bytes: o blob desce por rota própria, com
+    # cache, em vez de ser rebaixado a passageiro de todo /auth/me. Nulo
+    # significa "sem foto", e é também a chave de cache do cliente.
+    photo_updated_at: datetime | None
     plan: PlanResponse
 
     model_config = ConfigDict(from_attributes=True)
@@ -96,6 +100,7 @@ class UserResponse(BaseModel):
             "name": data.name,
             "email": data.email,
             "created_at": data.created_at,
+            "photo_updated_at": data.photo_updated_at,
             "plan": {
                 "ai_allowed": ai_gate_open(data),
                 "wallet_cap_applies": wallet_cap_active(data),

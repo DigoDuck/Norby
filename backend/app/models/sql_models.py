@@ -5,7 +5,7 @@ from enum import Enum as PyEnum
 from typing import Optional, List
 
 from sqlalchemy import (
-    String, DateTime, Date, Numeric, ForeignKey,
+    String, DateTime, Date, Numeric, ForeignKey, LargeBinary,
     Enum, Integer, Boolean, CheckConstraint, Index, text
 )
 from sqlalchemy.dialects.postgresql import UUID
@@ -89,6 +89,20 @@ class User(Base):
     # e dois customer.subscription.updated invertidos empurrariam premium_until
     # para trás ou ressuscitariam um cancel_at_period_end velho.
     stripe_event_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    # --- Foto de perfil (issue #35) -----------------------------------------
+    # Só o resultado do processamento mora aqui: 128x128 WebP, ~8 KB. Guardar o
+    # ORIGINAL é o que estoura o free tier do Neon, não o fato de ser bytea.
+    # `deferred`: sem isto TODA consulta de usuário — ou seja, toda requisição
+    # autenticada, via get_current_user — arrastaria o blob do banco à toa.
+    photo: Mapped[Optional[bytes]] = mapped_column(
+        LargeBinary, nullable=True, deferred=True
+    )
+    # Existe para o cliente saber DUAS coisas sem baixar nada: se há foto, e se
+    # a que ele tem em mãos envelheceu. Nulo significa "sem foto".
+    photo_updated_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
 

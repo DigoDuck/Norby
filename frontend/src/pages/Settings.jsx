@@ -15,8 +15,14 @@ import { authApi } from "@/api/auth";
 import { accountApi } from "@/api/account";
 import { apiErrorMessage, shadcnInputCls } from "@/lib/utils";
 import ThemeToggle from "@/components/shared/ThemeToggle";
+import Avatar from "@/components/shared/Avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+
+// Mesmo teto do backend (app/services/photo_service.py). Duplicado de
+// propósito: o servidor continua sendo quem decide, isto só evita a subida
+// inútil de um arquivo que já se sabe grande demais.
+const MAX_FOTO_BYTES = 2 * 1024 * 1024;
 
 // Header padrão de seção: ícone semântico + título.
 function SectionHead({ icon, children, danger }) {
@@ -45,12 +51,16 @@ export default function Settings() {
   // árvore sem duplicar id, que quebraria a associação label/campo.
   const nomeId = useId();
   const emailId = useId();
+  const fotoId = useId();
   const [form, setForm] = useState({
     name: user?.name || "",
     email: user?.email || "",
   });
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState(null);
+
+  const [photoError, setPhotoError] = useState("");
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   const [exporting, setExporting] = useState(false);
   const [confirmText, setConfirmText] = useState("");
@@ -61,6 +71,44 @@ export default function Settings() {
   async function handleLogout() {
     await authApi.logout();
     navigate("/");
+  }
+
+  async function handlePhotoChange(e) {
+    const file = e.target.files?.[0];
+    // Zera o input: sem isso, escolher o MESMO arquivo depois de um erro não
+    // dispara change de novo e a tela fica parecendo travada.
+    e.target.value = "";
+    if (!file) return;
+
+    setPhotoError("");
+    // O servidor recusa igual; conferir aqui só evita subir 20 MB para ouvir não.
+    if (file.size > MAX_FOTO_BYTES) {
+      setPhotoError("A imagem deve ter no máximo 2 MB.");
+      return;
+    }
+
+    setUploadingPhoto(true);
+    try {
+      const { data } = await accountApi.uploadPhoto(file);
+      // Guarda só a versão: quem baixa a foto processada (128x128 WebP) é o
+      // AppLayout. Mostrar o arquivo local seria mostrar um recorte diferente
+      // do que ficou salvo.
+      updateUser({ photo_updated_at: data.photo_updated_at });
+    } catch (err) {
+      setPhotoError(apiErrorMessage(err, "Não foi possível enviar a foto."));
+    } finally {
+      setUploadingPhoto(false);
+    }
+  }
+
+  async function handlePhotoRemove() {
+    setPhotoError("");
+    try {
+      await accountApi.deletePhoto();
+      updateUser({ photo_updated_at: null });
+    } catch (err) {
+      setPhotoError(apiErrorMessage(err, "Não foi possível remover a foto."));
+    }
   }
 
   async function handleExport() {
@@ -145,16 +193,50 @@ export default function Settings() {
         <SectionHead icon={User}>Perfil</SectionHead>
 
         <div className="flex items-center gap-4 mb-6">
-          <div className="w-16 h-16 rounded-full bg-accent-fill flex items-center justify-center text-2xl font-bold text-accent-contrast shrink-0">
-            {user?.name?.[0]?.toUpperCase() || "U"}
-          </div>
-          <div>
+          <Avatar name={user?.name} className="w-16 h-16" fallbackClassName="text-2xl" />
+          <div className="min-w-0">
             <p className="font-semibold text-content">{user?.name}</p>
             <p className="text-sm text-content-2">
               {memberSince ? `Membro desde ${memberSince}` : user?.email}
             </p>
+
+            <div className="flex flex-wrap items-center gap-3 mt-2">
+              {/* Label + input escondido: o input de arquivo nativo não é
+                  estilizável, e trocá-lo por um <button> que clica nele por JS
+                  quebraria o teclado. O label já é o rótulo acessível. */}
+              <label
+                htmlFor={fotoId}
+                className="text-xs font-medium text-accent cursor-pointer hover:underline focus-within:underline"
+              >
+                {uploadingPhoto ? "Enviando…" : user?.photo_updated_at ? "Trocar foto" : "Adicionar foto"}
+                <input
+                  id={fotoId}
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  disabled={uploadingPhoto}
+                  onChange={handlePhotoChange}
+                />
+              </label>
+
+              {user?.photo_updated_at && (
+                <button
+                  type="button"
+                  onClick={handlePhotoRemove}
+                  className="text-xs font-medium text-content-2 hover:text-content transition-colors"
+                >
+                  Remover
+                </button>
+              )}
+            </div>
           </div>
         </div>
+
+        {photoError && (
+          <p role="alert" className="text-xs text-danger mb-4">
+            {photoError}
+          </p>
+        )}
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
