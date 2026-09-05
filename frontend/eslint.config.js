@@ -23,7 +23,6 @@ export default defineConfig([
       },
     },
     rules: {
-      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
       // Permite exportar constantes (ex.: as variantes cva do shadcn) junto do componente.
       'react-refresh/only-export-components': ['error', { allowConstantExport: true }],
     },
