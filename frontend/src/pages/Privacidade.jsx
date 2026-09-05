@@ -132,8 +132,8 @@ export default function Privacidade() {
             <p className="leading-relaxed text-content-2">
               Para exercer seus direitos ou tirar dúvidas sobre privacidade, fale
               com o controlador pelo e-mail{" "}
-              <a className="text-accent hover:underline" href="mailto:privacidade@norby.app">
-                privacidade@norby.app
+              <a className="text-accent hover:underline" href="mailto:privacidade@norby.com.br">
+                privacidade@norby.com.br
               </a>
               . Sobre cobrança, cancelamento e reembolso, veja os{" "}
               <Link to="/termos" className="text-accent hover:underline">

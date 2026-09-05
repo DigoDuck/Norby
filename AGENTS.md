@@ -213,8 +213,11 @@ cookie `HttpOnly` + access só em memória, mas o frontend (`vercel.app`) e a AP
 seria bloqueado pelo Safari ITP e pelo Chrome, deslogando o usuário a cada
 recarga. Mitigações no lugar: CSP restritiva no `vercel.json`, access token de
 15 min e revogação de todas as sessões quando um refresh token é reusado.
-**Pré-requisito para migrar:** domínio próprio com API e frontend no mesmo site
-registrável (`norby.app` + `api.norby.app`) — aí o cookie vira `SameSite=Lax`.
+**Pré-requisito para migrar: CUMPRIDO em 2026-09-05.** `norby.com.br` foi
+adquirido, então API e frontend podem passar a viver no mesmo site registrável
+(`norby.com.br` + `api.norby.com.br`) e o cookie vira `SameSite=Lax`. A razão
+que segurava a correção canônica deixou de existir; falta apontar os domínios e
+fazer a migração.
 
 **Rate limit atrás do proxy — reescrito em 2026-08-16 (issue #22, fix round 1
 incluído):** o uvicorn só honra `X-Forwarded-For` quando o peer é

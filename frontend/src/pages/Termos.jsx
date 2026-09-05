@@ -18,7 +18,7 @@ import { PRECO_MENSAL } from "@/lib/plano";
 const FORNECEDOR = {
   nome: "",
   documento: "",
-  email: "contato@norby.app",
+  email: "contato@norby.com.br",
 };
 
 export default function Termos() {

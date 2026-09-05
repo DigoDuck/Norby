@@ -4,7 +4,7 @@
 > substitui revisão jurídica**. Mantido versionado no repo porque `docs/` é
 > ignorado pelo git (ver `.gitignore`).
 
-Controlador: **Norby** · Contato do titular: `privacidade@norby.app`
+Controlador: **Norby** · Contato do titular: `privacidade@norby.com.br`
 
 ## 1. Inventário de dados e base legal
 
