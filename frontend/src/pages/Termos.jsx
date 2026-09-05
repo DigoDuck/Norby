@@ -4,24 +4,38 @@ import { ArrowLeft } from "lucide-react";
 import { PRECO_MENSAL } from "@/lib/plano";
 
 /**
- * Identidade do fornecedor.
+ * Identidade do fornecedor: vem do BUILD, não do código.
  *
  * O Decreto nº 7.962/2013, art. 2º, I e II, exige que o site de comércio
  * eletrônico traga o NOME e o CPF/CNPJ de quem vende, mais um endereço
  * eletrônico de contato. Não é recomendação, é condição para cobrar.
  *
- * PREENCHER ANTES DE LIGAR O PAYWALL EM PRODUÇÃO. Fica isolado aqui de
- * propósito: é uma edição de duas linhas, e assim o CPF entra no repositório
- * por decisão consciente de quem edita, não porque veio junto num commit
- * grande. Enquanto `nome` estiver vazio a seção mostra só o e-mail.
+ * Por que variável de ambiente e não literal aqui: a lei exige o CPF visível
+ * no SITE, não no repositório, e este repositório é PÚBLICO. São exposições
+ * diferentes. O conteúdo do site sai do ar no dia em que o dono quiser; o
+ * histórico de um git público é permanente e viaja em todo clone e fork.
+ * Embutido no bundle em tempo de build, o CPF aparece em norby.com.br e
+ * cumpre o decreto; no dia em que houver CNPJ, troca-se a variável sem deixar
+ * o CPF para trás.
+ *
+ * PREENCHER ANTES DE LIGAR O PAYWALL, no painel da Vercel:
+ *   VITE_FORNECEDOR_NOME
+ *   VITE_FORNECEDOR_CPF
+ * São embutidas no build, então mudá-las exige REDEPLOY, igual à
+ * `VITE_API_URL`. Faltando, a seção 2 mostra só o e-mail: a falha aparece na
+ * própria página que a torna ilegal, o que é melhor do que silencioso, mas
+ * continua sendo falha.
  */
-const FORNECEDOR = {
-  nome: "",
-  documento: "",
-  email: "contato@norby.com.br",
-};
-
 export default function Termos() {
+  // Lido a cada render, e não no topo do módulo, para que o teste consiga
+  // exercitar os dois estados. Como efeito colateral útil, o teste do estado
+  // vazio falha se alguém voltar a escrever nome ou CPF na unha aqui.
+  const FORNECEDOR = {
+    nome: import.meta.env.VITE_FORNECEDOR_NOME || "",
+    documento: import.meta.env.VITE_FORNECEDOR_CPF || "",
+    email: "contato@norby.com.br",
+  };
+
   return (
     <div className="app-mesh min-h-screen bg-bg-base px-4 py-8 text-content sm:py-12">
       <main className="mx-auto max-w-3xl">
