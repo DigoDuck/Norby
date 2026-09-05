@@ -46,6 +46,19 @@ describe.each([
       );
     }
   });
+
+  it("aponta o contato para um domínio que é nosso", () => {
+    // Isto já esteve errado: as duas páginas nasceram apontando para
+    // `norby.app`, que nunca foi nosso. Num documento legal isso não é typo.
+    // O Decreto 7.962/2013 exige endereço eletrônico do fornecedor e a LGPD
+    // exige canal do controlador, e um e-mail que ninguém recebe é PIOR que
+    // nenhum, porque parece um: a pessoa escreve, ninguém responde, e o
+    // registro mostra que ela tentou.
+    const { container } = renderPage(Page);
+
+    expect(container.textContent).toContain("@norby.com.br");
+    expect(container.textContent).not.toMatch(/norby\.app/);
+  });
 });
 
 // Conteúdo que existe por obrigação legal, não por estilo. Um refactor de
