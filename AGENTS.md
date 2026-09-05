@@ -336,6 +336,12 @@ nunca esgota o próprio balde).
   E como `/auth/forgot-password` responde 202 exista ou não a conta, a falha não
   aparece para quem pediu o link: some no log do servidor. Manter DESLIGADO
   enquanto o egresso não for estático. Teto do plano gratuito: 300 e-mails/dia.
+- **Ligar `PAYWALL_ENABLED` sem `VITE_FORNECEDOR_NOME` e `VITE_FORNECEDOR_CPF`
+  na Vercel é cobrar com Termos incompletos.** O Decreto 7.962/2013, art. 2º, I
+  exige nome e CPF/CNPJ do vendedor no site; sem as variáveis, a seção 2 dos
+  Termos mostra só o e-mail. Elas ficam fora do código porque o repositório é
+  público e histórico de git não se apaga, mas são **embutidas no build**: mudar
+  exige REDEPLOY, igual à `VITE_API_URL`.
 
 **`docker-compose.prod.yml` + `Caddyfile`:** rota **alternativa self-hosted (VPS)**,
 **não usada** pelo deploy atual no Railway. Sobem backend + Postgres + Mongo num
