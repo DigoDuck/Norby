@@ -161,6 +161,14 @@ App no ar, deploy a partir da branch `main`:
 - **Frontend:** Vercel — `https://norby-finance.vercel.app`. `VITE_API_URL`
   aponta pro Railway (**embutida no build** → mudou, tem que rebuildar).
 
+⚠️ **Trocar o host da API é DUAS mudanças, e a ordem importa.** O
+`connect-src` da CSP em `frontend/vercel.json` lista os hosts permitidos na
+unha. Apontar a `VITE_API_URL` para um host que não está lá faz o navegador
+**bloquear toda chamada**, e isso não aparece como erro de build nem de deploy:
+a tela sobe e as requisições morrem. Primeiro o host entra na CSP e vai para
+produção, depois a variável muda. Durante a transição os dois hosts ficam
+listados; o antigo só sai quando ninguém mais o usa.
+
 Start em produção: `backend/start.sh` roda `alembic upgrade head` + uvicorn na
 `$PORT` do provedor (o `CMD` do `backend/Dockerfile`; o `docker-compose.yml` de
 dev sobrescreve com `--reload`).
