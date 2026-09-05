@@ -327,3 +327,129 @@ async def reconcile_subscription(user: User, db: AsyncSession) -> bool:
     await db.commit()
     logger.info("stripe: assinatura de %s reconciliada (%s)", user.id, sub.get("status"))
     return True
+
+
+# --- Checkout e Customer Portal (issue #46) ----------------------------------
+# As duas saídas ao Stripe que o USUÁRIO alcança, ambas HOSPEDADAS. O Payment
+# Element exigiria abrir a CSP para js.stripe.com mais frames — afrouxar a CSP
+# na mesma release que começa a processar pagamento. O preço é real e não está
+# escondido: a pessoa sai do app na hora de pagar.
+
+
+class GatewayError(Exception):
+    """O gateway não respondeu ou recusou a criação da sessão.
+
+    Vira 502 no router, e não 500: a falha é de um terceiro, e a mensagem
+    precisa dizer isso para a pessoa saber que tentar de novo faz sentido.
+    """
+
+
+class CheckoutNotOurs(Exception):
+    """A sessão apresentada não pertence a quem está pedindo."""
+
+
+class CheckoutNotPaid(Exception):
+    """A sessão existe mas não foi paga."""
+
+
+async def create_checkout_session(
+    *,
+    client_reference_id: str,
+    price_id: str,
+    customer_id: str | None,
+    success_url: str,
+    cancel_url: str,
+) -> str:
+    """Cria a sessão de Checkout e devolve a URL para onde redirecionar.
+
+    `client_reference_id` é o id do usuário, e é a ÚNICA vez em que o Stripe
+    ainda não sabe quem é a pessoa — o `_dono` do webhook depende dele para
+    casar a primeira compra. Dali em diante casa por `stripe_customer_id`.
+    """
+    parametros = {
+        "mode": "subscription",
+        "line_items": [{"price": price_id, "quantity": 1}],
+        "client_reference_id": client_reference_id,
+        "success_url": success_url,
+        "cancel_url": cancel_url,
+        "locale": "pt-BR",
+    }
+    # Reaproveita o customer de quem já comprou antes. Deixar o Stripe criar um
+    # segundo deixaria metade dos eventos futuros sem dono, porque a busca é
+    # por `stripe_customer_id`.
+    if customer_id:
+        parametros["customer"] = customer_id
+
+    try:
+        sessao = await stripe.checkout.Session.create_async(
+            **parametros, api_key=_chave()
+        )
+    except Exception as erro:  # noqa: BLE001 — rede, credencial ou 4xx do Stripe
+        raise GatewayError(str(erro)) from erro
+    return sessao.url
+
+
+async def create_portal_session(*, customer_id: str, return_url: str) -> str:
+    """Cria a sessão do Customer Portal e devolve a URL.
+
+    Cancelamento, troca de cartão e histórico de faturas numa superfície só. Um
+    endpoint próprio de cancelar entregaria um terço da feature.
+    """
+    try:
+        sessao = await stripe.billing_portal.Session.create_async(
+            customer=customer_id, return_url=return_url, api_key=_chave()
+        )
+    except Exception as erro:  # noqa: BLE001
+        raise GatewayError(str(erro)) from erro
+    return sessao.url
+
+
+async def fetch_checkout_session(session_id: str) -> dict:
+    """Lê a sessão de Checkout. Saída de rede, e é ela que os testes stubam."""
+    try:
+        sessao = await stripe.checkout.Session.retrieve_async(
+            session_id, api_key=_chave()
+        )
+    except Exception as erro:  # noqa: BLE001
+        raise GatewayError(str(erro)) from erro
+    return dict(sessao)
+
+
+async def confirm_checkout(user: User, session_id: str, db: AsyncSession) -> None:
+    """Fecha a corrida da PRIMEIRA compra, na volta do Checkout.
+
+    Lacuna registrada no ADR 0001: o redirect chega antes do webhook, e a
+    reconciliação preguiçosa não cobre este instante porque exige
+    `stripe_subscription_id` — que é justamente o que ainda não veio. A sessão
+    de Checkout traz os dois ids, então amarrá-los aqui deixa a reconciliação
+    conseguir trabalhar em seguida.
+
+    Nada disto substitui o webhook: ele continua sendo a fonte da verdade, e
+    este caminho só antecipa o que ele traria segundos depois.
+    """
+    sessao = await fetch_checkout_session(session_id)
+
+    # O id da sessão chega pela URL, ou seja, pelo CLIENTE. Sem esta conferência
+    # qualquer pessoa apresentaria a sessão de outra e levaria o premium dela
+    # junto do customer, o que ainda deixaria os eventos da vítima sem dono.
+    if sessao.get("client_reference_id") != str(user.id):
+        raise CheckoutNotOurs()
+
+    if sessao.get("status") != "complete" or sessao.get("payment_status") != "paid":
+        raise CheckoutNotPaid()
+
+    # O MESMO `_aplicar` do webhook, com o tipo de checkout: ele já sabe que
+    # checkout só AMARRA ids e não move o portão.
+    evento = {
+        "id": f"checkout-return:{session_id}",
+        "type": EVENTO_CHECKOUT,
+        "data": {"object": sessao},
+    }
+    _aplicar(user, evento, _projecao(evento))
+    await db.commit()
+
+    # A compra invalida a janela de consulta: sem isto, quem estava vencido e
+    # voltou a assinar dentro de 15 minutos de uma reconciliação anterior
+    # ficaria sem premium até a janela expirar.
+    _ULTIMA_CONSULTA.pop(user.id, None)
+    await reconcile_subscription(user, db)
