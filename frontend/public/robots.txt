@@ -1,0 +1,12 @@
+# As rotas abaixo exigem login, então um crawler só encontra redirect nelas.
+# Bloquear economiza crawl budget e evita indexar tela de login.
+User-agent: *
+Disallow: /dashboard
+Disallow: /wallets
+Disallow: /transactions
+Disallow: /ai
+Disallow: /recurring
+Disallow: /goals
+Disallow: /settings
+
+Sitemap: https://norby.com.br/sitemap.xml
