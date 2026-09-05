@@ -5,6 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 import { billingApi } from "@/api/billing";
 import { authApi } from "@/api/auth";
 import { useAuthStore } from "@/store/authStore";
+import { PRECO_MENSAL } from "@/lib/plano";
 import PlanCard from "./PlanCard";
 
 vi.mock("@/api/billing", () => ({
@@ -159,5 +160,35 @@ describe("PlanCard", () => {
   it("does not call confirm when there is no session in the URL", () => {
     renderCard({ ...LIBERADO, ai_allowed: false, wallet_cap_applies: true });
     expect(billingApi.confirmCheckout).not.toHaveBeenCalled();
+  });
+
+  it("states price, renewal and the withdrawal right beside the subscribe button", () => {
+    // Art. 6º, III do CDC: informação clara ANTES de contratar. O Checkout do
+    // Stripe repete o valor na tela seguinte, mas quem clica aqui já tem de
+    // saber o que está clicando.
+    renderCard({ ...LIBERADO, ai_allowed: false, wallet_cap_applies: true });
+
+    expect(screen.getByRole("link", { name: "Termos de Uso" })).toHaveAttribute(
+      "href",
+      "/termos",
+    );
+    const cartao = screen.getByText("Plano").closest("div.glass");
+    expect(cartao.textContent).toContain(PRECO_MENSAL);
+    expect(cartao.textContent).toContain("renovação automática");
+    expect(cartao.textContent).toContain("7 dias");
+  });
+
+  it("does not pitch the price to someone who already subscribed", () => {
+    // Quem já assinou vê o cartão pelo botão de gerenciar, e repetir a oferta
+    // ali é ruído: a informação prévia serve a quem ainda vai decidir.
+    renderCard({
+      ...LIBERADO,
+      subscription_status: "active",
+      premium_until: "2099-01-01T00:00:00Z",
+    });
+
+    expect(screen.getByRole("button", { name: "Gerenciar assinatura" })).toBeInTheDocument();
+    const cartao = screen.getByText("Plano").closest("div.glass");
+    expect(cartao.textContent).not.toContain(PRECO_MENSAL);
   });
 });

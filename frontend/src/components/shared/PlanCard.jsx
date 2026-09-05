@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { CreditCard } from "lucide-react";
 
 import { billingApi } from "@/api/billing";
 import { authApi } from "@/api/auth";
 import { useAuthStore } from "@/store/authStore";
 import { apiErrorMessage, formatDateBR } from "@/lib/utils";
+import { PRECO_MENSAL } from "@/lib/plano";
 import { Button } from "@/components/ui/button";
 
 /**
@@ -151,6 +152,22 @@ export default function PlanCard() {
           </Button>
         )}
       </div>
+
+      {/* Preço, periodicidade e direito de arrependimento ao lado do botão, e
+          não só na página de termos. O art. 6º, III do CDC pede informação
+          adequada e clara ANTES de contratar, e "antes" é aqui: é neste botão
+          que a decisão é tomada. O Checkout do Stripe repete o valor depois,
+          mas quem clica já precisa saber o que está clicando. */}
+      {restringido && (
+        <p className="text-xs text-content-3 leading-relaxed mt-4">
+          {PRECO_MENSAL} por mês, com renovação automática. Cancele quando
+          quiser, sem multa. Veja os{" "}
+          <Link to="/termos" className="text-accent hover:underline">
+            Termos de Uso
+          </Link>
+          , incluindo o direito de desistir em 7 dias com devolução integral.
+        </p>
+      )}
     </div>
   );
 }
