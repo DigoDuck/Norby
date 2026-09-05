@@ -152,14 +152,17 @@ Ver `docs/agents/domain.md`.
 ## Deploy (produção)
 
 App no ar, deploy a partir da branch `main`:
-- **Backend:** Railway (Docker, Hobby) — `https://norby-production.up.railway.app`.
+- **Backend:** Railway (Docker, Hobby) — `https://api.norby.com.br`
+  (a antiga `https://norby-production.up.railway.app` continua respondendo).
   Não dorme (sem cold start). **Root Directory = `backend`** (faz achar o
   `backend/Dockerfile`); **Healthcheck Path = `/health`**. Env vars no painel do
   Railway. (Migrado do Render em 2026-07-16 — só config, zero código.)
 - **Postgres:** Neon (serverless, free). **Mongo:** Atlas M0 (free). Ficam fora do
   Railway — **não** anexar banco do próprio Railway (zeraria os dados).
-- **Frontend:** Vercel — `https://norby-finance.vercel.app`. `VITE_API_URL`
-  aponta pro Railway (**embutida no build** → mudou, tem que rebuildar).
+- **Frontend:** Vercel — `https://norby.com.br` (apex canônico; o `www` faz
+  308 para ele na borda, e a antiga `norby-finance.vercel.app` ainda serve).
+  `VITE_API_URL` aponta pra API (**embutida no build** → mudou, tem que
+  rebuildar).
 
 ⚠️ **Trocar o host da API é DUAS mudanças, e a ordem importa.** O
 `connect-src` da CSP em `frontend/vercel.json` lista os hosts permitidos na
