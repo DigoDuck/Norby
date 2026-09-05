@@ -88,6 +88,8 @@ packaging==26.2
     # via limits
 passlib==1.7.4
     # via -r requirements.txt
+pillow==12.3.0
+    # via -r requirements.txt
 pyasn1==0.6.4
     # via
     #   pyasn1-modules
@@ -114,6 +116,8 @@ python-dotenv==1.2.3
     #   pydantic-settings
     #   uvicorn
 python-jose==3.5.0
+    # via -r requirements.txt
+python-multipart==0.0.32
     # via -r requirements.txt
 pyyaml==6.0.3
     # via uvicorn

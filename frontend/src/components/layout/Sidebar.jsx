@@ -6,6 +6,7 @@ import NorbyMark from "../shared/Logo";
 import NorthStar from "../shared/NorthStar";
 import AiOrb from "../shared/AiOrb";
 import { mainItems, prefItems } from "./navItems";
+import Avatar from "@/components/shared/Avatar";
 
 // Item de navegação: ativo = moldura iridescente + acento no ícone, no label e
 // na estrela. O acento chapado segue reservado ao CTA primário (ver DESIGN.md);
@@ -93,9 +94,7 @@ export default function Sidebar() {
 
       {/* User */}
       <div className="flex items-center gap-3 pt-4 border-t border-line/[0.08] px-1">
-        <div className="w-8 h-8 rounded-full bg-accent-fill flex items-center justify-center text-xs font-bold text-accent-contrast">
-          {user?.name?.[0]?.toUpperCase() || "U"}
-        </div>
+        <Avatar name={user?.name} className="w-8 h-8" fallbackClassName="text-xs" />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-content truncate">
             {user?.name || "Usuário"}

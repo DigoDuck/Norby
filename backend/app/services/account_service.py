@@ -6,6 +6,7 @@ O dado do usuário vive em dois lugares:
 - MongoDB: ai_insights e chat_history, ligados por user_id (string). Não há
   cascade no Mongo — a remoção precisa ser explícita.
 """
+import base64
 from datetime import datetime, timezone
 
 from sqlalchemy import select
@@ -68,6 +69,11 @@ async def export_data(user: User, db: AsyncSession) -> dict:
         doc["_id"] = str(doc["_id"])
         chats.append(doc)
 
+    # SELECT explícito: `photo` é deferido no modelo (para não vir junto em
+    # toda requisição autenticada) e lê-lo pelo atributo dispararia lazy load,
+    # que em sessão async estoura.
+    foto = await db.scalar(select(User.photo).where(User.id == user.id))
+
     return {
         "exported_at": datetime.now(timezone.utc),
         "profile": {
@@ -75,6 +81,12 @@ async def export_data(user: User, db: AsyncSession) -> dict:
             "name": user.name,
             "email": user.email,
             "created_at": user.created_at,
+            # A foto é dado pessoal, e portabilidade que deixa dado de fora não
+            # é portabilidade. Base64 porque o dump é JSON; são ~8 KB, o que
+            # não muda o tamanho de um export de verdade.
+            "photo_webp_base64": (
+                base64.b64encode(foto).decode() if foto else None
+            ),
         },
         "wallets": await _scoped(db, Wallet, user.id),
         "transactions": await _scoped(db, Transaction, user.id),

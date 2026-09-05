@@ -21,3 +21,8 @@ slowapi==0.1.10
 # webhook: ela precisa ser timing-safe e checar a tolerância de timestamp
 # contra replay, e isso não é lugar para HMAC feito à mão.
 stripe==15.5.1
+
+# Foto de perfil (issue #35): redimensiona no servidor para 128x128 WebP.
+# python-multipart é o que o FastAPI usa para ler multipart/form-data.
+pillow==12.3.0
+python-multipart==0.0.32
