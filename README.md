@@ -37,7 +37,7 @@ flowchart LR
     FE -->|axios + JWT| API["FastAPI<br/>(Railway, Docker)"]
     API -->|SQLAlchemy async / asyncpg| PG[("PostgreSQL<br/>(Neon)")]
     API -->|Motor| MG[("MongoDB<br/>(Atlas)")]
-    API -->|google-generativeai| GEM["Gemini 3.5 Flash-Lite"]
+    API -->|google-genai| GEM["Gemini 3.5 Flash-Lite"]
 ```
 
 ## Decisões técnicas de destaque
