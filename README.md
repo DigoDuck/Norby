@@ -18,9 +18,9 @@ O Norby junta os lançamentos num lugar só (recorrências incluídas), mantém 
 
 | Camada | Tecnologias |
 |---|---|
-| Backend | FastAPI 0.139 · SQLAlchemy 2.0 (async) + asyncpg · Alembic · Pydantic v2 · python-jose (JWT) · slowapi (rate limit) · uv |
+| Backend | FastAPI 0.141 · SQLAlchemy 2.0 (async) + asyncpg · Alembic · Pydantic v2 · PyJWT (JWT) · slowapi (rate limit) · uv |
 | Bancos | PostgreSQL 16 (núcleo relacional) · MongoDB 7 via Motor (insights e chat da IA) |
-| IA | Google Gemini 3.5 Flash-Lite (`google-generativeai`) |
+| IA | Google Gemini 3.5 Flash-Lite (`google-genai`) |
 | Frontend | React 19 · Vite 8 · TailwindCSS · componentes estilo shadcn/ui · Zustand · React Router v7 · React Hook Form + Zod · axios · Recharts |
 | Testes | pytest + pytest-asyncio (backend) · Vitest + Testing Library (frontend) |
 | Infra | Docker Compose (dev) · Railway (backend, Docker) · Neon (Postgres) · MongoDB Atlas · Vercel (frontend) |

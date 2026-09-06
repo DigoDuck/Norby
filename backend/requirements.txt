@@ -8,10 +8,9 @@ PyJWT==2.13.0  # JWT HS256 do access token. Substituiu o python-jose (issue #29)
 python-dotenv==1.2.3
 pydantic-settings==2.15.0
 google-genai==2.22.0
-# Pin de transitiva: nao e o python-jose que puxa mais (removido, issue #29),
-# e sim o google-auth (dependencia do google-genai). Fixado so pra deixar o
-# dependente real documentado; sem CVE aberto pendente sobre ela hoje.
-cryptography==50.0.0
+# cryptography entra como transitiva do google-auth (dependência do
+# google-genai) — sem pin direto aqui de propósito; quem fixa a versão
+# resolvida é o lock (requirements.lock), checado por scripts/check_locks.py.
 email-validator==2.3.0
 bcrypt==5.0.0
 slowapi==0.1.10

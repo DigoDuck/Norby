@@ -59,16 +59,20 @@ def _log_xff(request: Request) -> None:
 
 
 def _set_refresh_cookie(response: Response, raw: str) -> None:
-    # HttpOnly tira o token do alcance de qualquer script na página; Lax é o
-    # que fecha o CSRF, porque um POST cross-site não leva o cookie; Path=/auth
-    # mantém o cookie fora de todas as outras rotas.
+    # HttpOnly tira o token do alcance de qualquer script na página; Path=/auth
+    # mantém o cookie fora de todas as outras rotas. SameSite=Strict, e não
+    # Lax: o Lax do Chrome ("Lax-allowing-unsafe") ainda manda o cookie num
+    # POST cross-site de navegação de topo enquanto ele tem menos de 2 minutos
+    # — e este cookie nunca é lido por uma navegação, só por XHR same-site
+    # disparado pelo próprio norby.com.br. Strict cobre exatamente os mesmos
+    # casos legítimos e fecha também essa janela de 2 minutos.
     response.set_cookie(
         key=settings.refresh_cookie_name,
         value=raw,
         max_age=settings.refresh_token_expire_days * 86400,
         httponly=True,
         secure=settings.refresh_cookie_secure,
-        samesite="lax",
+        samesite="strict",
         path="/auth",
     )
 
@@ -79,7 +83,7 @@ def _clear_refresh_cookie(response: Response) -> None:
         path="/auth",
         httponly=True,
         secure=settings.refresh_cookie_secure,
-        samesite="lax",
+        samesite="strict",
     )
 
 

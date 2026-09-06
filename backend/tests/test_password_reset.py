@@ -154,6 +154,10 @@ async def test_reset_revokes_every_session(client, enviados, db_session):
 
     # Quem redefine ou esqueceu a senha ou desconfia que alguém a tem. Nos dois
     # casos, um refresh vivo de 7 dias anularia o motivo de ter redefinido.
+    # Limpa antes de setar: o cookie que o servidor emitiu vive em Path=/auth,
+    # o setado aqui explicitamente vai pra "/", e isso deixa claro qual dos
+    # dois o servidor de fato recebe.
+    client.cookies.clear()
     client.cookies.set(COOKIE, refresh)
     usado = await client.post("/auth/refresh")
     assert usado.status_code == 401

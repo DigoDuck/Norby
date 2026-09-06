@@ -37,9 +37,7 @@ colorama==0.4.6 ; sys_platform == 'win32'
     #   pytest
     #   uvicorn
 cryptography==50.0.0
-    # via
-    #   -r requirements.txt
-    #   google-auth
+    # via google-auth
 cyclonedx-python-lib==11.11.0
     # via pip-audit
 defusedxml==0.7.1
