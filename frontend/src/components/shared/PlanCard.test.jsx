@@ -30,7 +30,7 @@ const LIBERADO = {
 };
 
 function renderCard(plan, { url = "/settings" } = {}) {
-  useAuthStore.getState().login("access", "refresh", {
+  useAuthStore.getState().login("access", {
     name: "Alice",
     email: "alice@test.com",
     plan,

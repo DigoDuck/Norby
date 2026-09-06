@@ -6,7 +6,10 @@ import { authApi } from "@/api/auth";
 import App from "./App";
 
 vi.mock("@/api/auth", () => ({
-  authApi: { me: vi.fn(() => Promise.resolve({ data: { name: "Alice" } })) },
+  authApi: {
+    refresh: vi.fn(() => Promise.resolve({ data: { access_token: "novo" } })),
+    me: vi.fn(() => Promise.resolve({ data: { name: "Alice" } })),
+  },
 }));
 // Este teste cobre routing, não a tela em si: o redirect de sessão válida
 // monta o Dashboard de verdade, que dispara chamadas reais de rede (rejeitam
@@ -26,7 +29,7 @@ describe("rota raiz", () => {
   });
 
   it("manda para o dashboard quem já tem sessão", async () => {
-    useAuthStore.getState().login("t", "r", { name: "Alice" });
+    useAuthStore.getState().login("t", { name: "Alice" });
 
     render(<App />);
 
@@ -46,7 +49,7 @@ describe("rota raiz", () => {
     // /auth/me, que rejeita -> logout() -> raiz precisa mostrar Auth uma
     // única vez, sem re-navegar (RootRoute não redireciona quando desloga).
     authApi.me.mockRejectedValueOnce(new Error("401"));
-    useAuthStore.getState().login("token-invalido", "r", { name: "Alice" });
+    useAuthStore.getState().login("token-invalido", { name: "Alice" });
 
     render(<App />);
 

@@ -33,7 +33,6 @@ describe("interceptor de refresh", () => {
     instancia.mockResolvedValue({ data: "ok" });
     useAuthStore.setState({
       token: "velho",
-      refreshToken: "refresh-valido",
       user: { name: "Alice" },
       isAuthenticated: true,
     });
@@ -48,7 +47,7 @@ describe("interceptor de refresh", () => {
 
   it("renova o token no 401 e repete a requisição", async () => {
     axios.post.mockResolvedValue({
-      data: { access_token: "novo", refresh_token: "refresh-novo" },
+      data: { access_token: "novo" },
     });
 
     await onRejected(erro401());
@@ -75,7 +74,7 @@ describe("interceptor de refresh", () => {
     let liberar;
     axios.post.mockReturnValue(
       new Promise((r) => {
-        liberar = () => r({ data: { access_token: "novo", refresh_token: "rn" } });
+        liberar = () => r({ data: { access_token: "novo" } });
       }),
     );
 
@@ -93,12 +92,15 @@ describe("interceptor de refresh", () => {
     expect(axios.post).not.toHaveBeenCalled();
   });
 
-  it("desloga direto quando não há refresh token guardado", async () => {
-    useAuthStore.setState({ refreshToken: null });
+  it("chama o refresh sem corpo, com credenciais, e guarda só o access token", async () => {
+    axios.post.mockResolvedValue({ data: { access_token: "novo" } });
 
-    await expect(onRejected(erro401())).rejects.toBeTruthy();
+    await onRejected(erro401());
 
-    expect(axios.post).not.toHaveBeenCalled();
-    expect(window.location.href).toBe("/");
+    const [url, corpo, opcoes] = axios.post.mock.calls[0];
+    expect(url).toMatch(/\/auth\/refresh$/);
+    expect(corpo).toBeNull();
+    expect(opcoes).toEqual({ withCredentials: true });
+    expect(useAuthStore.getState().token).toBe("novo");
   });
 });

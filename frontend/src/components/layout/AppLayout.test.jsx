@@ -52,7 +52,7 @@ describe("AppLayout", () => {
     // 403 do backend enquanto a tela, lendo um `plan` velho do localStorage,
     // continua sem oferecer o upgrade. Uma chamada por carga do app resolve.
     recurringApi.run.mockResolvedValue({});
-    useAuthStore.getState().login("access", "refresh", {
+    useAuthStore.getState().login("access", {
       name: "Alice",
       plan: { ai_allowed: true, wallet_cap_applies: false },
     });

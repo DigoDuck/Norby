@@ -154,7 +154,7 @@ export default function Auth() {
               accept_privacy: data.acceptedTerms,
             });
 
-      login(res.data.access_token, res.data.refresh_token, res.data.user);
+      login(res.data.access_token, res.data.user);
       navigate("/dashboard");
     } catch (err) {
       if (!err.response) {
