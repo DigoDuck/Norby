@@ -49,6 +49,20 @@ const USERS = [
     cancel_at_period_end: false,
     is_admin: false,
   },
+  // O admin logado (beforeEach) aparece na própria lista devolvida pela API,
+  // como no backend de verdade — precisa disto para testar que a própria
+  // linha não ganha botão de ação.
+  {
+    id: "admin1",
+    name: "Root",
+    email: "root@norby.dev",
+    created_at: "2025-01-01T00:00:00Z",
+    premium_until: null,
+    ai_trial_ends_at: null,
+    subscription_status: null,
+    cancel_at_period_end: false,
+    is_admin: true,
+  },
 ];
 
 function renderAdmin() {
@@ -57,6 +71,14 @@ function renderAdmin() {
       <Admin />
     </MemoryRouter>,
   );
+}
+
+// Timeout maior: o Dialog do Base UI monta em portal, e a máquina de CI pode
+// demorar mais que o padrão de 1s sob carga.
+async function fillPassword(value) {
+  fireEvent.change(await screen.findByLabelText("Sua senha atual", {}, { timeout: 3000 }), {
+    target: { value },
+  });
 }
 
 describe("Admin", () => {
@@ -116,23 +138,20 @@ describe("Admin", () => {
     renderAdmin();
     await screen.findByText("alice@test.com");
 
-    const linha = screen.getByText("alice@test.com").closest("[data-user-row]");
+    const linha = screen.getByText("alice@test.com").closest("li");
     fireEvent.click(
       within(linha).getByRole("button", { name: "Cancelar assinatura" }),
     );
 
-    // Timeout maior: o Dialog do Base UI monta em portal, e a máquina de CI
-    // pode demorar mais que o padrão de 1s sob carga.
-    fireEvent.change(await screen.findByLabelText("Sua senha atual", {}, { timeout: 3000 }), {
-      target: { value: "secret123" },
-    });
+    await fillPassword("secret123");
     fireEvent.click(screen.getByRole("button", { name: "Confirmar" }));
 
     await waitFor(() =>
       expect(adminApi.cancelSubscription).toHaveBeenCalledWith("u1", "secret123"),
     );
-    // A lista recarrega após o sucesso.
+    // A lista E as métricas recarregam após o sucesso.
     await waitFor(() => expect(adminApi.users).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(adminApi.metrics).toHaveBeenCalledTimes(2));
   });
 
   it("senha errada mostra o erro sem fechar o diálogo", async () => {
@@ -142,18 +161,48 @@ describe("Admin", () => {
     renderAdmin();
     await screen.findByText("alice@test.com");
 
-    const linha = screen.getByText("alice@test.com").closest("[data-user-row]");
+    const linha = screen.getByText("alice@test.com").closest("li");
     fireEvent.click(within(linha).getByRole("button", { name: "Excluir conta" }));
 
-    // Timeout maior: o Dialog do Base UI monta em portal, e a máquina de CI
-    // pode demorar mais que o padrão de 1s sob carga.
-    fireEvent.change(await screen.findByLabelText("Sua senha atual", {}, { timeout: 3000 }), {
-      target: { value: "senhaerrada" },
-    });
+    await fillPassword("senhaerrada");
     fireEvent.click(screen.getByRole("button", { name: "Confirmar" }));
 
     expect(await screen.findByText("Senha incorreta")).toBeInTheDocument();
     // O diálogo continua aberto: o campo de senha ainda está na tela.
     expect(screen.getByLabelText("Sua senha atual")).toBeInTheDocument();
+  });
+
+  it("a própria linha do admin logado não tem botão de ação", async () => {
+    renderAdmin();
+
+    const linha = (await screen.findByText("root@norby.dev")).closest("li");
+    expect(within(linha).queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("mantém a tela montada e avisa quando a releitura falha após uma ação bem-sucedida", async () => {
+    adminApi.deleteUser.mockResolvedValue({ status: 204 });
+    renderAdmin();
+    await screen.findByText("alice@test.com");
+
+    const linha = screen.getByText("alice@test.com").closest("li");
+    fireEvent.click(within(linha).getByRole("button", { name: "Excluir conta" }));
+    await fillPassword("secret123");
+
+    // A exclusão em si funciona; só a releitura seguinte falha desta vez.
+    adminApi.users.mockRejectedValueOnce(new Error("falha de rede"));
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar" }));
+
+    // O diálogo fecha: a ação pedida teve sucesso.
+    await waitFor(() =>
+      expect(screen.queryByLabelText("Sua senha atual")).not.toBeInTheDocument(),
+    );
+    // Cabeçalho e lista continuam na tela — não é o estado de erro de carga
+    // (que substitui a página inteira).
+    expect(screen.getByRole("heading", { name: "Admin" })).toBeInTheDocument();
+    expect(screen.getByText("alice@test.com")).toBeInTheDocument();
+    // Aviso inline de que os números podem estar desatualizados.
+    expect(
+      await screen.findByText(/não foi possível atualizar os dados/i),
+    ).toBeInTheDocument();
   });
 });

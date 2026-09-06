@@ -75,9 +75,11 @@ export function ConfirmDialog({
             type="password"
             aria-label="Sua senha atual"
             placeholder="Sua senha atual"
-            // "off" evita que o navegador tente casar este campo com um campo
-            // de usuário/e-mail vizinho (aqui, a busca) e o preencha sozinho.
-            autoComplete="off"
+            // O Chrome documenta que ignora autoComplete="off" em campos de
+            // credencial; "new-password" é o valor que ele de fato respeita
+            // para não tentar casar este campo com um campo de usuário/e-mail
+            // vizinho (aqui, a busca) e preenchê-lo sozinho.
+            autoComplete="new-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className={shadcnInputCls}

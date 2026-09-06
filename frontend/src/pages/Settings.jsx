@@ -318,7 +318,7 @@ export default function Settings() {
             onClick={handleExport}
             disabled={exporting}
             variant="outline"
-            className="shrink-0 border-accent/40 bg-transparent text-accent hover:bg-accent/10"
+            className="shrink-0 border-accent/40 bg-transparent text-accent hover:bg-accent/10 hover:text-accent"
           >
             <Download size={15} /> {exporting ? "Exportando…" : "Exportar"}
           </Button>
