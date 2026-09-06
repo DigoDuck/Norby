@@ -1,8 +1,12 @@
 import asyncio
+from datetime import datetime, timedelta, timezone
 
 import pytest
+from sqlalchemy import update
 
 from app.config import get_settings
+from app.models.sql_models import RefreshToken
+from app.services.auth_service import ROTATION_REUSE_GRACE
 
 REG = {
     "name": "Bob",
@@ -30,7 +34,7 @@ async def test_the_refresh_token_never_travels_in_the_body(client):
 
 
 @pytest.mark.asyncio
-async def test_refresh_rotates_and_invalidates_old_token(client):
+async def test_refresh_rotates_and_invalidates_old_token(client, db_session):
     await _register(client)
     old_refresh = client.cookies.get(COOKIE)
 
@@ -44,6 +48,17 @@ async def test_refresh_rotates_and_invalidates_old_token(client):
     # O novo refresh continua válido.
     again = await client.post("/auth/refresh")
     assert again.status_code == 200
+
+    # #130: dentro dos 30s de ROTATION_REUSE_GRACE, reapresentar o antigo
+    # ganharia um sucessor novo em vez de falhar (resposta perdida). Este
+    # teste quer o antigo comportamento — token rotacionado É inválido —,
+    # então envelhece a revogação para além da janela antes de reapresentar.
+    await db_session.execute(
+        update(RefreshToken)
+        .where(RefreshToken.revoked.is_(True))
+        .values(revoked_at=datetime.now(timezone.utc) - ROTATION_REUSE_GRACE - timedelta(seconds=1))
+    )
+    await db_session.commit()
 
     # O refresh antigo foi rotacionado: usá-lo de novo deve falhar. O jar do
     # httpx já guarda o cookie mais recente; apresenta o antigo explicitamente
@@ -214,32 +229,64 @@ async def test_refresh_with_invalid_token_401(client):
 
 
 @pytest.mark.asyncio
-async def test_concurrent_rotation_issues_only_one_successor(client):
-    # Duas rotações simultâneas do MESMO refresh: só uma pode vencer.
-    # Sem FOR UPDATE, as duas validam o token ainda não revogado e emitem
-    # dois sucessores válidos — o token roubado mantém sessão paralela.
+async def test_concurrent_rotations_both_succeed_within_the_grace(client):
+    # Duas abas restaurando ao mesmo tempo apresentam o MESMO cookie. O FOR
+    # UPDATE serializa: a segunda vê o token já rotacionado há milissegundos,
+    # dentro da janela, e ganha um sucessor próprio em vez de derrubar tudo.
     await _register(client)
-
     res_a, res_b = await asyncio.gather(
         client.post("/auth/refresh"),
         client.post("/auth/refresh"),
     )
-    assert sorted([res_a.status_code, res_b.status_code]) == [200, 401]
+    assert [res_a.status_code, res_b.status_code] == [200, 200]
+    assert res_a.json()["access_token"] and res_b.json()["access_token"]
 
 
 @pytest.mark.asyncio
-async def test_reusing_rotated_token_revokes_all_sessions(client):
-    # Reuso de um token já rotacionado = sinal de roubo. Derruba tudo.
+async def test_reusing_a_just_rotated_token_within_the_grace_keeps_the_session(client):
+    # Resposta perdida: o servidor rotacionou r0 -> r1, o navegador ficou com r0.
+    await _register(client)
+    r0 = client.cookies.get(COOKIE)
+    await client.post("/auth/refresh")
+    r1 = client.cookies.get(COOKIE)
+
+    client.cookies.clear()
+    client.cookies.set(COOKIE, r0)
+    res = await client.post("/auth/refresh")
+    assert res.status_code == 200
+    # res.cookies, não client.cookies: o jar do httpx guarda o cookie setado
+    # à mão acima (domain="") e o que o servidor acabou de emitir (domain do
+    # host efetivo) como duas entradas distintas com o mesmo nome — CookieConflict
+    # no client.cookies.get(). res.cookies só tem o que ESTA resposta setou.
+    r2 = res.cookies.get(COOKIE)
+    assert r2 and r2 not in (r0, r1)
+
+    # Nada foi derrubado: r1 e r2 continuam válidos.
+    for token in (r1, r2):
+        client.cookies.clear()
+        client.cookies.set(COOKIE, token)
+        assert (await client.post("/auth/refresh")).status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_reusing_rotated_token_revokes_all_sessions(client, db_session):
+    # Reuso de um token rotacionado FORA da janela = sinal de roubo. Derruba tudo.
     await _register(client)
     r1 = client.cookies.get(COOKIE)
     await client.post("/auth/refresh")
     r2 = client.cookies.get(COOKIE)
 
-    # r1 já foi rotacionado; reapresentá-lo é o sinal de roubo.
+    # Envelhece a revogação para além da janela.
+    await db_session.execute(
+        update(RefreshToken)
+        .where(RefreshToken.revoked.is_(True))
+        .values(revoked_at=datetime.now(timezone.utc) - ROTATION_REUSE_GRACE - timedelta(seconds=1))
+    )
+    await db_session.commit()
+
     client.cookies.clear()
     client.cookies.set(COOKIE, r1)
     assert (await client.post("/auth/refresh")).status_code == 401
-    # O sucessor legítimo também morre: a sessão inteira foi invalidada.
     client.cookies.clear()
     client.cookies.set(COOKIE, r2)
     assert (await client.post("/auth/refresh")).status_code == 401
@@ -284,7 +331,7 @@ async def test_login_sets_an_httponly_refresh_cookie(client):
 
 
 @pytest.mark.asyncio
-async def test_refresh_works_from_the_cookie_alone(client):
+async def test_refresh_works_from_the_cookie_alone(client, db_session):
     await _register(client)
     antigo = client.cookies.get(COOKIE)
 
@@ -294,6 +341,16 @@ async def test_refresh_works_from_the_cookie_alone(client):
     # Rotacionou: o cookie novo é outro, e o antigo já não vale.
     novo = client.cookies.get(COOKIE)
     assert novo and novo != antigo
+
+    # #130: fora dos 30s de ROTATION_REUSE_GRACE, reapresentar o antigo
+    # continua inválido (dentro da janela ganharia um sucessor novo).
+    await db_session.execute(
+        update(RefreshToken)
+        .where(RefreshToken.revoked.is_(True))
+        .values(revoked_at=datetime.now(timezone.utc) - ROTATION_REUSE_GRACE - timedelta(seconds=1))
+    )
+    await db_session.commit()
+
     client.cookies.clear()
     client.cookies.set(COOKIE, antigo)
     reused = await client.post("/auth/refresh")

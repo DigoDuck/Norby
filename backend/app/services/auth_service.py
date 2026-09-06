@@ -90,19 +90,34 @@ async def rotate_refresh_token(raw: str, db: AsyncSession) -> tuple[str, str, Us
     if record is None:
         return None
 
-    # Token já rotacionado sendo reapresentado é sinal de possível roubo.
-    # Revogar todas as sessões evita manter um sucessor comprometido ativo.
     if record.revoked:
-        await db.execute(
-            update(RefreshToken)
-            .where(
-                RefreshToken.user_id == record.user_id,
-                RefreshToken.revoked.is_(False),
-            )
-            .values(revoked=True)
+        agora = datetime.now(timezone.utc)
+        dentro_da_janela = (
+            record.revoked_at is not None and agora - record.revoked_at <= ROTATION_REUSE_GRACE
         )
+        if not dentro_da_janela:
+            # Token já rotacionado sendo reapresentado fora da janela é sinal
+            # de roubo. Revogar todas as sessões evita manter um sucessor
+            # comprometido ativo. `revoked_at` fica NULL aqui de propósito: é
+            # um cascateamento, não uma rotação individual, e não pode virar
+            # elegível para a própria janela de tolerância se alguém
+            # reapresentar uma dessas sessões momentos depois (o cascateamento
+            # tem que ser terminal, sem ressuscitar nada).
+            await db.execute(
+                update(RefreshToken)
+                .where(RefreshToken.user_id == record.user_id, RefreshToken.revoked.is_(False))
+                .values(revoked=True)
+            )
+            await db.commit()
+            return None
+        # Dentro da janela: sucessor NOVO para quem ficou com o antecessor. O
+        # sucessor anterior continua válido; o servidor só tem o hash dele.
+        user = await db.get(User, record.user_id)
+        if user is None:
+            return None
+        new_refresh = _new_refresh(str(user.id), db)
         await db.commit()
-        return None
+        return create_access_token(str(user.id)), new_refresh, user
 
     if record.expires_at <= datetime.now(timezone.utc):
         return None
@@ -112,6 +127,7 @@ async def rotate_refresh_token(raw: str, db: AsyncSession) -> tuple[str, str, Us
         return None
 
     record.revoked = True
+    record.revoked_at = datetime.now(timezone.utc)
     new_refresh = _new_refresh(str(user.id), db)
     await db.commit()
 
@@ -136,6 +152,12 @@ async def revoke_refresh_token(raw: str, db: AsyncSession) -> None:
     if record is None:
         return
 
+    # `revoked_at` fica de fora nos dois pontos abaixo, de propósito: o logout
+    # nunca consulta a janela de tolerância (#130, SEC-01), e se gravasse o
+    # instante aqui um refresh apresentado segundos depois do logout leria
+    # esse instante recente e ganharia a graça de uma rotação legítima — a
+    # sessão encerrada voltaria à vida. `revoked_at` só tem sentido para a
+    # rotação individual normal, que é a única fonte de reuso tolerável.
     if record.revoked:
         await db.execute(
             update(RefreshToken)
@@ -158,6 +180,13 @@ async def revoke_refresh_token(raw: str, db: AsyncSession) -> None:
 # este chega por e-mail e caixa comprometida é o vetor que ele abre.
 
 RESET_TTL = timedelta(minutes=settings.password_reset_expire_minutes)
+
+# #130: janela em que reapresentar um refresh já rotacionado é tratado como
+# resposta perdida (aba fechada em voo, conexão caída, 502 depois do commit)
+# ou como duas abas restaurando juntas, e não como roubo. Maior que o timeout
+# de 15 s do refresh no frontend, para o retry depois dele ainda caber aqui.
+# Fora da janela, reuso continua derrubando todas as sessões.
+ROTATION_REUSE_GRACE = timedelta(seconds=30)
 
 
 async def create_password_reset(user_id: str, db: AsyncSession) -> str:
