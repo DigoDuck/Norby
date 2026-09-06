@@ -7,7 +7,10 @@ import App from "./App";
 
 vi.mock("@/api/auth", () => ({
   authApi: {
-    refresh: vi.fn(() => Promise.resolve({ data: { access_token: "novo" } })),
+    // O refreshAccessToken de verdade resolve com o access token cru
+    // (string), não com a resposta axios inteira — quem guarda o token no
+    // store é a própria função, não quem chama authApi.refresh().
+    refresh: vi.fn(() => Promise.resolve("novo")),
     me: vi.fn(() => Promise.resolve({ data: { name: "Alice" } })),
   },
 }));

@@ -36,8 +36,13 @@ export async function refreshAccessToken() {
   if (inflightRefresh) return inflightRefresh;
   const run = async () => {
     // Chamada "crua" (sem interceptors) para evitar recursão. Sem corpo: o
-    // refresh token vai no cookie HttpOnly.
-    const { data } = await axios.post(`${baseURL}/auth/refresh`, null, { withCredentials: true });
+    // refresh token vai no cookie HttpOnly. timeout: uma requisição que trava
+    // não pode segurar o Web Lock "norby-auth-refresh" para sempre — sem
+    // limite, uma aba com rede ruim travaria o refresh de todas as outras.
+    const { data } = await axios.post(`${baseURL}/auth/refresh`, null, {
+      withCredentials: true,
+      timeout: 15000,
+    });
     useAuthStore.getState().setToken(data.access_token);
     return data.access_token;
   };
@@ -58,13 +63,16 @@ api.interceptors.response.use(
   async (error) => {
     const original = error.config || {};
     const url = original.url || "";
-    // login/register/refresh não passam pelo fluxo de renovação:
+    // login/register/refresh/logout não passam pelo fluxo de renovação:
     // - login/register: o catch do componente exibe a mensagem de erro;
-    // - refresh: se ele falha, não há o que renovar.
+    // - refresh: se ele falha, não há o que renovar;
+    // - logout: um 401 aqui só significa "sem cookie", não motivo pra tentar
+    //   renovar um token que a própria chamada está encerrando.
     const isAuthEndpoint =
       url.includes("/auth/login") ||
       url.includes("/auth/register") ||
-      url.includes("/auth/refresh");
+      url.includes("/auth/refresh") ||
+      url.includes("/auth/logout");
 
     if (error.response?.status !== 401 || isAuthEndpoint || original._retry) {
       return Promise.reject(error);
