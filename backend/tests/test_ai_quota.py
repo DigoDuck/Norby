@@ -10,7 +10,6 @@ from decimal import Decimal
 from types import SimpleNamespace
 
 import pytest
-import pytest_asyncio
 from sqlalchemy import select
 
 import app.services.ai_service as ai
@@ -18,37 +17,6 @@ from app.config import get_settings
 from app.models.sql_models import AiUsageDaily, Transaction, TransactionType, User, Wallet
 
 INSIGHT = '{"summary_text": "a|b|c", "suggested_action": "faça X"}'
-
-
-@pytest_asyncio.fixture
-async def mongo(monkeypatch):
-    """Sombra o `mongo` do conftest só neste arquivo. O original rebinda as
-    coleções do `account_service`; `ai_service.py` e `routers/ai.py` importam
-    a coleção do `database` direto no módulo, e este é o primeiro arquivo a
-    bater de verdade em `/ai/chat` e `/ai/insight` mais de uma vez na mesma
-    sessão. Sem rebindar as duas também, os testes caem no cliente de import,
-    preso ao primeiro event loop que o tocou: RuntimeError "Event loop is
-    closed" do 2º teste em diante. Mesmo truque de `monkeypatch.setattr` que
-    test_ai.py e test_ai_history.py já usam para essas duas coleções, com a
-    coleção real do fixture no lugar de um fake."""
-    from motor.motor_asyncio import AsyncIOMotorClient
-    from app import database
-    import app.services.account_service as acc
-    import app.routers.ai as ai_router
-
-    client = AsyncIOMotorClient(database.settings.mongodb_url)
-    db = client["norby_db"]
-    insights = db["ai_insights"]
-    history = db["chat_history"]
-
-    monkeypatch.setattr(acc, "ai_insights_collection", insights)
-    monkeypatch.setattr(acc, "chat_history_collection", history)
-    monkeypatch.setattr(ai, "ai_insights_collection", insights)
-    monkeypatch.setattr(ai_router, "chat_history_collection", history)
-    try:
-        yield {"ai_insights": insights, "chat_history": history}
-    finally:
-        client.close()
 
 
 @pytest.fixture
