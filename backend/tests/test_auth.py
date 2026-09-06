@@ -1,4 +1,10 @@
+import uuid
+from datetime import datetime, timedelta, timezone
+
+import jwt  # PyJWT. Caracterização (Step 2, ver task-2-report.md): passou igual com `from jose import jwt`.
 import pytest
+
+from app.config import get_settings
 
 REG = {
     "name": "Alice",
@@ -85,6 +91,30 @@ async def test_me_requires_token(client):
 @pytest.mark.asyncio
 async def test_me_with_invalid_token_401(client):
     res = await client.get("/auth/me", headers={"Authorization": "Bearer not.a.jwt"})
+    assert res.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_expired_access_token_is_rejected(client):
+    s = get_settings()
+    token = jwt.encode(
+        {"sub": str(uuid.uuid4()), "exp": datetime.now(timezone.utc) - timedelta(minutes=1)},
+        s.secret_key,
+        algorithm=s.algorithm,
+    )
+    res = await client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert res.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_token_signed_with_another_key_is_rejected(client):
+    s = get_settings()
+    token = jwt.encode(
+        {"sub": str(uuid.uuid4()), "exp": datetime.now(timezone.utc) + timedelta(minutes=5)},
+        "outra-chave-que-nao-e-a-do-servidor",
+        algorithm=s.algorithm,
+    )
+    res = await client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
     assert res.status_code == 401
 
 
