@@ -347,6 +347,11 @@ protege o token é a entropia dos 48 bytes, não o contador.
   E como `/auth/forgot-password` responde 202 exista ou não a conta, a falha não
   aparece para quem pediu o link: some no log do servidor. Manter DESLIGADO
   enquanto o egresso não for estático. Teto do plano gratuito: 300 e-mails/dia.
+- **`DOCS_ENABLED` não existe em produção, e é assim de propósito.** O default
+  do código é `false`, então esquecer a variável mantém `/docs`, `/redoc` e
+  `/openapi.json` FECHADOS (issue #29). Criá-la com `true` no Railway publica
+  todas as rotas, todos os campos e todos os formatos de erro da API. Em
+  desenvolvimento ela vem ligada pelo `.env.example`, que é onde ela serve.
 - **Ligar `PAYWALL_ENABLED` sem `VITE_FORNECEDOR_NOME` e `VITE_FORNECEDOR_CPF`
   na Vercel é cobrar com Termos incompletos.** O Decreto 7.962/2013, art. 2º, I
   exige nome e CPF/CNPJ do vendedor no site; sem as variáveis, a seção 2 dos

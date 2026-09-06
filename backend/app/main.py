@@ -35,10 +35,19 @@ logger = logging.getLogger("norby")
 
 settings = get_settings()
 
+# `None` remove a rota inteira, e não apenas a página: sem `openapi_url` não há
+# schema para servir, então /docs e /redoc não teriam o que renderizar de todo
+# jeito. Os três são explícitos porque um leitor futuro precisa ver que a
+# decisão foi tomada, e não deduzir que o FastAPI cuidou disso sozinho.
+_docs = settings.docs_enabled
+
 app = FastAPI(
     title="Norby API",
     description="Backend do Organizador Financeiro com IA",
     version="0.1.0",
+    docs_url="/docs" if _docs else None,
+    redoc_url="/redoc" if _docs else None,
+    openapi_url="/openapi.json" if _docs else None,
 )
 
 # Rate limiting (anti brute-force). Respostas 429 passam pelo CORS normalmente.
