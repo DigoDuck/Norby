@@ -25,6 +25,13 @@ const erro401 = (url = "/transactions/") => ({
   config: { url, headers: {} },
 });
 
+// Roda ANTES do describe abaixo (a ordem de declaração é a ordem de
+// execução): axios.create só é chamado uma vez, no import do módulo lá em
+// cima, e o beforeEach do describe seguinte limpa o histórico dos mocks.
+it("cria a instância do axios com credenciais habilitadas", () => {
+  expect(axios.create).toHaveBeenCalledWith(expect.objectContaining({ withCredentials: true }));
+});
+
 describe("interceptor de refresh", () => {
   let hrefOriginal;
 
@@ -43,6 +50,7 @@ describe("interceptor de refresh", () => {
 
   afterEach(() => {
     window.location = { href: hrefOriginal };
+    delete navigator.locks;
   });
 
   it("renova o token no 401 e repete a requisição", async () => {
@@ -100,7 +108,7 @@ describe("interceptor de refresh", () => {
     const [url, corpo, opcoes] = axios.post.mock.calls[0];
     expect(url).toMatch(/\/auth\/refresh$/);
     expect(corpo).toBeNull();
-    expect(opcoes).toEqual({ withCredentials: true });
+    expect(opcoes).toEqual({ withCredentials: true, timeout: 15000 });
     expect(useAuthStore.getState().token).toBe("novo");
   });
 
@@ -126,6 +134,5 @@ describe("interceptor de refresh", () => {
     await refreshAccessToken();
 
     expect(navigator.locks.request).toHaveBeenCalledWith("norby-auth-refresh", expect.any(Function));
-    delete navigator.locks;
   });
 });
