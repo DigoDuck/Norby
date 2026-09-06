@@ -24,14 +24,28 @@ api.interceptors.request.use((config) => {
 
 // --- Refresh token automático em 401 ---
 // Ao receber 401 num endpoint não-auth, tenta UMA vez renovar o access token via
-// /auth/refresh. Requests concorrentes durante a renovação entram numa fila para
-// não disparar N refreshes ao mesmo tempo.
-let isRefreshing = false;
-let pendingQueue = [];
+// /auth/refresh.
 
-function flushQueue(error, token) {
-  pendingQueue.forEach(({ resolve, reject }) => (error ? reject(error) : resolve(token)));
-  pendingQueue = [];
+// Renovação única por aba e serializada entre abas (#110). O refresh
+// rotaciona o token do cookie, e apresentar o token antigo de novo é lido
+// pelo backend como roubo: derruba TODAS as sessões. Duas abas restaurando
+// ao mesmo tempo (ou o StrictMode em dev) fariam exatamente isso sem isto.
+let inflightRefresh = null;
+
+export async function refreshAccessToken() {
+  if (inflightRefresh) return inflightRefresh;
+  const run = async () => {
+    // Chamada "crua" (sem interceptors) para evitar recursão. Sem corpo: o
+    // refresh token vai no cookie HttpOnly.
+    const { data } = await axios.post(`${baseURL}/auth/refresh`, null, { withCredentials: true });
+    useAuthStore.getState().setToken(data.access_token);
+    return data.access_token;
+  };
+  const locks = typeof navigator !== "undefined" ? navigator.locks : undefined;
+  inflightRefresh = (locks?.request ? locks.request("norby-auth-refresh", run) : run()).finally(() => {
+    inflightRefresh = null;
+  });
+  return inflightRefresh;
 }
 
 function forceLogout() {
@@ -56,32 +70,14 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    // Já existe um refresh em andamento: enfileira esta request.
-    if (isRefreshing) {
-      return new Promise((resolve, reject) => {
-        pendingQueue.push({ resolve, reject });
-      }).then((token) => {
-        original.headers.Authorization = `Bearer ${token}`;
-        return api(original);
-      });
-    }
-
     original._retry = true;
-    isRefreshing = true;
     try {
-      // Chamada "crua" (sem interceptors) para evitar recursão. Sem corpo: o
-      // refresh token vai no cookie HttpOnly (#110).
-      const { data } = await axios.post(`${baseURL}/auth/refresh`, null, { withCredentials: true });
-      useAuthStore.getState().setToken(data.access_token);
-      flushQueue(null, data.access_token);
-      original.headers.Authorization = `Bearer ${data.access_token}`;
+      const token = await refreshAccessToken();
+      original.headers.Authorization = `Bearer ${token}`;
       return api(original);
     } catch (refreshError) {
-      flushQueue(refreshError, null);
       forceLogout();
       return Promise.reject(refreshError);
-    } finally {
-      isRefreshing = false;
     }
   },
 );

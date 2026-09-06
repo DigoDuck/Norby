@@ -39,8 +39,9 @@ export default function App() {
   useEffect(() => {
     if (!isAuthenticated) return;
     authApi
+      // authApi.refresh() já guarda o token novo no store (single-flight em
+      // ./axios); aqui só encadeamos o /auth/me depois que ele resolve.
       .refresh()
-      .then((res) => useAuthStore.getState().setToken(res.data.access_token))
       .then(() => authApi.me())
       .then((res) => useAuthStore.getState().updateUser(res.data))
       .catch(() => useAuthStore.getState().logout())

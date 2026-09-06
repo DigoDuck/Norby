@@ -18,7 +18,7 @@ vi.mock("axios", () => {
 
 const { useAuthStore } = await import("@/store/authStore");
 const axios = (await import("axios")).default;
-await import("./axios");
+const { refreshAccessToken } = await import("./axios");
 
 const erro401 = (url = "/transactions/") => ({
   response: { status: 401 },
@@ -102,5 +102,30 @@ describe("interceptor de refresh", () => {
     expect(corpo).toBeNull();
     expect(opcoes).toEqual({ withCredentials: true });
     expect(useAuthStore.getState().token).toBe("novo");
+  });
+
+  it("o boot disparado duas vezes ao mesmo tempo renova uma vez só", async () => {
+    // StrictMode (dev) ou duas abas restaurando juntas chamam o refresh do
+    // boot em paralelo. Sem o single-flight, a segunda chamada apresentaria o
+    // refresh token já rotacionado pela primeira, e o backend lê isso como
+    // reuso: derruba todas as sessões (#110).
+    axios.post.mockResolvedValue({ data: { access_token: "novo" } });
+
+    const [a, b] = await Promise.all([refreshAccessToken(), refreshAccessToken()]);
+
+    expect(axios.post).toHaveBeenCalledTimes(1);
+    expect(a).toBe("novo");
+    expect(b).toBe("novo");
+    expect(useAuthStore.getState().token).toBe("novo");
+  });
+
+  it("serializa a renovação entre abas com navigator.locks quando existe", async () => {
+    axios.post.mockResolvedValue({ data: { access_token: "novo" } });
+    navigator.locks = { request: vi.fn((name, cb) => cb()) };
+
+    await refreshAccessToken();
+
+    expect(navigator.locks.request).toHaveBeenCalledWith("norby-auth-refresh", expect.any(Function));
+    delete navigator.locks;
   });
 });

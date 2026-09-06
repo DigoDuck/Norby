@@ -45,9 +45,10 @@ describe("rota raiz", () => {
   });
 
   it("cai na autenticação sem loop quando o token persistido é inválido", async () => {
-    // Simula sessão persistida com token adulterado/expirado: o boot chama
-    // /auth/me, que rejeita -> logout() -> raiz precisa mostrar Auth uma
-    // única vez, sem re-navegar (RootRoute não redireciona quando desloga).
+    // Simula sessão persistida com o access token adulterado/expirado: o boot
+    // chama /auth/refresh (que aqui sucede), depois /auth/me, que rejeita ->
+    // logout() -> raiz precisa mostrar Auth uma única vez, sem re-navegar
+    // (RootRoute não redireciona quando desloga).
     authApi.me.mockRejectedValueOnce(new Error("401"));
     useAuthStore.getState().login("token-invalido", { name: "Alice" });
 
@@ -56,5 +57,19 @@ describe("rota raiz", () => {
     expect(await screen.findAllByRole("button", { name: /entrar/i })).not.toHaveLength(0);
     expect(useAuthStore.getState().isAuthenticated).toBe(false);
     expect(window.location.pathname).toBe("/");
+  });
+
+  it("cai na autenticação sem chamar /auth/me quando o cookie de refresh expirou ou não existe", async () => {
+    // O boot chama /auth/refresh primeiro. Se ele falha (cookie ausente ou
+    // revogado), não há token novo para validar, então /auth/me nem deveria
+    // ser chamado.
+    authApi.refresh.mockRejectedValueOnce(new Error("401"));
+    useAuthStore.getState().login("token-velho", { name: "Alice" });
+
+    render(<App />);
+
+    expect(await screen.findAllByRole("button", { name: /entrar/i })).not.toHaveLength(0);
+    expect(authApi.me).not.toHaveBeenCalled();
+    expect(useAuthStore.getState().isAuthenticated).toBe(false);
   });
 });

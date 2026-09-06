@@ -1,4 +1,4 @@
-import api from "./axios";
+import api, { refreshAccessToken } from "./axios";
 import { useAuthStore } from "../store/authStore";
 
 export const authApi = {
@@ -6,7 +6,7 @@ export const authApi = {
   login: (data) => api.post("/auth/login", data),
   me: () => api.get("/auth/me"),
   updateProfile: (data) => api.put("/auth/me", data),
-  refresh: () => api.post("/auth/refresh"),
+  refresh: () => refreshAccessToken(),
   // Anônimas: a resposta é sempre a mesma exista o e-mail ou não, então não há
   // nada a interpretar aqui além de "deu certo" ou "deu erro de rede".
   forgotPassword: (email) => api.post("/auth/forgot-password", { email }),
