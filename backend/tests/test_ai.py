@@ -2,12 +2,13 @@ import uuid
 from decimal import Decimal
 
 import pytest
+from sqlalchemy import select
 
 from google.genai import chats as genai_chats
 
 import app.services.ai_service as ai
 from app.limiter import limiter
-from app.models.sql_models import User, Wallet
+from app.models.sql_models import AiUsageDaily, User, Wallet
 
 
 def _chat_que_registra(recebido: list):
@@ -15,8 +16,17 @@ def _chat_que_registra(recebido: list):
     que este teste precisa inspecionar."""
     async def _responder(historico, _mensagem):
         recebido.extend(historico)
-        return "resposta ok"
+        return "resposta ok", 0
     return _responder
+
+
+async def _novo_usuario(db_session) -> User:
+    """User de verdade: a cota diária (FK de `ai_usage_daily`) precisa de um
+    `user_id` que exista, e `uuid.UUID("user-1")` não é um UUID válido."""
+    user = User(name="Al", email=f"al_{uuid.uuid4().hex[:8]}@t.com", password_hash="x")
+    db_session.add(user)
+    await db_session.commit()
+    return user
 
 
 @pytest.mark.asyncio
@@ -69,11 +79,12 @@ async def test_insight_score_is_deterministic_not_from_llm(db_session, monkeypat
     monkeypatch.setattr(ai, "ai_insights_collection", _FakeInsights())
 
     async def _resposta(_prompt):
-        return '{"summary_text": "a|b|c", "suggested_action": "faça X"}'
+        return '{"summary_text": "a|b|c", "suggested_action": "faça X"}', 0
 
     monkeypatch.setattr(ai, "_gerar_json", _resposta)
 
-    result = await ai.get_or_generate_insight(db_session, "user-1")
+    user = await _novo_usuario(db_session)
+    result = await ai.get_or_generate_insight(db_session, str(user.id))
     assert result["score"] == 90
     assert result["summary_text"] == "a|b|c"
     assert result["suggested_action"] == "faça X"
@@ -98,11 +109,12 @@ async def test_insight_returns_score_when_llm_text_fails(db_session, monkeypatch
     monkeypatch.setattr(ai, "ai_insights_collection", _FakeInsights())
 
     async def _nao_e_json(_prompt):
-        return "desculpe, não consegui"
+        return "não é json", 0
 
     monkeypatch.setattr(ai, "_gerar_json", _nao_e_json)
 
-    result = await ai.get_or_generate_insight(db_session, "user-1")
+    user = await _novo_usuario(db_session)
+    result = await ai.get_or_generate_insight(db_session, str(user.id))
     assert result["score"] == 90
     assert result["summary_text"] == ""
     assert result.get("error")
@@ -131,7 +143,8 @@ async def test_insight_returns_score_when_llm_call_raises(db_session, monkeypatc
 
     monkeypatch.setattr(ai, "_gerar_json", _boom)
 
-    result = await ai.get_or_generate_insight(db_session, "user-1")
+    user = await _novo_usuario(db_session)
+    result = await ai.get_or_generate_insight(db_session, str(user.id))
     assert result["score"] == 90
     assert result["summary_text"] == ""
     assert result.get("error")
@@ -178,7 +191,8 @@ async def test_insight_recomputes_score_on_cache_hit(db_session, monkeypatch):
 
     monkeypatch.setattr(ai, "_gerar_json", _boom)
 
-    result = await ai.get_or_generate_insight(db_session, "user-1")
+    user = await _novo_usuario(db_session)
+    result = await ai.get_or_generate_insight(db_session, str(user.id))
     assert result["score"] == 90
     assert result["summary_text"] == "cached text"
 
@@ -223,11 +237,12 @@ async def test_insight_regenerates_text_when_data_changes(db_session, monkeypatc
     monkeypatch.setattr(ai, "ai_insights_collection", fake)
 
     async def _resposta(_prompt):
-        return '{"summary_text": "novo|texto|fresco", "suggested_action": "nova ação"}'
+        return '{"summary_text": "novo|texto|fresco", "suggested_action": "nova ação"}', 0
 
     monkeypatch.setattr(ai, "_gerar_json", _resposta)
 
-    result = await ai.get_or_generate_insight(db_session, "user-1")
+    user = await _novo_usuario(db_session)
+    result = await ai.get_or_generate_insight(db_session, str(user.id))
     assert result["score"] == 100
     assert result["summary_text"] == "novo|texto|fresco"  # regenerado, não o velho
     assert result["suggested_action"] == "nova ação"
@@ -317,19 +332,22 @@ async def test_both_gemini_calls_carry_an_output_ceiling(monkeypatch):
     monkeypatch.setattr(ai.client.aio.models, "generate_content", _fake_generate)
     monkeypatch.setattr(genai_chats.AsyncChat, "send_message", _fake_send)
 
-    assert await ai._gerar_json("prompt") == '{"summary_text": "a", "suggested_action": "b"}'
-    assert await ai._responder_chat([], "oi") == "ok"
+    assert (await ai._gerar_json("prompt"))[0] == '{"summary_text": "a", "suggested_action": "b"}'
+    assert (await ai._responder_chat([], "oi"))[0] == "ok"
 
     assert capturado["insight"] == ai.MAX_TOKENS_INSIGHT > 0
     assert capturado["chat"] == ai.MAX_TOKENS_CHAT > 0
 
 
 @pytest.mark.asyncio
-async def test_an_empty_chat_answer_raises_instead_of_being_stored(monkeypatch):
+async def test_an_empty_chat_answer_raises_instead_of_being_stored(db_session, monkeypatch):
     """O SDK antigo levantava quando a resposta vinha vazia ou bloqueada; este
     devolve None. Sem a guarda, o "" chegaria à rota, seria GRAVADO no
     histórico como mensagem da IA e viraria uma bolha vazia — em vez do 503
-    claro que a rota já sabe dar."""
+    claro que a rota já sabe dar. A guarda mora em `chat_with_ai`, DEPOIS do
+    `_com_cota`: a chamada já aconteceu e já foi debitada (achado de review de
+    2026-09-06, ver `_responder_chat`), então este teste confere o débito
+    também, não só o raise."""
     from types import SimpleNamespace
 
     async def _vazia(self, _mensagem, config=None):
@@ -337,5 +355,17 @@ async def test_an_empty_chat_answer_raises_instead_of_being_stored(monkeypatch):
 
     monkeypatch.setattr(genai_chats.AsyncChat, "send_message", _vazia)
 
+    user = await _novo_usuario(db_session)
     with pytest.raises(ValueError):
-        await ai._responder_chat([], "oi")
+        await ai.chat_with_ai(db_session, str(user.id), "oi", [])
+
+    user_id = user.id  # antes do expire_all, como em test_ai_quota.py
+    db_session.expire_all()
+    uso = (
+        await db_session.execute(
+            select(AiUsageDaily).where(
+                AiUsageDaily.user_id == user_id, AiUsageDaily.day == ai.dia_da_cota()
+            )
+        )
+    ).scalar_one()
+    assert uso.calls == 1

@@ -140,6 +140,10 @@ matar.
 **Três códigos, e só:** `WALLET_LIMIT_REACHED`, `WALLET_READ_ONLY`,
 `AI_REQUIRES_PREMIUM`.
 
+**Emenda (ADR 0003, 2026-09-06):** quarto código, `AI_DAILY_CAP_REACHED`, para
+a cota diária de IA. O contrato do objeto não muda; esse código é o único que
+também traz `resets_at`.
+
 Não existe código separado para "trial acabou" versus "nunca teve": a mensagem
 na tela difere, mas o frontend deriva isso do `plan.ai_trial_ends_at` estar
 preenchido e no passado. Código novo para um fato que já viaja no `plan` seria

@@ -23,6 +23,8 @@ Resolvido pelo [ADR 0001](docs/adr/0001-modelo-de-assinatura.md) (issue #19).
 | **carência** (`GRACE`) | 72 horas exatas depois de `premium_until` em que o vencido ainda escapa do teto de carteiras. A IA já parou | `premium_until <= now < premium_until + 72h` |
 | **teto de carteiras** | Limite de 2 carteiras ativas. Vale para free e para vencido fora da carência | `premium_until IS NULL OR now >= premium_until + 72h` |
 | **carteira excedente** | Carteira acima do teto: fica somente-leitura, mas **continua contando em todo total** | as 2 mais antigas nunca são excedentes |
+| **cota diária de IA** | 120k tokens **ou** 100 chamadas por dia da cota, para quem pode gerar. Vale com o paywall desligado | linha de `ai_usage_daily` do dia abaixo dos dois tetos |
+| **dia da cota** | Dia em UTC-8, o dia em que o Google zera o RPD do projeto. Nem UTC nem Brasília | `dia_da_cota()` em `ai_service.py` |
 
 Os dois portões, escritos por extenso:
 
@@ -49,6 +51,7 @@ reescrito; `message` é livre.**
 | `WALLET_LIMIT_REACHED` | criar carteira além do teto |
 | `WALLET_READ_ONLY` | qualquer escrita numa carteira bloqueada, inclusive como destino |
 | `AI_REQUIRES_PREMIUM` | gerar IA sem trial e sem assinatura |
+| `AI_DAILY_CAP_REACHED` | gerar IA depois de estourar a cota diária (ADR 0003); traz `resets_at` |
 
 ### Termos que este glossário evita de propósito
 

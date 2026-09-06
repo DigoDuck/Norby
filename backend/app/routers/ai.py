@@ -6,6 +6,7 @@ from app.dependencies import get_db, get_current_user, require_ai_access
 from app.limiter import limiter, user_key
 from app.models.sql_models import User
 from app.services.ai_service import get_or_generate_insight, chat_with_ai
+from app.services.plan_service import PlanRefused
 from app.schemas.ai import (
     ChatMessage,
     InsightResponse,
@@ -74,6 +75,10 @@ async def chat(
     # Chama o Gemini (se falhar, devolve 503 claro em vez de 500 sem headers de CORS)
     try:
         ai_response = await chat_with_ai(db, user_id, payload.message, history)
+    except PlanRefused:
+        # Cota diária (ADR 0003): sobe até o handler do main, que vira 403 com
+        # o código. Antes do genérico, que a transformaria num 503 sem motivo.
+        raise
     except Exception:
         logger.exception("Falha no chat com a IA (user=%s)", user_id)
         raise HTTPException(
