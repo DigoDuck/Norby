@@ -13,7 +13,7 @@ from app.dependencies import get_db, get_current_user
 from app.limiter import limiter, user_key, refresh_token_key, reset_email_key
 from app.models.sql_models import User
 from app.schemas.user import (
-    UserRegister, UserLogin, UserUpdate, Token, TokenPair, RefreshRequest,
+    UserRegister, UserLogin, UserUpdate, Token, TokenPair,
     DeleteAccountRequest, UserResponse, ForgotPassword, ResetPassword,
 )
 from app.services.auth_service import (
@@ -83,11 +83,11 @@ def _clear_refresh_cookie(response: Response) -> None:
     )
 
 
-async def _refresh_body(request: Request, payload: RefreshRequest | None = None) -> str:
-    # Cookie primeiro (#110), corpo como transição para builds antigos do
-    # frontend. Carimba em request.state ANTES do decorator do slowapi rodar,
-    # porque refresh_token_key é síncrono e não vê o corpo parseado.
-    raw = request.cookies.get(settings.refresh_cookie_name) or (payload.refresh_token if payload else None)
+async def _refresh_body(request: Request) -> str:
+    # Passo 3 de 3 do #110: só o cookie, o corpo não existe mais. Carimba em
+    # request.state ANTES do decorator do slowapi rodar, porque
+    # refresh_token_key é síncrono e não vê o corpo parseado.
+    raw = request.cookies.get(settings.refresh_cookie_name)
     if not raw:
         raise HTTPException(status_code=401, detail="Refresh token ausente")
     request.state.refresh_token = raw
@@ -152,7 +152,7 @@ async def register(
     access = create_access_token(str(user.id))
     refresh = await create_refresh_token(str(user.id), db)
     _set_refresh_cookie(response, refresh)
-    return Token(access_token=access, refresh_token=refresh, user=UserResponse.model_validate(user))
+    return Token(access_token=access, user=UserResponse.model_validate(user))
 
 @router.post("/login", response_model=Token)
 # Teto global 200/min: só flood. A defesa contra força bruta é o atraso
@@ -198,7 +198,7 @@ async def login(
     access = create_access_token(str(user.id))
     refresh = await create_refresh_token(str(user.id), db)
     _set_refresh_cookie(response, refresh)
-    return Token(access_token=access, refresh_token=refresh, user=UserResponse.model_validate(user))
+    return Token(access_token=access, user=UserResponse.model_validate(user))
 
 @router.post("/refresh", response_model=TokenPair)
 # Issue #22: 20/min era teto de CAPACIDADE, não defesa — com access token de
@@ -219,7 +219,7 @@ async def refresh_token(
         raise HTTPException(status_code=401, detail="Refresh token inválido ou expirado")
     access, new_refresh, _user = result
     _set_refresh_cookie(response, new_refresh)
-    return TokenPair(access_token=access, refresh_token=new_refresh)
+    return TokenPair(access_token=access)
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 # Desde que o logout passou a derrubar TODAS as sessões ao receber um token já

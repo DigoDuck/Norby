@@ -13,9 +13,12 @@ import pytest
 from sqlalchemy import select
 
 import app.routers.auth as auth_router
+from app.config import get_settings
 from app.models.sql_models import LoginThrottle, PasswordResetToken, RefreshToken, User
 from app.services.auth_service import _hash_token
 from app.services.throttle_service import email_key_hash
+
+COOKIE = get_settings().refresh_cookie_name
 
 
 @pytest.fixture(autouse=True)
@@ -140,7 +143,8 @@ async def test_the_password_actually_changes(client, enviados):
 
 @pytest.mark.asyncio
 async def test_reset_revokes_every_session(client, enviados, db_session):
-    email, tokens = await registrar(client)
+    email, _ = await registrar(client)
+    refresh = client.cookies.get(COOKIE)
     await client.post("/auth/forgot-password", json={"email": email})
 
     await client.post(
@@ -150,9 +154,8 @@ async def test_reset_revokes_every_session(client, enviados, db_session):
 
     # Quem redefine ou esqueceu a senha ou desconfia que alguém a tem. Nos dois
     # casos, um refresh vivo de 7 dias anularia o motivo de ter redefinido.
-    usado = await client.post(
-        "/auth/refresh", json={"refresh_token": tokens["refresh_token"]}
-    )
+    client.cookies.set(COOKIE, refresh)
+    usado = await client.post("/auth/refresh")
     assert usado.status_code == 401
 
 

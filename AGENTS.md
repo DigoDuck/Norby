@@ -251,18 +251,24 @@ dele vira `$bcrypt-sha256$`, formato que o código anterior a 2026-08-15 não sa
 verificar — reverter tranca esses usuários para fora com a senha correta. Em
 qualquer rollback, `bcrypt_sha256` tem de continuar sendo verificado.
 
-**Tokens no navegador — decisão consciente (2026-07-21):** access e refresh
-ficam no `localStorage` (Zustand persist). A correção canônica seria refresh em
-cookie `HttpOnly` + access só em memória, mas o frontend (`vercel.app`) e a API
-(`railway.app`) são *sites* diferentes: o cookie exigiria `SameSite=None` e
-seria bloqueado pelo Safari ITP e pelo Chrome, deslogando o usuário a cada
-recarga. Mitigações no lugar: CSP restritiva no `vercel.json`, access token de
-15 min e revogação de todas as sessões quando um refresh token é reusado.
-**Pré-requisito para migrar: CUMPRIDO em 2026-09-05.** `norby.com.br` foi
-adquirido, então API e frontend podem passar a viver no mesmo site registrável
-(`norby.com.br` + `api.norby.com.br`) e o cookie vira `SameSite=Lax`. Os dois
-domínios já estão no ar, então não sobrou passo de infraestrutura: falta só o
-código, rastreado no #110.
+**Tokens no navegador — refresh em cookie, access em memória (2026-07-21,
+migrado em 2026-09-05/06, issue #110):** o refresh token vive no cookie
+`norby_refresh` (`HttpOnly; SameSite=Lax; Path=/auth`, `Secure` quando
+`app_base_url` é https) do host da API; o access token nunca é persistido,
+fica só em memória (`authStore` sem `persist` para o `token`). No boot, o
+`App` chama `/auth/refresh` (que lê só o cookie) antes do primeiro `/auth/me`
+— sobrevive a recarga sem tocar em `localStorage` (`frontend/src/App.jsx`).
+Pré-requisito para sair do `localStorage`: API e frontend no mesmo site
+registrável, cumprido em 2026-09-05 com o `norby.com.br`. Requisições
+concorrentes de UMA aba entram numa fila (`frontend/src/api/axios.js`) para
+não disparar dois refreshes ao mesmo tempo: apresentar um token já rotacionado
+aciona a detecção de reuso (`rotate_refresh_token`) e derruba TODAS as
+sessões, inclusive a que venceu a corrida. Essa fila não cobre duas ABAS
+refrescando ao mesmo tempo — dívida aceita, sem trava entre abas ainda.
+O deploy do passo 2 (access só em memória) deslogou de uma vez as sessões que
+não tinham passado por login/refresh desde o passo 1: o build antigo nunca
+recebeu o cookie, e sem `localStorage` para recorrer não sobrou refresh para
+apresentar.
 
 **Rate limit atrás do proxy — reescrito em 2026-08-16 (issue #22, fix round 1
 incluído):** o uvicorn só honra `X-Forwarded-For` quando o peer é
