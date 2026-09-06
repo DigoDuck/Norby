@@ -2,6 +2,7 @@
 responde "o que o admin alcança"."""
 
 import asyncio
+import logging
 import uuid
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
@@ -19,6 +20,7 @@ from app.services.auth_service import verify_password
 from app.services.billing_service import GatewayCancelFailed
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
+logger = logging.getLogger("norby.admin")
 
 
 async def _alvo(db: AsyncSession, admin: User, user_id: uuid.UUID, senha: str) -> User:
@@ -57,7 +59,8 @@ async def cancel_subscription(
         await admin_service.cancelar_assinatura(db, admin=admin, alvo=alvo)
     except admin_service.SemAssinatura:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Este usuário não tem assinatura ativa")
-    except GatewayCancelFailed:
+    except GatewayCancelFailed as erro:
+        logger.error("falha ao cancelar assinatura no gateway: %s", erro)
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="O Stripe recusou o cancelamento. Tente de novo.")
 
 
@@ -70,9 +73,10 @@ async def delete_user(
     alvo = await _alvo(db, admin, user_id, payload.password)
     try:
         await admin_service.excluir_conta(db, admin=admin, alvo=alvo)
-    except GatewayCancelFailed:
+    except GatewayCancelFailed as erro:
         # Mesma regra do DELETE /auth/me: assinatura viva que o Stripe não
         # cancelou, NADA é apagado.
+        logger.error("falha ao cancelar assinatura no gateway: %s", erro)
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="O Stripe recusou o cancelamento; a conta não foi excluída.")
 
 
@@ -82,9 +86,10 @@ async def recovery_email(
     request: Request, user_id: uuid.UUID, payload: AdminActionRequest, background: BackgroundTasks,
     admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db),
 ):
+    # Step-up primeiro: senha errada é sempre 401, mesmo sem Brevo configurado.
+    alvo = await _alvo(db, admin, user_id, payload.password)
     if not get_settings().brevo_api_key:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Recuperação de senha indisponível")
-    alvo = await _alvo(db, admin, user_id, payload.password)
     link = await admin_service.preparar_recuperacao(
         db, admin=admin, alvo=alvo, base_url=get_settings().app_base_url, rota=ROTA_REDEFINIR,
     )

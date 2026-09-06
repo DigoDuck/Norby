@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import select, func
+from sqlalchemy import select
 
 import app.routers.admin as admin_router
 import app.routers.auth as auth_router
@@ -23,17 +23,6 @@ from app.models.sql_models import (
 )
 
 SENHA = "secret123"  # a senha que o make_auth_client cadastra
-
-
-@pytest.fixture(autouse=True)
-def brevo_configurado(monkeypatch):
-    """Vários testes aqui usam /recovery-email sem testar o Brevo em si; sem
-    isto, herdariam o `brevo_api_key` vazio do ambiente e cairiam no 503 antes
-    de chegar no step-up de senha. Os dois testes sobre o Brevo (configurado e
-    ausente) sobrescrevem por cima dentro do próprio teste, e restauram o que
-    encontraram — que passa a ser este valor, não o vazio do ambiente."""
-    settings = get_settings()
-    monkeypatch.setattr(settings, "brevo_api_key", "xkeysib-teste")
 
 
 async def _usuario(ac, db_session) -> User:
@@ -212,6 +201,50 @@ async def test_cancel_calls_stripe_and_ends_premium_now(make_auth_client, db_ses
         eu_id, "cancel_subscription", alvo_id, alvo_email,
     )
     assert linha.detail == {"stripe_subscription_id": "sub_teste"}
+
+
+@pytest.mark.asyncio
+async def test_cancel_survives_a_failed_fetch_after_the_stripe_cancel(
+    make_auth_client, db_session, monkeypatch
+):
+    # O Stripe JÁ cancelou quando o fetch (ou a aplicação) falha depois. Isso
+    # não pode virar 500 nem ficar sem auditoria: repetir bateria num
+    # GatewayCancelFailed permanente (o Stripe recusa cancelar de novo o que
+    # já está cancelado), e a ação que de fato aconteceu sumiria sem rastro.
+    admin = await make_auth_client("Admin")
+    eu = await _promover(admin, db_session)
+    eu_id = eu.id
+    alvo = await _usuario(await make_auth_client("Alvo"), db_session)
+    alvo_id = alvo.id
+    alvo.stripe_subscription_id = "sub_teste"
+    alvo.premium_until = datetime.now(timezone.utc) + timedelta(days=20)
+    await db_session.commit()
+
+    cancelados = []
+
+    async def _cancel(subscription_id):
+        cancelados.append(subscription_id)
+
+    async def _fetch(subscription_id):
+        raise RuntimeError("stripe indisponível")
+
+    monkeypatch.setattr(admin_service, "cancel_subscription", _cancel)
+    monkeypatch.setattr(admin_service, "fetch_subscription", _fetch)
+
+    res = await admin.post(f"/admin/users/{alvo_id}/cancel-subscription", json={"password": SENHA})
+    assert res.status_code == 204, res.text
+    assert cancelados == ["sub_teste"]
+
+    db_session.expire_all()
+    alvo = (await db_session.execute(select(User).where(User.id == alvo_id))).scalar_one()
+    # A aplicação falhou: premium_until continua no futuro até o webhook
+    # `customer.subscription.deleted` fechar o portão.
+    assert alvo.premium_until > datetime.now(timezone.utc)
+    (linha,) = await _auditoria(db_session)
+    assert (linha.admin_id, linha.action, linha.target_user_id) == (
+        eu_id, "cancel_subscription", alvo_id,
+    )
+    assert linha.detail == {"stripe_subscription_id": "sub_teste", "aplicado": False}
 
 
 @pytest.mark.asyncio

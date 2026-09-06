@@ -6,6 +6,7 @@ primeiro, recusa aborta tudo), `cancel_subscription` (imediato) e
 métricas. Service não conhece HTTP: as exceções daqui viram status no router.
 """
 
+import logging
 import uuid
 from datetime import datetime, timezone
 
@@ -21,6 +22,8 @@ from app.services.billing_service import (
     cancel_subscription,
     fetch_subscription,
 )
+
+logger = logging.getLogger(__name__)
 
 # Limite de requisições por dia do projeto Gemini no tier gratuito (ADR 0003),
 # só para a tela mostrar "X de 500". Não é aplicado em lugar nenhum: quem
@@ -76,13 +79,18 @@ async def metricas(db: AsyncSession) -> dict:
 
 
 async def _registrar(
-    db: AsyncSession, *, admin: User, acao: str, alvo_id: uuid.UUID, alvo_email: str,
+    db: AsyncSession, *, admin_id: uuid.UUID, acao: str, alvo_id: uuid.UUID, alvo_email: str,
     detail: dict | None = None,
 ) -> None:
+    # admin_id em vez de `admin: User`, de propósito: um `db.rollback()` (ver
+    # `cancelar_assinatura`) expira TODOS os objetos ORM da sessão, e reler
+    # `admin.id` depois disso estoura MissingGreenlet. O id já é um valor
+    # simples, sem esse risco — mesma razão de `alvo_id`/`alvo_email` abaixo.
+    #
     # DEPOIS da ação, em commit próprio: ação que falhou não deixa linha, e a
     # linha não depende de o alvo ainda existir (ver AdminAction).
     db.add(AdminAction(
-        admin_id=admin.id, action=acao, target_user_id=alvo_id,
+        admin_id=admin_id, action=acao, target_user_id=alvo_id,
         target_email=alvo_email, detail=detail,
     ))
     await db.commit()
@@ -99,25 +107,48 @@ async def cancelar_assinatura(db: AsyncSession, *, admin: User, alvo: User) -> N
     if not alvo.stripe_subscription_id:
         raise SemAssinatura()
     sub_id = alvo.stripe_subscription_id
+    # Capturados ANTES do try: um `db.rollback()` no except expira os
+    # atributos do objeto ORM, e reler um atributo expirado fora de um
+    # `await` explícito estoura MissingGreenlet no SQLAlchemy async.
+    admin_id, alvo_id, alvo_email = admin.id, alvo.id, alvo.email
     await cancel_subscription(sub_id)  # GatewayCancelFailed sobe até o router
-    aplicar_assinatura(alvo, await fetch_subscription(sub_id))
-    await db.commit()
+
+    # A partir daqui o Stripe JÁ cancelou. Se o fetch ou o commit falharem
+    # (rede, 5xx), o cancelamento não pode virar erro 500 nem ficar sem
+    # auditoria: ele aconteceu. Sem esta guarda, o admin tentaria de novo, o
+    # Stripe recusaria cancelar uma assinatura já cancelada
+    # (GatewayCancelFailed para sempre), e a linha de auditoria de uma ação
+    # que de fato ocorreu nunca seria escrita. O webhook
+    # `customer.subscription.deleted` fecha `premium_until` quando chegar.
+    detail = {"stripe_subscription_id": sub_id}
+    try:
+        aplicar_assinatura(alvo, await fetch_subscription(sub_id))
+        await db.commit()
+    except Exception as erro:  # noqa: BLE001 — rede, credencial ou 5xx do Stripe
+        await db.rollback()
+        logger.warning(
+            "admin: assinatura %s cancelada no Stripe mas o fetch/aplicação falhou "
+            "para o usuário %s: %s", sub_id, alvo_id, erro,
+        )
+        detail["aplicado"] = False
+
     await _registrar(
-        db, admin=admin, acao="cancel_subscription", alvo_id=alvo.id, alvo_email=alvo.email,
-        detail={"stripe_subscription_id": sub_id},
+        db, admin_id=admin_id, acao="cancel_subscription", alvo_id=alvo_id, alvo_email=alvo_email,
+        detail=detail,
     )
 
 
 async def excluir_conta(db: AsyncSession, *, admin: User, alvo: User) -> None:
-    alvo_id, alvo_email = alvo.id, alvo.email
+    admin_id, alvo_id, alvo_email = admin.id, alvo.id, alvo.email
     await delete_account(alvo, db)  # Stripe primeiro; GatewayCancelFailed sobe
-    await _registrar(db, admin=admin, acao="delete_account", alvo_id=alvo_id, alvo_email=alvo_email)
+    await _registrar(db, admin_id=admin_id, acao="delete_account", alvo_id=alvo_id, alvo_email=alvo_email)
 
 
 async def preparar_recuperacao(db: AsyncSession, *, admin: User, alvo: User, base_url: str, rota: str) -> str:
     """Cria o token e devolve o link. Quem ENVIA é o router, em background,
     pelo mesmo helper do /auth/forgot-password: o service não conhece
     BackgroundTasks."""
-    raw = await create_password_reset(str(alvo.id), db)
-    await _registrar(db, admin=admin, acao="send_recovery_email", alvo_id=alvo.id, alvo_email=alvo.email)
+    admin_id, alvo_id, alvo_email = admin.id, alvo.id, alvo.email
+    raw = await create_password_reset(str(alvo_id), db)
+    await _registrar(db, admin_id=admin_id, acao="send_recovery_email", alvo_id=alvo_id, alvo_email=alvo_email)
     return f"{base_url.rstrip('/')}{rota}?token={raw}"

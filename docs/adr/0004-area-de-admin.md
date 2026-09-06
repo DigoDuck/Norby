@@ -33,7 +33,11 @@ inexistente (`{"detail": "Not Found"}`), nunca 403.** Um 403 confirmaria que
 `/admin/*` existe e convidaria a insistir (senha errada, força bruta no id).
 404 faz a área inteira parecer não-existente para quem não é admin — o mesmo
 raciocínio do `WalletNotFound` em `main.py`, aplicado à existência da própria
-rota.
+rota. O disfarce vale para quem está autenticado e não é admin; uma
+requisição anônima leva 401 como qualquer rota autenticada (não passa nem de
+`get_current_user`), e `/openapi.json` lista `/admin/*` normalmente quando
+`docs_enabled` está ligado — a ocultação depende de docs continuarem
+desligados em produção.
 
 **As três ações exigem a senha atual (step-up), não só o access token.** A
 conta de admin é protegida só por senha — não há 2FA nesta v2, porque exigir
