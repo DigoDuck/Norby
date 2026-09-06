@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Send, Plus, MessageCircle, Shield } from "lucide-react";
 import { aiApi } from "@/api/ai";
+import { apiErrorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import NorthStar from "@/components/shared/NorthStar";
@@ -72,12 +73,14 @@ export default function AIAnalyst() {
         ...prev,
         { role: "assistant", content: res.data.response },
       ]);
-    } catch {
+    } catch (err) {
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
-          content: "Erro ao conectar com a IA. Tente novamente.",
+          // Recusa de plano ou de cota (403 com detail.message) chega como
+          // fala da assistente, com o motivo; o resto cai no genérico.
+          content: apiErrorMessage(err, "Erro ao conectar com a IA. Tente novamente."),
         },
       ]);
     } finally {

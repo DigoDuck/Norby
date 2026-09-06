@@ -52,7 +52,7 @@ export default function Privacidade() {
             <p className="leading-relaxed text-content-2">Tratamos seus dados com as seguintes bases legais (art. 7º da LGPD):</p>
             <ul className="mt-3 list-disc space-y-1 pl-5 leading-relaxed text-content-2">
               <li><strong>Execução de contrato (art. 7º, V):</strong> cadastro, autenticação e funcionamento do organizador financeiro — sem esses dados o serviço não existe. Também é a base do plano pago: sem os identificadores da seção 5 não há como saber que a assinatura está válida.</li>
-              <li><strong>Consentimento (art. 7º, I):</strong> envio dos seus dados financeiros ao provedor de IA (Google Gemini) para gerar insights e responder no chat. Você pode deixar de usar os recursos de IA a qualquer momento.</li>
+              <li><strong>Consentimento (art. 7º, I):</strong> envio dos seus dados financeiros ao provedor de IA (Google Gemini) para gerar insights e responder no chat. Você pode deixar de usar os recursos de IA a qualquer momento. Nas condições atuais do serviço do Google, o conteúdo enviado à IA pode ser usado por ele para aprimorar seus produtos.</li>
               <li><strong>Cumprimento de obrigação legal/regulatória (art. 7º, II):</strong> quando aplicável, para atender determinações legais.</li>
             </ul>
           </section>
