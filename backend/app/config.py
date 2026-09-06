@@ -13,7 +13,16 @@ class Settings(BaseSettings):
     algorithm: Literal["HS256"] = "HS256"
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 7
-    
+
+    # #110: o refresh token viaja num cookie HttpOnly do host da API, restrito
+    # a /auth. `Secure` acompanha o esquema da app: em produção é https; em
+    # localhost o navegador recusaria um cookie Secure sobre http.
+    refresh_cookie_name: str = "norby_refresh"
+
+    @property
+    def refresh_cookie_secure(self) -> bool:
+        return self.app_base_url.startswith("https://")
+
     # Gemini
     gemini_api_key: str
 

@@ -2,12 +2,16 @@ import asyncio
 
 import pytest
 
+from app.config import get_settings
+
 REG = {
     "name": "Bob",
     "email": "bob@test.com",
     "password": "secret123",
     "accept_privacy": True,
 }
+
+COOKIE = get_settings().refresh_cookie_name
 
 
 async def _register(client):
@@ -43,7 +47,11 @@ async def test_refresh_rotates_and_invalidates_old_token(client):
     again = await client.post("/auth/refresh", json={"refresh_token": new["refresh_token"]})
     assert again.status_code == 200
 
-    # O refresh antigo foi rotacionado: usá-lo de novo deve falhar.
+    # O refresh antigo foi rotacionado: usá-lo de novo deve falhar. O cookie
+    # tem precedência sobre o corpo (#110), e o jar do httpx já guarda o
+    # cookie mais recente; limpa antes para garantir que É o corpo antigo
+    # quem chega no servidor.
+    client.cookies.clear()
     reused = await client.post("/auth/refresh", json={"refresh_token": old_refresh})
     assert reused.status_code == 401
 
@@ -207,6 +215,9 @@ async def test_reusing_rotated_token_revokes_all_sessions(client):
         "refresh_token"
     ]
 
+    # Cookie tem precedência sobre o corpo (#110); limpa o jar para garantir
+    # que r1 (já rotacionado) chega pelo corpo, não pelo cookie mais recente.
+    client.cookies.clear()
     assert (await client.post("/auth/refresh", json={"refresh_token": r1})).status_code == 401
     # O sucessor legítimo também morre: a sessão inteira foi invalidada.
     assert (await client.post("/auth/refresh", json={"refresh_token": r2})).status_code == 401
@@ -231,3 +242,46 @@ async def test_logout_with_rotated_token_revokes_successor(client):
     # O sucessor do atacante tem que estar morto.
     after = await client.post("/auth/refresh", json={"refresh_token": r1})
     assert after.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_login_sets_an_httponly_refresh_cookie(client):
+    await _register(client)
+    res = await client.post("/auth/login", json={"email": REG["email"], "password": REG["password"]})
+    assert res.status_code == 200
+    set_cookie = res.headers["set-cookie"]
+    assert f"{COOKIE}=" in set_cookie
+    assert "HttpOnly" in set_cookie
+    assert "SameSite=lax" in set_cookie
+    assert "Path=/auth" in set_cookie
+    # O cookie leva o MESMO token do corpo durante a transição (passo 1 de 3).
+    assert res.json()["refresh_token"] in set_cookie
+
+
+@pytest.mark.asyncio
+async def test_refresh_works_from_the_cookie_alone(client):
+    body = await _register(client)
+    antigo = client.cookies.get(COOKIE)
+    assert antigo == body["refresh_token"]
+
+    res = await client.post("/auth/refresh")  # sem corpo: só o cookie
+    assert res.status_code == 200, res.text
+    assert res.json()["access_token"]
+    # Rotacionou: o cookie novo é outro, e o antigo já não vale. O jar do
+    # httpx reenviaria o cookie novo (que tem precedência sobre o corpo), por
+    # isso ele é limpo antes de apresentar o token antigo pelo corpo.
+    novo = client.cookies.get(COOKIE)
+    assert novo and novo != antigo
+    client.cookies.clear()
+    reused = await client.post("/auth/refresh", json={"refresh_token": antigo})
+    assert reused.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_logout_clears_the_cookie(client):
+    await _register(client)
+    res = await client.post("/auth/logout")  # sem corpo: só o cookie
+    assert res.status_code == 204
+    assert "Max-Age=0" in res.headers["set-cookie"]
+    # Sem cookie e sem corpo não há o que renovar.
+    assert (await client.post("/auth/refresh")).status_code == 401
