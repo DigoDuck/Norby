@@ -11,6 +11,7 @@ As chamadas de rede são stubadas na fronteira do service, como o
 from datetime import datetime, timedelta, timezone
 
 import pytest
+import stripe
 from sqlalchemy import select
 
 import app.routers.billing as billing_router
@@ -129,6 +130,34 @@ async def test_a_gateway_failure_is_502_not_500(make_auth_client, monkeypatch):
     res = await alice.post("/billing/checkout-session")
     assert res.status_code == 502
     assert res.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_checkout_requires_the_terms_checkbox(monkeypatch):
+    # #107: o aceite fica gravado na própria sessão do Stripe, com carimbo de
+    # tempo, colado ao pagamento. É a prova que vale numa disputa, e não exige
+    # coluna nem modal de re-aceite. Sem este parâmetro o checkbox some em
+    # silêncio, por isso o teste existe.
+    recebido = {}
+
+    async def _create(**kwargs):
+        recebido.update(kwargs)
+        return stripe.checkout.Session.construct_from(
+            {"id": "cs_1", "url": "https://checkout.stripe.com/c/pay/cs_1"}, "sk_test_dummy"
+        )
+
+    monkeypatch.setattr(stripe.checkout.Session, "create_async", _create)
+
+    url = await billing.create_checkout_session(
+        client_reference_id="u1",
+        price_id="price_1",
+        customer_id=None,
+        success_url="https://norby.com.br/settings?checkout=success",
+        cancel_url="https://norby.com.br/settings?checkout=cancel",
+    )
+
+    assert url.startswith("https://checkout.stripe.com/")
+    assert recebido["consent_collection"] == {"terms_of_service": "required"}
 
 
 # --- Customer Portal ---------------------------------------------------------

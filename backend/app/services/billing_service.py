@@ -382,6 +382,12 @@ async def create_checkout_session(
         "success_url": success_url,
         "cancel_url": cancel_url,
         "locale": "pt-BR",
+        # #107: o Stripe mostra o checkbox dos termos na página dele e grava o
+        # aceite na sessão (`consent.terms_of_service = "accepted"`), com
+        # carimbo de tempo, colado ao pagamento. Exige a URL dos termos em
+        # Settings → Business → Public details, nos DOIS modos: sem ela a
+        # sessão não é criada, e não degrada, quebra.
+        "consent_collection": {"terms_of_service": "required"},
     }
     # Reaproveita o customer de quem já comprou antes. Deixar o Stripe criar um
     # segundo deixaria metade dos eventos futuros sem dono, porque a busca é
