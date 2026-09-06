@@ -15,10 +15,19 @@ import Privacidade from "./pages/Privacidade";
 import Termos from "./pages/Termos";
 import EsqueciSenha from "./pages/EsqueciSenha";
 import RedefinirSenha from "./pages/RedefinirSenha";
+import Admin from "./pages/Admin";
 
 function ProtectedRoute({ children }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   return isAuthenticated ? children : <Navigate to="/" replace />;
+}
+
+// Só admin entra; o resto volta para o dashboard sem mensagem. O backend já
+// responde 404 a quem não é admin, então isto é só para não mostrar uma tela
+// vazia a quem digitou a URL.
+function AdminRoute({ children }) {
+  const isAdmin = useAuthStore((s) => Boolean(s.user?.is_admin));
+  return isAdmin ? children : <Navigate to="/dashboard" replace />;
 }
 
 // A raiz é a porta de entrada: com sessão válida ela leva ao dashboard em vez
@@ -81,6 +90,14 @@ export default function App() {
           <Route path="/recurring" element={<Recurring />} />
           <Route path="/goals" element={<Goals />} />
           <Route path="/settings" element={<Settings />} />
+          <Route
+            path="/admin"
+            element={
+              <AdminRoute>
+                <Admin />
+              </AdminRoute>
+            }
+          />
         </Route>
       </Routes>
     </BrowserRouter>

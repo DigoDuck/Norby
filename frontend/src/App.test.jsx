@@ -24,6 +24,10 @@ vi.mock("./pages/Dashboard", () => ({ default: () => <div>Dashboard</div> }));
 vi.mock("@/api/recurring", () => ({
   recurringApi: { run: vi.fn(() => Promise.resolve({})) },
 }));
+// A tela de admin de verdade buscaria métricas e lista na montagem; mockamos
+// para este teste cobrir só o roteamento (não-admin em /admin cai no
+// dashboard), igual ao mock do Dashboard acima.
+vi.mock("./pages/Admin", () => ({ default: () => <div>Admin</div> }));
 
 describe("rota raiz", () => {
   beforeEach(() => {
@@ -36,6 +40,19 @@ describe("rota raiz", () => {
 
     render(<App />);
 
+    await waitFor(() => expect(window.location.pathname).toBe("/dashboard"));
+  });
+
+  it("não-admin em /admin cai no dashboard", async () => {
+    // O backend já responde 404 a quem não é admin; isto só evita mostrar uma
+    // tela vazia a quem digitou a URL.
+    window.history.pushState({}, "", "/admin");
+    useAuthStore.getState().login("t", { name: "Alice", is_admin: false });
+
+    render(<App />);
+
+    // Só o pathname: "Dashboard" também aparece como label da sidebar, então
+    // findByText encontraria mais de um elemento.
     await waitFor(() => expect(window.location.pathname).toBe("/dashboard"));
   });
 

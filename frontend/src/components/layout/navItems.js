@@ -6,6 +6,7 @@ import {
   Settings,
   Repeat,
   Target,
+  ShieldCheck,
 } from "lucide-react";
 
 // Lista única de rotas do shell, consumida pela Sidebar (desktop) e pelo
@@ -23,3 +24,7 @@ export const mainItems = [
 export const prefItems = [
   { to: "/settings", icon: Settings, label: "Configurações" },
 ];
+
+// Só aparece para quem tem `user.is_admin` (issue #23). O backend já responde
+// 404 a quem não é admin; esconder o item evita oferecer um link morto.
+export const adminItems = [{ to: "/admin", icon: ShieldCheck, label: "Admin" }];

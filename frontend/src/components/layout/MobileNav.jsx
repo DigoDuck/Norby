@@ -2,9 +2,10 @@ import { useRef, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { Menu, X, LogOut } from "lucide-react";
 import { authApi } from "../../api/auth";
+import { useAuthStore } from "../../store/authStore";
 import NorbyMark from "../shared/Logo";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { mainItems, prefItems } from "./navItems";
+import { mainItems, prefItems, adminItems } from "./navItems";
 
 // Abaixo de lg a sidebar vira gaveta. Todas as rotas e o logout continuam
 // acessíveis — nada é escondido, só recolhido.
@@ -15,7 +16,8 @@ export default function MobileNav() {
   // o hambúrguer, o foco ainda volta para ele em vez de cair no body.
   const hamburguer = useRef(null);
   const navigate = useNavigate();
-  const items = [...mainItems, ...prefItems];
+  const isAdmin = useAuthStore((s) => Boolean(s.user?.is_admin));
+  const items = [...mainItems, ...prefItems, ...(isAdmin ? adminItems : [])];
 
   async function handleLogout() {
     await authApi.logout();
