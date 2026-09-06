@@ -131,6 +131,26 @@ class RefreshToken(Base):
 
     user: Mapped["User"] = relationship("User", back_populates="refresh_tokens")
 
+class AiUsageDaily(Base):
+    """Uso de IA por usuário e por dia da cota (issue #21, ADR 0003).
+
+    Uma linha por (usuário, dia). `day` é o dia em UTC-8 (ver `QUOTA_TZ` em
+    ai_service.py), o dia em que o Google zera o RPD do projeto, não o dia UTC
+    nem o de Brasília. Sem purga de propósito: uma linha por usuário por dia
+    não pesa, e o histórico é o instrumento que calibra os tetos (o número de
+    hoje é estimativa; o p99 real, depois de um mês, é medida). Some com o
+    usuário pelo ON DELETE CASCADE. Não entra no export da LGPD: contadores,
+    não conteúdo.
+    """
+    __tablename__ = "ai_usage_daily"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    day: Mapped[date] = mapped_column(Date, primary_key=True)
+    tokens: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    calls: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+
 class PasswordResetToken(Base):
     """Token de recuperação de senha (#36).
 

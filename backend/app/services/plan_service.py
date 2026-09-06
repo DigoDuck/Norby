@@ -61,9 +61,11 @@ class PlanRefused(Exception):
     O `code` é contrato e NUNCA é reescrito; `message` é livre.
     """
 
-    def __init__(self, code: str, message: str):
+    def __init__(self, code: str, message: str, resets_at: datetime | None = None):
         self.code = code
         self.message = message
+        # Só a cota diária (ADR 0003) preenche: quando o bloqueio termina, em UTC.
+        self.resets_at = resets_at
         super().__init__(message)
 
 

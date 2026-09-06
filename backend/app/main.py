@@ -63,9 +63,10 @@ async def _plan_refused_handler(request: Request, exc: PlanRefused) -> JSONRespo
     # `detail` em objeto de propósito: o frontend faz switch no `code`, que é
     # contrato e nunca é reescrito. Header próprio exigiria expose_headers no
     # CORS — a armadilha que este repo já pisou com o X-Total-Count.
-    return JSONResponse(
-        status_code=403, content={"detail": {"code": exc.code, "message": exc.message}}
-    )
+    detail = {"code": exc.code, "message": exc.message}
+    if exc.resets_at is not None:
+        detail["resets_at"] = exc.resets_at.isoformat()
+    return JSONResponse(status_code=403, content={"detail": detail})
 
 
 @app.exception_handler(WalletNotFound)
