@@ -7,7 +7,7 @@
 
 - **Backend:** FastAPI 0.139 + SQLAlchemy 2.0 async + Alembic · PostgreSQL 16
   (relacional) + MongoDB 7 via Motor (blocos de texto da IA) · Auth JWT
-  (python-jose) · IA **Gemini 3.5 Flash Lite** (`models/gemini-3.5-flash-lite`,
+  (PyJWT) · IA **Gemini 3.5 Flash Lite** (`models/gemini-3.5-flash-lite`,
   ver `services/ai_service.py`) · gerenciador de pacotes **uv**.
 - **Frontend:** React 19 + Vite 8 · TailwindCSS + shadcn/ui · Zustand ·
   React Router v7 · React Hook Form + Zod · axios.
@@ -41,7 +41,7 @@ alembic revision -m "descricao"                             # nova migration (pr
 uv pip compile --universal --python-version 3.12 requirements.txt -o requirements.lock
 uv pip compile --universal --python-version 3.12 requirements-dev.txt -o requirements-dev.lock
 uv pip install -r requirements-dev.lock                     # deps + ferramentas de dev/CI
-pip-audit -r requirements.lock --ignore-vuln PYSEC-2026-1325 # audit; exceção abaixo
+pip-audit -r requirements.lock                               # audit de vulnerabilidades
 ```
 Banco de teste (uma vez, apenas em dev): criar um banco `norby_test` no Postgres local usando um usuário com permissão de criar bancos. Essa permissão é específica do ambiente de desenvolvimento — não replicar em produção.
 
@@ -85,9 +85,6 @@ npm run test     # Vitest
   Existe porque quem instala é o `.lock` — bumpar só o `.txt` deixa o container
   na versão antiga com a CI verde. É exatamente o que os PRs de pip do
   Dependabot fazem: eles não sabem regenerar lock de `uv`.
-- Exceção do audit: `python-jose` traz `ecdsa`, afetado por
-  `PYSEC-2026-1325` sem versão corrigida. `Settings.algorithm` aceita somente
-  `HS256`, então o caminho vulnerável de assinatura ECDSA/ECDH não é alcançável.
 - `pip-audit` não tem filtro de severidade: o gate do backend reprova em
   qualquer advisory, mais estrito que o "só high" da issue #37 (`npm audit
   --audit-level=high` é quem casa com aquele critério). O job de Lighthouse só

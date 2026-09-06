@@ -4,15 +4,14 @@ sqlalchemy[asyncio]==2.0.52
 asyncpg==0.30.0
 alembic==1.19.1
 motor==3.7.1
-python-jose[cryptography]==3.5.0
-# Pin de transitiva por seguranca: o python-jose puxa cryptography, e a 49.0.0
-# tem PYSEC-2026-3552 (oraculo em decrypt PKCS7). O Norby nao usa PKCS7 e o JWT
-# e so HS256, entao nao ha caminho alcancavel, mas o gate de release do
-# AGENTS.md exige o pip-audit limpo.
-cryptography==50.0.0
+PyJWT==2.13.0  # JWT HS256 do access token. Substituiu o python-jose (issue #29): sem ecdsa, sem cryptography.
 python-dotenv==1.2.3
 pydantic-settings==2.15.0
 google-genai==2.22.0
+# Pin de transitiva: nao e o python-jose que puxa mais (removido, issue #29),
+# e sim o google-auth (dependencia do google-genai). Fixado so pra deixar o
+# dependente real documentado; sem CVE aberto pendente sobre ela hoje.
+cryptography==50.0.0
 email-validator==2.3.0
 bcrypt==5.0.0
 slowapi==0.1.10

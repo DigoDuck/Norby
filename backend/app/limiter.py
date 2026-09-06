@@ -1,6 +1,6 @@
 import hashlib
 
-from jose import JWTError, jwt
+import jwt  # PyJWT. Era: from jose import JWTError, jwt
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from starlette.requests import Request
@@ -37,7 +37,7 @@ def user_key(request: Request) -> str:
             sub = payload.get("sub")
             if sub:
                 return f"user:{sub}"
-        except JWTError:
+        except jwt.PyJWTError:
             pass
     return get_remote_address(request)
 

@@ -3,7 +3,7 @@ import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from jose import jwt
+import jwt  # PyJWT. Era: from jose import jwt
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
