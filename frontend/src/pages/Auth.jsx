@@ -1,5 +1,5 @@
-import { Children, cloneElement, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Children, cloneElement, useEffect, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -119,6 +119,19 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const login = useAuthStore((s) => s.login);
   const navigate = useNavigate();
+  const location = useLocation();
+  // Vem do RedefinirSenha.jsx, que navega para cá sem mostrar nada: a troca de
+  // senha derruba todas as sessões no servidor, então é aqui que a pessoa
+  // fica sabendo que precisa entrar de novo. Inicializador preguiçoso em vez
+  // de setState num efeito: o valor já nasce certo no primeiro render, sem
+  // precisar de outro render nem de suprimir a regra do hook.
+  const [senhaRedefinida] = useState(() => Boolean(location.state?.senhaRedefinida));
+
+  // Limpa o state do histórico (mesmo idioma do atalho de tipo em
+  // Transactions.jsx) para o aviso não voltar ao navegar para trás.
+  useEffect(() => {
+    if (location.state?.senhaRedefinida) navigate(location.pathname, { replace: true });
+  }, [location, navigate]);
 
   const schema = mode === "login" ? loginSchema : registerSchema;
   const {
@@ -299,6 +312,15 @@ export default function Auth() {
                 </button>
               ))}
             </div>
+
+            {senhaRedefinida && (
+              <div
+                role="status"
+                className="mt-5 rounded-xl border border-accent/20 bg-accent/10 p-3 text-sm text-accent"
+              >
+                Senha redefinida. Entre com a nova senha.
+              </div>
+            )}
 
             <form className="mt-5 space-y-3" onSubmit={handleSubmit(onSubmit)}>
               {mode === "register" && (

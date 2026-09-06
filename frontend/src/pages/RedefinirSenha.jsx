@@ -29,7 +29,8 @@ export default function RedefinirSenha() {
       // Sem login automático: a troca derruba TODAS as sessões no servidor, e
       // entrar sozinho aqui esconderia isso de quem precisa saber que os
       // outros aparelhos caíram. Entrar de novo é a confirmação de que a senha
-      // nova funciona.
+      // nova funciona. O state avisa o Auth.jsx a mostrar essa confirmação,
+      // já que esta página não fica no ar tempo nenhum para mostrar nada.
       navigate("/", { replace: true, state: { senhaRedefinida: true } });
     } catch (err) {
       setErro(

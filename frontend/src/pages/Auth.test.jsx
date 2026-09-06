@@ -103,4 +103,18 @@ describe("Auth", () => {
     expect(link).toHaveAttribute("href", "/esqueci-senha");
     expect(screen.queryByText("em breve")).not.toBeInTheDocument();
   });
+
+  it("avisa que a senha foi redefinida ao voltar do fluxo de redefinição", () => {
+    // RedefinirSenha.jsx navega pra cá com esse state em vez de mostrar
+    // qualquer coisa na própria tela (a sessão dela já caiu com a troca).
+    render(
+      <MemoryRouter initialEntries={[{ pathname: "/", state: { senhaRedefinida: true } }]}>
+        <Auth />
+      </MemoryRouter>,
+    );
+
+    expect(
+      screen.getByText("Senha redefinida. Entre com a nova senha."),
+    ).toBeInTheDocument();
+  });
 });
