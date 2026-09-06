@@ -104,7 +104,8 @@ class TokenPair(BaseModel):
     token_type: str = "bearer"
 
 class RefreshRequest(BaseModel):
-    refresh_token: str
+    # Opcional desde o #110: o token pode vir no cookie. Some no passo 3.
+    refresh_token: str | None = None
 
 class DeleteAccountRequest(BaseModel):
     confirm: bool

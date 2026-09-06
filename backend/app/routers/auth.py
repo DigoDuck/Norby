@@ -32,6 +32,7 @@ from app.services.throttle_service import check_throttle, record_failure, record
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 logger = logging.getLogger("norby.auth")
+settings = get_settings()
 
 
 def _throttled(retry_after: int) -> HTTPException:
@@ -56,6 +57,42 @@ def _log_xff(request: Request) -> None:
         request.url.path,
     )
 
+
+def _set_refresh_cookie(response: Response, raw: str) -> None:
+    # HttpOnly tira o token do alcance de qualquer script na página; Lax é o
+    # que fecha o CSRF, porque um POST cross-site não leva o cookie; Path=/auth
+    # mantém o cookie fora de todas as outras rotas.
+    response.set_cookie(
+        key=settings.refresh_cookie_name,
+        value=raw,
+        max_age=settings.refresh_token_expire_days * 86400,
+        httponly=True,
+        secure=settings.refresh_cookie_secure,
+        samesite="lax",
+        path="/auth",
+    )
+
+
+def _clear_refresh_cookie(response: Response) -> None:
+    response.delete_cookie(
+        settings.refresh_cookie_name,
+        path="/auth",
+        httponly=True,
+        secure=settings.refresh_cookie_secure,
+        samesite="lax",
+    )
+
+
+async def _refresh_body(request: Request, payload: RefreshRequest | None = None) -> str:
+    # Cookie primeiro (#110), corpo como transição para builds antigos do
+    # frontend. Carimba em request.state ANTES do decorator do slowapi rodar,
+    # porque refresh_token_key é síncrono e não vê o corpo parseado.
+    raw = request.cookies.get(settings.refresh_cookie_name) or (payload.refresh_token if payload else None)
+    if not raw:
+        raise HTTPException(status_code=401, detail="Refresh token ausente")
+    request.state.refresh_token = raw
+    return raw
+
 @router.post("/register", response_model=Token, status_code=status.HTTP_201_CREATED)
 # Teto global 60/min: só proteção contra flood, não é a defesa principal (ver
 # check_throttle abaixo). Compartilha o balde por-conta do login: tentativas
@@ -64,6 +101,7 @@ def _log_xff(request: Request) -> None:
 @limiter.limit("60/minute")
 async def register(
     request: Request,
+    response: Response,
     payload: UserRegister,
     db: AsyncSession = Depends(get_db),
     _xff: None = Depends(_log_xff),
@@ -113,6 +151,7 @@ async def register(
 
     access = create_access_token(str(user.id))
     refresh = await create_refresh_token(str(user.id), db)
+    _set_refresh_cookie(response, refresh)
     return Token(access_token=access, refresh_token=refresh, user=UserResponse.model_validate(user))
 
 @router.post("/login", response_model=Token)
@@ -122,6 +161,7 @@ async def register(
 @limiter.limit("200/minute")
 async def login(
     request: Request,
+    response: Response,
     payload: UserLogin,
     db: AsyncSession = Depends(get_db),
     _xff: None = Depends(_log_xff),
@@ -157,6 +197,7 @@ async def login(
 
     access = create_access_token(str(user.id))
     refresh = await create_refresh_token(str(user.id), db)
+    _set_refresh_cookie(response, refresh)
     return Token(access_token=access, refresh_token=refresh, user=UserResponse.model_validate(user))
 
 @router.post("/refresh", response_model=TokenPair)
@@ -168,22 +209,17 @@ async def login(
 @limiter.limit("600/minute")
 async def refresh_token(
     request: Request,
-    payload: RefreshRequest,
+    response: Response,
+    raw: str = Depends(_refresh_body),
     db: AsyncSession = Depends(get_db),
     _xff: None = Depends(_log_xff),
 ):
-    result = await rotate_refresh_token(payload.refresh_token, db)
+    result = await rotate_refresh_token(raw, db)
     if result is None:
         raise HTTPException(status_code=401, detail="Refresh token inválido ou expirado")
     access, new_refresh, _user = result
+    _set_refresh_cookie(response, new_refresh)
     return TokenPair(access_token=access, refresh_token=new_refresh)
-
-async def _refresh_body(request: Request, payload: RefreshRequest) -> RefreshRequest:
-    # Carimba o token em request.state ANTES do decorator do slowapi rodar,
-    # pra refresh_token_key (limiter.py) conseguir ler: o key_func é síncrono
-    # e só recebe `request`, sem acesso ao corpo já parseado pelo Pydantic.
-    request.state.refresh_token = payload.refresh_token
-    return payload
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 # Desde que o logout passou a derrubar TODAS as sessões ao receber um token já
@@ -200,12 +236,14 @@ async def _refresh_body(request: Request, payload: RefreshRequest) -> RefreshReq
 @limiter.limit("120/minute", key_func=refresh_token_key)
 async def logout(
     request: Request,
-    payload: RefreshRequest = Depends(_refresh_body),
+    response: Response,
+    raw: str = Depends(_refresh_body),
     db: AsyncSession = Depends(get_db),
     _xff: None = Depends(_log_xff),
 ):
     # Revoga o refresh recebido. Idempotente: token inexistente também retorna 204.
-    await revoke_refresh_token(payload.refresh_token, db)
+    await revoke_refresh_token(raw, db)
+    _clear_refresh_cookie(response)
 
 @router.get("/me", response_model=UserResponse)
 async def me(current_user: User = Depends(get_current_user)):
