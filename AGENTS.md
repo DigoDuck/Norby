@@ -271,6 +271,17 @@ não tinham passado por login/refresh desde o passo 1: o build antigo nunca
 recebeu o cookie, e sem `localStorage` para recorrer não sobrou refresh para
 apresentar.
 
+**Janela de tolerância a reuso na rotação (#130):** o refresh no boot (acima)
+tornou comum um navegador ficar com o token antecessor depois de uma resposta
+perdida (conexão caída, aba fechada em voo, 502 depois do commit) ou de duas
+abas restaurando juntas. `ROTATION_REUSE_GRACE` (30s, `auth_service.py`) trata
+isso como sessão legítima: reapresentar um token rotacionado há menos de 30s
+ganha um sucessor novo em vez de derrubar a família. Fora da janela, reuso
+continua sinal de roubo e cascateia como antes; o logout **nunca** consulta a
+janela (SEC-01 continua valendo). A coluna `refresh_tokens.revoked_at`
+(migration desta task) fica NULL em toda revogação em cascata — de propósito,
+para que um cascateamento nunca vire elegível para a própria graça.
+
 **Rate limit atrás do proxy — reescrito em 2026-08-16 (issue #22, fix round 1
 incluído):** o uvicorn só honra `X-Forwarded-For` quando o peer é
 `127.0.0.1` (default de `forwarded_allow_ips`), e o proxy do Railway não é
