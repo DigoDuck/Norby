@@ -88,6 +88,12 @@ npm run test     # Vitest
 - Exceção do audit: `python-jose` traz `ecdsa`, afetado por
   `PYSEC-2026-1325` sem versão corrigida. `Settings.algorithm` aceita somente
   `HS256`, então o caminho vulnerável de assinatura ECDSA/ECDH não é alcançável.
+- `pip-audit` não tem filtro de severidade: o gate do backend reprova em
+  qualquer advisory, mais estrito que o "só high" da issue #37 (`npm audit
+  --audit-level=high` é quem casa com aquele critério). O job de Lighthouse só
+  roda em push para `main` contra o site já implantado — é alarme pós-deploy,
+  não gate de merge, e disputa corrida com o redeploy da Vercel (documentado
+  no próprio workflow).
 
 ## Skills neste repo
 
@@ -283,7 +289,11 @@ rotacionado, então tem DOIS limites empilhados: por hash do token
 apresentado (não IP — um token velho da vítima não esgota o balde de outra
 sessão) **e** por IP (fix round 1: chavear só pelo token deixava o teto sem
 efeito nenhum contra flood, já que um token aleatório novo a cada chamada
-nunca esgota o próprio balde).
+nunca esgota o próprio balde). `/auth/forgot-password` soma 200/min por IP
+(mesma dívida aceita do login, balde único do proxy) com 3/hora por e-mail
+(HMAC, `reset_email_key`) — este último é quem de fato protege a caixa de
+entrada do alvo. `/auth/reset-password` tem só o teto de 200/min por IP: quem
+protege o token é a entropia dos 48 bytes, não o contador.
 
 **Duas dívidas aceitas nesta reescrita, não pendências esquecidas:**
 - **A vítima pode levar 429 mesmo digitando a senha certa.** `check_throttle`
@@ -291,8 +301,9 @@ nunca esgota o próprio balde).
   verdade (checar a senha primeiro e só depois atrasar não defende contra
   força bruta, só atrasa a resposta depois que o custo real já foi pago).
   Consequência: um atacante que erra a senha da vítima 1x por minuto nega o
-  login dela indefinidamente. A saída da vítima seria recuperação de senha,
-  que não existe (depende de domínio próprio, issue #41).
+  login dela indefinidamente. A saída da vítima existe desde a PR #116: ao
+  redefinir a senha, `reset_password` chama `record_success` e zera o
+  contador da conta, então a vítima recupera o acesso mesmo sob ataque.
 - **O teto global de login continua chaveado no IP do proxy**, o mesmo balde
   pra todo mundo atrás do Railway. Ficou 20x mais caro que antes
   (10/min → 200/min), não foi eliminado: ~3,3 req/s sustentados ainda negam

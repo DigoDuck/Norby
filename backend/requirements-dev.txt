@@ -2,5 +2,6 @@
 -r requirements.txt
 pytest==9.1.1
 pytest-asyncio==1.4.0
-httpx==0.28.1  # cliente de teste (AsyncClient); não é dep de produção
+# httpx virou dep de produção (email_service/Brevo, ver requirements.txt);
+# o AsyncClient de teste é o mesmo pacote, sem pin duplicado aqui.
 pip-audit==2.10.1

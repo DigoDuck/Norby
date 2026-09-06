@@ -20,8 +20,15 @@ _MAX_WAIT_SECONDS = 60
 _PURGE_AFTER = timedelta(hours=24)
 
 
-def _key_hash(email: str) -> str:
-    """HMAC-SHA256 do email normalizado. Nunca gravar o email cru na tabela."""
+def email_key_hash(email: str) -> str:
+    """Chave por conta: strip + lower, depois HMAC-SHA256 com o secret do servidor.
+
+    Pública porque `limiter.py` reusa a MESMA chave para `reset_email_key`
+    (POST /auth/forgot-password) — throttle de login e teto de recuperação
+    protegem a mesma conta, então a chave tem que ser idêntica. HMAC, não
+    sha256 puro: sem o secret, ninguém reconstrói a chave rehasheando uma
+    lista de e-mails candidatos (o que um hash sozinho permitiria).
+    """
     normalized = email.strip().lower()
     return hmac.new(
         settings.secret_key.encode(), normalized.encode(), hashlib.sha256
@@ -44,7 +51,7 @@ async def _purge_expired(db: AsyncSession) -> None:
 async def check_throttle(email: str, db: AsyncSession) -> int | None:
     """None = pode prosseguir. Caso contrário, segundos restantes de espera."""
     row = await db.scalar(
-        select(LoginThrottle).where(LoginThrottle.key_hash == _key_hash(email))
+        select(LoginThrottle).where(LoginThrottle.key_hash == email_key_hash(email))
     )
     if row is None:
         return None
@@ -75,7 +82,7 @@ async def record_failure(email: str, db: AsyncSession) -> None:
     é resolvido pelo índice único que já existe em key_hash, sem exception.
     """
     await _purge_expired(db)
-    key = _key_hash(email)
+    key = email_key_hash(email)
     now = datetime.now(timezone.utc)
     stmt = pg_insert(LoginThrottle).values(key_hash=key, failure_count=1, last_failure_at=now)
     stmt = stmt.on_conflict_do_update(
@@ -91,5 +98,5 @@ async def record_failure(email: str, db: AsyncSession) -> None:
 
 async def record_success(email: str, db: AsyncSession) -> None:
     """Login/cadastro bem-sucedido reseta o contador daquela chave."""
-    await db.execute(delete(LoginThrottle).where(LoginThrottle.key_hash == _key_hash(email)))
+    await db.execute(delete(LoginThrottle).where(LoginThrottle.key_hash == email_key_hash(email)))
     await db.commit()

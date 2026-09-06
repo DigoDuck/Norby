@@ -29,7 +29,14 @@ TIMEOUT = 10.0
 
 
 class EmailNotConfigured(Exception):
-    """Sem `BREVO_API_KEY`. O router traduz para 503."""
+    """Sem `BREVO_API_KEY` no momento do envio.
+
+    O router já barra isso alto, ANTES de agendar o envio (checagem em
+    `auth.py`, resposta 503) — na prática esta exceção é a última linha de
+    defesa, só alcançável se a chave sumir entre o pre-check e a BackgroundTask
+    rodar. `_mandar_link` a engole em silêncio, sem logar: a resposta já foi
+    entregue e não há para quem reportar o erro.
+    """
 
 
 class EmailFailed(Exception):
@@ -102,10 +109,11 @@ def html_recuperacao(link: str) -> str:
     Texto curto de propósito. E-mail de recuperação é lido com pressa, muitas
     vezes no celular, por alguém já irritado por não conseguir entrar.
     """
+    minutos = get_settings().password_reset_expire_minutes
     return f"""<div style="font-family:system-ui,-apple-system,Segoe UI,sans-serif;line-height:1.6">
   <p>Você pediu para redefinir sua senha do Norby.</p>
   <p>Abra este endereço para criar uma nova senha:</p>
   <p><a href="{link}">{link}</a></p>
-  <p>O link vale por 30 minutos e só pode ser usado uma vez.</p>
+  <p>O link vale por {minutos} minutos e só pode ser usado uma vez.</p>
   <p>Se não foi você que pediu, ignore este e-mail: sua senha continua a mesma.</p>
 </div>"""

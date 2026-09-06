@@ -19,7 +19,7 @@ from app.schemas.user import (
 from app.services.auth_service import (
     hash_password, verify_password, verify_and_upgrade, create_access_token,
     create_refresh_token, rotate_refresh_token, revoke_refresh_token,
-    create_password_reset, reset_password, _DUMMY_HASH,
+    create_password_reset, find_user_by_email, reset_password, _DUMMY_HASH,
 )
 from app.services.account_service import delete_account, export_data
 from app.services.photo_service import MAX_BYTES, PhotoInvalid, PhotoTooLarge, processar_foto
@@ -72,14 +72,13 @@ async def register(
     if retry_after is not None:
         raise _throttled(retry_after)
 
-    # Verifica email duplicado. func.lower(): "Joao@x.com" e "joao@x.com" são
-    # a MESMA conta pro throttle (a chave HMAC já normaliza caixa), então
-    # deixar a checagem sensível a caixa permitia criar uma conta-sombra que,
-    # ao logar com sucesso, resetava o balde da vítima (fix round 1, issue
-    # #22 — ver também o índice único funcional em ix_users_email_lower).
-    normalized_email = payload.email.strip().lower()
-    existing = await db.execute(select(User).where(func.lower(User.email) == normalized_email))
-    if existing.scalar_one_or_none():
+    # Verifica email duplicado. find_user_by_email compara por func.lower():
+    # "Joao@x.com" e "joao@x.com" são a MESMA conta pro throttle (a chave HMAC
+    # já normaliza caixa), então deixar a checagem sensível a caixa permitia
+    # criar uma conta-sombra que, ao logar com sucesso, resetava o balde da
+    # vítima (fix round 1, issue #22 — ver também o índice único funcional em
+    # ix_users_email_lower).
+    if await find_user_by_email(payload.email, db):
         await record_failure(payload.email, db)
         raise HTTPException(status_code=400, detail="Email já cadastrado")
 
@@ -131,11 +130,10 @@ async def login(
     if retry_after is not None:
         raise _throttled(retry_after)
 
-    # func.lower(): login precisa aceitar a caixa que o usuário digitar, não
-    # só a caixa exata gravada no cadastro (fix round 1, issue #22).
-    normalized_email = payload.email.strip().lower()
-    result = await db.execute(select(User).where(func.lower(User.email) == normalized_email))
-    user = result.scalar_one_or_none()
+    # find_user_by_email compara por func.lower(): login precisa aceitar a
+    # caixa que o usuário digitar, não só a caixa exata gravada no cadastro
+    # (fix round 1, issue #22).
+    user = await find_user_by_email(payload.email, db)
 
     # bcrypt roda SEMPRE — contra o hash real ou contra o dummy. Sem isso, o
     # e-mail inexistente retorna ~200ms mais rápido e vira oráculo de enumeração.
@@ -447,8 +445,10 @@ async def _mandar_link(email: str, link: str) -> None:
 # por todo mundo (ver "Rate limit atrás do proxy" no AGENTS.md), e o que este
 # teto protege é a CAIXA DE ENTRADA do alvo. O segundo limite, por IP, é o
 # freio de flood — um e-mail diferente a cada chamada nunca esgota o próprio
-# balde, a mesma lição que o logout aprendeu no fix round 1.
-@limiter.limit("60/minute")
+# balde, a mesma lição que o logout aprendeu no fix round 1. Issue #22: mesma
+# dívida aceita do teto global de login, 200/min por ser o balde único do
+# proxy do Railway.
+@limiter.limit("200/minute")
 @limiter.limit("3/hour", key_func=reset_email_key)
 async def forgot_password(
     request: Request,
@@ -468,7 +468,10 @@ async def forgot_password(
         # que precisa saber que a variável não existe.
         raise HTTPException(status_code=503, detail="Recuperação de senha indisponível")
 
-    user = await db.scalar(select(User).where(User.email == payload.email))
+    # find_user_by_email compara por func.lower(): sem isso, quem se cadastrou
+    # como "Joao@x.com" e digita "joao@x.com" aqui não achava a conta e nunca
+    # recebia o link (fix round 2, issue #22).
+    user = await find_user_by_email(payload.email, db)
     if user is not None:
         raw = await create_password_reset(str(user.id), db)
         base = get_settings().app_base_url.rstrip("/")
@@ -479,9 +482,11 @@ async def forgot_password(
 
 @router.post("/reset-password", status_code=status.HTTP_204_NO_CONTENT)
 # Sem chave por e-mail aqui: quem apresenta o token não informa e-mail nenhum.
-# O teto é contra força bruta no token, que tem 48 bytes de entropia e não cai
-# por tentativa — o limite existe para o custo, não para a segurança.
-@limiter.limit("20/minute")
+# Este teto NÃO protege o token — 48 bytes de entropia é que fazem isso, e não
+# caem por tentativa. É só freio de flood no balde único do proxy do Railway
+# (get_remote_address atrás dele devolve o mesmo IP pra todo mundo), a mesma
+# dívida aceita do teto global de login (ver AGENTS.md).
+@limiter.limit("200/minute")
 async def reset_password_route(
     request: Request,
     payload: ResetPassword,
