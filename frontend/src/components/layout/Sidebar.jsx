@@ -5,7 +5,7 @@ import { LogOut } from "lucide-react";
 import NorbyMark from "../shared/Logo";
 import NorthStar from "../shared/NorthStar";
 import AiOrb from "../shared/AiOrb";
-import { mainItems, prefItems } from "./navItems";
+import { mainItems, prefItems, adminItems } from "./navItems";
 import Avatar from "@/components/shared/Avatar";
 
 // Item de navegação: ativo = moldura iridescente + acento no ícone, no label e
@@ -39,6 +39,7 @@ function NavItem({ to, icon, label }) {
 
 export default function Sidebar() {
   const user = useAuthStore((s) => s.user);
+  const isAdmin = useAuthStore((s) => Boolean(s.user?.is_admin));
   const navigate = useNavigate();
 
   async function handleLogout() {
@@ -76,6 +77,9 @@ export default function Sidebar() {
         {prefItems.map((item) => (
           <NavItem key={item.to} {...item} />
         ))}
+
+        {isAdmin &&
+          adminItems.map((item) => <NavItem key={item.to} {...item} />)}
       </nav>
 
       {/* IA do Mês — atalho para o analista */}
