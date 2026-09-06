@@ -236,6 +236,10 @@ async def test_logout_with_rotated_token_revokes_successor(client):
     ]
     assert r1
 
+    # Cookie tem precedência sobre o corpo (#110); limpa o jar para garantir
+    # que r0 (o token roubado e já rotacionado) chega pelo corpo, não pelo
+    # cookie mais recente que o jar reenviaria.
+    client.cookies.clear()
     res = await client.post("/auth/logout", json={"refresh_token": r0})
     assert res.status_code == 204
 
