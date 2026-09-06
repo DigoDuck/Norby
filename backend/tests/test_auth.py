@@ -1,7 +1,8 @@
 import uuid
 from datetime import datetime, timedelta, timezone
 
-import jwt  # PyJWT. Caracterização (Step 2, ver task-2-report.md): passou igual com `from jose import jwt`.
+import jwt  # PyJWT. Os dois testes abaixo são de caracterização: foram escritos e
+# passaram com o python-jose antes da troca, e têm de continuar passando aqui.
 import pytest
 
 from app.config import get_settings
