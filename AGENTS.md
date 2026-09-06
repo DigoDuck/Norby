@@ -259,12 +259,13 @@ fica só em memória (`authStore` sem `persist` para o `token`). No boot, o
 `App` chama `/auth/refresh` (que lê só o cookie) antes do primeiro `/auth/me`
 — sobrevive a recarga sem tocar em `localStorage` (`frontend/src/App.jsx`).
 Pré-requisito para sair do `localStorage`: API e frontend no mesmo site
-registrável, cumprido em 2026-09-05 com o `norby.com.br`. Requisições
-concorrentes de UMA aba entram numa fila (`frontend/src/api/axios.js`) para
-não disparar dois refreshes ao mesmo tempo: apresentar um token já rotacionado
-aciona a detecção de reuso (`rotate_refresh_token`) e derruba TODAS as
-sessões, inclusive a que venceu a corrida. Essa fila não cobre duas ABAS
-refrescando ao mesmo tempo — dívida aceita, sem trava entre abas ainda.
+registrável, cumprido em 2026-09-05 com o `norby.com.br`. `refreshAccessToken`
+(`frontend/src/api/axios.js`) faz uma renovação só por aba — a mesma promise
+em voo atende o boot e o interceptor de 401 — e serializa entre abas com a Web
+Locks API (`navigator.locks.request("norby-auth-refresh", ...)`; sem suporte
+no navegador, chama direto, sem trava), porque apresentar um refresh token já
+rotacionado aciona a detecção de reuso (`rotate_refresh_token`) e derruba
+TODAS as sessões, inclusive a que venceu a corrida.
 O deploy do passo 2 (access só em memória) deslogou de uma vez as sessões que
 não tinham passado por login/refresh desde o passo 1: o build antigo nunca
 recebeu o cookie, e sem `localStorage` para recorrer não sobrou refresh para
