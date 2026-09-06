@@ -183,6 +183,36 @@ Start em produção: `backend/start.sh` roda `alembic upgrade head` + uvicorn na
 `$PORT` do provedor (o `CMD` do `backend/Dockerfile`; o `docker-compose.yml` de
 dev sobrescreve com `--reload`).
 
+**O endpoint do Stripe assina QUATRO eventos, e o quarto é fácil de esquecer
+(2026-09-06):**
+
+```
+checkout.session.completed
+customer.subscription.created   <- o que move o premium_until na PRIMEIRA compra
+customer.subscription.updated
+customer.subscription.deleted
+```
+
+O `checkout.session.completed` **não traz período nenhum**: ele só amarra
+`stripe_customer_id` e `stripe_subscription_id`. Quem escreve o `premium_until`
+da primeira assinatura é o `created`. Assinar só três eventos, omitindo ele,
+NÃO derruba nada de forma visível: o retorno do Checkout chama
+`/billing/confirm-checkout` (#46), que busca a assinatura pela API e preenche o
+portão. O caminho principal fica desligado e ninguém percebe, porque a rede de
+segurança segura a primeira compra.
+
+Quebra de verdade para quem fecha a aba antes de voltar do Stripe. Aí só a
+reconciliação preguiçosa (#48) salva, e só no próximo request autenticado.
+Conferir a lista de eventos no painel é mais rápido do que diagnosticar isso
+depois.
+
+**Ciclo de cobrança validado em produção com dinheiro real (2026-09-06):**
+compra de R$ 20,00 em modo live, premium ativado, Portal do cliente aberto,
+cancelamento imediato via `DELETE /v1/subscriptions` e estorno integral. Cobre
+o art. 49 do CDC (arrependimento com devolução integral) e a exigência do
+Decreto 7.962/2013 de cancelar ser tão fácil quanto contratar. Taxa do Stripe
+na operação: R$ 1,19 sobre R$ 20,00, **não devolvida no estorno**.
+
 **Reembolso são DUAS ações, sempre (2026-09-05):** estornar a cobrança no
 painel do Stripe **não cancela a assinatura**. Os quatro eventos que o webhook
 assina não incluem nada de estorno, então só devolver o dinheiro deixa
