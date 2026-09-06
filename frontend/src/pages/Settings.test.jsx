@@ -42,7 +42,7 @@ function fillDeleteConfirmation(password = "secret123") {
 describe("Settings", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useAuthStore.getState().login("access", "refresh", {
+    useAuthStore.getState().login("access", {
       name: "Alice",
       email: "alice@test.com",
     });
@@ -102,7 +102,7 @@ describe("Settings", () => {
 describe("Settings, foto de perfil", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useAuthStore.getState().login("access", "refresh", {
+    useAuthStore.getState().login("access", {
       name: "Alice",
       email: "alice@test.com",
       photo_updated_at: null,

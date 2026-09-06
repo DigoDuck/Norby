@@ -8,6 +8,9 @@ const api = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
+  // O cookie de refresh só existe em /auth (Path=/auth), então isso não muda
+  // nada nas outras rotas (#110).
+  withCredentials: true,
 });
 
 // Interceptor para adicionar o token de autenticação em cada requisição
@@ -53,12 +56,6 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    const refreshToken = useAuthStore.getState().refreshToken;
-    if (!refreshToken) {
-      forceLogout();
-      return Promise.reject(error);
-    }
-
     // Já existe um refresh em andamento: enfileira esta request.
     if (isRefreshing) {
       return new Promise((resolve, reject) => {
@@ -72,11 +69,10 @@ api.interceptors.response.use(
     original._retry = true;
     isRefreshing = true;
     try {
-      // Chamada "crua" (sem interceptors) para evitar recursão.
-      const { data } = await axios.post(`${baseURL}/auth/refresh`, {
-        refresh_token: refreshToken,
-      });
-      useAuthStore.getState().setTokens(data.access_token, data.refresh_token);
+      // Chamada "crua" (sem interceptors) para evitar recursão. Sem corpo: o
+      // refresh token vai no cookie HttpOnly (#110).
+      const { data } = await axios.post(`${baseURL}/auth/refresh`, null, { withCredentials: true });
+      useAuthStore.getState().setToken(data.access_token);
       flushQueue(null, data.access_token);
       original.headers.Authorization = `Bearer ${data.access_token}`;
       return api(original);

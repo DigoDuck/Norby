@@ -4,8 +4,10 @@ import { persist } from "zustand/middleware";
 export const useAuthStore = create(
   persist(
     (set) => ({
+      // Access token só em memória (#110): o refresh vive num cookie HttpOnly
+      // que o JavaScript não lê. Recarregou a página, o App pede um access
+      // token novo em /auth/refresh antes de liberar as rotas.
       token: null,
-      refreshToken: null,
       user: null,
       isAuthenticated: false,
       // Foto de perfil como data URI (#35). Fica no store, e não numa <img>
@@ -15,26 +17,26 @@ export const useAuthStore = create(
       photo: null,
       photoFor: null,
 
-      login: (token, refreshToken, user) =>
+      login: (token, user) =>
         // A foto do dono anterior não pode sobreviver a um login: sem zerar
         // aqui, quem entrasse em seguida veria o rosto de quem saiu.
-        set({ token, refreshToken, user, isAuthenticated: true, photo: null, photoFor: null }),
+        set({ token, user, isAuthenticated: true, photo: null, photoFor: null }),
       setPhoto: (photo, photoFor) => set({ photo, photoFor }),
-      // Atualiza só o par de tokens (usado na rotação do refresh), mantém o user.
-      setTokens: (token, refreshToken) => set({ token, refreshToken }),
+      setToken: (token) => set({ token }),
       logout: () =>
-        set({
-          token: null, refreshToken: null, user: null, isAuthenticated: false,
-          photo: null, photoFor: null,
-        }),
+        set({ token: null, user: null, isAuthenticated: false, photo: null, photoFor: null }),
       updateUser: (userData) =>
-        set((state) => ({
-          // Atualiza apenas os campos fornecidos, mantendo os outros intactos
-          user: { ...state.user, ...userData },
-        })),
+        set((state) => ({ user: { ...state.user, ...userData } })),
     }),
     {
-      name: "norby-auth", // Salva no localStorage automaticamente
+      name: "norby-auth",
+      // O que sobrevive à recarga. O token fica de fora de propósito.
+      partialize: (s) => ({
+        user: s.user,
+        isAuthenticated: s.isAuthenticated,
+        photo: s.photo,
+        photoFor: s.photoFor,
+      }),
     },
   ),
 );

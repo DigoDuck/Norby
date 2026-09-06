@@ -31,7 +31,7 @@ function renderDashboard() {
 describe("Dashboard hero", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useAuthStore.getState().login("access", "refresh", {
+    useAuthStore.getState().login("access", {
       name: "Alice",
       email: "alice@test.com",
     });
