@@ -8,7 +8,7 @@ from sqlalchemy import (
     String, DateTime, Date, Numeric, ForeignKey, LargeBinary,
     Enum, Integer, Boolean, CheckConstraint, Index, text
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -56,6 +56,14 @@ class User(Base):
     # frontend não deixa rastro — sem timestamp não há como demonstrar o aceite.
     privacy_accepted_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
+    )
+
+    # Área de admin (ADR 0004). Nenhum endpoint escreve aqui: o primeiro e
+    # único admin nasce por UPDATE manual no console do banco (ver AGENTS.md).
+    # Coluna, e não lista de e-mails em config: a coluna morre com a linha, e
+    # um e-mail recadastrado depois de excluir a conta não herda nada.
+    is_admin: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
     )
 
     # --- Plano e assinatura (ADR 0001, issue #19) ----------------------------
@@ -150,6 +158,28 @@ class AiUsageDaily(Base):
     day: Mapped[date] = mapped_column(Date, primary_key=True)
     tokens: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
     calls: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+
+class AdminAction(Base):
+    """Auditoria da área de admin (issue #23, ADR 0004). Só insert.
+
+    `admin_id` e `target_user_id` são UUIDs SEM chave estrangeira, de
+    propósito: excluir a conta é uma das ações auditadas, e uma FK com cascade
+    apagaria junto o registro de que ela foi excluída. `target_email` é o
+    snapshot que identifica o alvo depois que a linha dele some. É PII numa
+    tabela sem purga, e é isso mesmo: o registro das operações do controlador
+    é obrigação da LGPD (art. 37), não entra no export do usuário e não é
+    apagado com a conta. `detail` guarda só identificadores (id de assinatura),
+    nunca conteúdo.
+    """
+    __tablename__ = "admin_actions"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    admin_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    action: Mapped[str] = mapped_column(String(32), nullable=False)
+    target_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    target_email: Mapped[str] = mapped_column(String(255), nullable=False)
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
+    detail: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
 
 class PasswordResetToken(Base):
     """Token de recuperação de senha (#36).

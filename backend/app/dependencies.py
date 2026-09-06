@@ -82,3 +82,14 @@ async def require_ai_access(current_user: User = Depends(get_current_user)) -> U
             "continuam aqui.",
         )
     return current_user
+
+async def require_admin(current_user: User = Depends(get_current_user)) -> User:
+    """Portão da área de admin (ADR 0004).
+
+    404 e não 403, com o MESMO corpo que o FastAPI dá para rota inexistente:
+    quem não é admin não fica sabendo que /admin existe. Um 403 confirmaria a
+    rota e convidaria a insistir.
+    """
+    if not current_user.is_admin:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not Found")
+    return current_user

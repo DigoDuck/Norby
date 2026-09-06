@@ -461,7 +461,7 @@ async def _forgot_body(request: Request, payload: ForgotPassword) -> ForgotPassw
     return payload
 
 
-async def _mandar_link(email: str, link: str) -> None:
+async def mandar_link_de_recuperacao(email: str, link: str) -> None:
     """Roda DEPOIS da resposta, via BackgroundTasks. Não é otimização.
 
     Enviando dentro da requisição, e-mail existente levaria o tempo do POST ao
@@ -469,6 +469,9 @@ async def _mandar_link(email: str, link: str) -> None:
     de enumeração de conta tão bom quanto uma mensagem diferente — só que
     medido no relógio em vez de lido na tela. Respondendo antes de enviar, os
     dois casos custam o mesmo.
+
+    Público (não `_`): a área de admin (ADR 0004) reusa esta função para o
+    reenvio manual disparado por um admin.
     """
     try:
         await enviar_email(
@@ -517,7 +520,7 @@ async def forgot_password(
     if user is not None:
         raw = await create_password_reset(str(user.id), db)
         base = get_settings().app_base_url.rstrip("/")
-        background.add_task(_mandar_link, user.email, f"{base}{ROTA_REDEFINIR}?token={raw}")
+        background.add_task(mandar_link_de_recuperacao, user.email, f"{base}{ROTA_REDEFINIR}?token={raw}")
 
     return {"detail": "Se este e-mail tiver conta, o link de redefinição chegou nele."}
 

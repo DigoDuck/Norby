@@ -53,6 +53,16 @@ reescrito; `message` é livre.**
 | `AI_REQUIRES_PREMIUM` | gerar IA sem trial e sem assinatura |
 | `AI_DAILY_CAP_REACHED` | gerar IA depois de estourar a cota diária (ADR 0003); traz `resets_at` |
 
+## Área de admin
+
+Resolvido pelo [ADR 0004](docs/adr/0004-area-de-admin.md) (issue #23).
+
+| Termo | Significa | Como se mede |
+|---|---|---|
+| **admin** | Quem tem `users.is_admin = true`. Só SQL escreve esta coluna; um só nesta v2 | `is_admin` |
+| **ação de admin** | Cancelar assinatura, excluir conta ou disparar recuperação de senha em nome de outro usuário. Sempre exige a senha atual do admin | uma linha nova em `admin_actions` por ação bem-sucedida |
+| **auditoria** | `admin_actions`: registro só-insert das ações de admin, sem chave estrangeira no alvo, sem tela | `target_email` (snapshot) e `detail` (só identificador, nunca conteúdo) |
+
 ### Termos que este glossário evita de propósito
 
 | Não usar | Usar | Por quê |
@@ -64,3 +74,4 @@ reescrito; `message` é livre.**
 | "trial" para período pago | trial de IA | O trial nunca concede carteira. Confundir os dois inverte o teto |
 | "carteira desativada" ou "arquivada" | carteira bloqueada | Ela não some nem para de contar nos totais: só não recebe escrita |
 | mensagem de erro como identificador | o `code` da recusa | `message` muda quando o texto melhora; quem o frontend testa é o `code` |
+| "moderador", "staff" | admin | Existe **um** papel de controlador nesta v2, sem hierarquia entre eles |

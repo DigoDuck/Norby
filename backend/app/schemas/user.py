@@ -59,6 +59,7 @@ class UserResponse(BaseModel):
     # cache, em vez de ser rebaixado a passageiro de todo /auth/me. Nulo
     # significa "sem foto", e é também a chave de cache do cliente.
     photo_updated_at: datetime | None
+    is_admin: bool
     plan: PlanResponse
 
     model_config = ConfigDict(from_attributes=True)
@@ -82,6 +83,7 @@ class UserResponse(BaseModel):
             "email": data.email,
             "created_at": data.created_at,
             "photo_updated_at": data.photo_updated_at,
+            "is_admin": data.is_admin,
             "plan": {
                 "ai_allowed": ai_gate_open(data),
                 "wallet_cap_applies": wallet_cap_active(data),

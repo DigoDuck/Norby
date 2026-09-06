@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from app.routers import auth, wallets, transactions, ai, recurring, goals, dashboard, billing
+from app.routers import auth, wallets, transactions, ai, recurring, goals, dashboard, billing, admin
 from app.services.plan_service import PlanRefused
 from app.services.wallet_service import WalletNotFound
 from app.config import get_settings
@@ -143,6 +143,7 @@ app.include_router(recurring.router)
 app.include_router(goals.router)
 app.include_router(dashboard.router)
 app.include_router(billing.router)
+app.include_router(admin.router)
 
 @app.get("/health", tags=["Health"]) 
 async def health_check():

@@ -309,6 +309,20 @@ independe de `paywall_enabled`. A chave de produção está no tier gratuito
 (RPD 500 compartilhado por todos os usuários): os 100 são RPD/5. A rajada de
 até 10 chamadas concorrentes no último token é aceita.
 
+**Área de admin (#23, ADR 0004):** `users.is_admin` é escrito só por SQL;
+`require_admin` devolve 404 com o corpo do FastAPI para não-admin; router
+`/admin/*` próprio; as três ações exigem a senha atual e gravam uma linha em
+`admin_actions` (sem FK no alvo, com `target_email` de snapshot, sem purga,
+fora do export). Cancelamento é imediato e aplicado na hora pelo
+`aplicar_assinatura`; exclusão reusa `delete_account`; recuperação reusa
+`mandar_link_de_recuperacao`. O schema `AdminUserOut` é a garantia de que
+nenhum dado financeiro de terceiro sai.
+
+Primeiro admin, depois da migration: no console do banco,
+`UPDATE users SET is_admin = true WHERE lower(email) = '<email>';`. Local:
+`docker exec norby_postgres psql -U $POSTGRES_USER -d $POSTGRES_DB -c "..."`
+(os nomes vêm do `.env`).
+
 Login e cadastro (anônimos) **não seguem mais por IP.** Desde 2026-08-16 usam
 atraso progressivo **por conta**: a chave é o HMAC-SHA256 do email
 normalizado (lower + trim) com o `secret_key` do servidor — o email cru nunca
