@@ -53,25 +53,25 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements-dev.lock
 
-      # requirements.txt is what a human edits; requirements.lock is what the
-      # Dockerfile installs and what pip-audit reads. A bump landing in one and
-      # not the other is invisible - the container keeps running the old version
-      # while the repository claims the new one, and this job goes green because
-      # it tested the lock. Dependabot's pip pull requests do exactly that: they
-      # touch requirements.txt alone.
+      # requirements.txt é o que um humano edita; requirements.lock é o que o
+      # Dockerfile instala e o que o pip-audit lê. Um bump que cai em um e não
+      # no outro é invisível - o container continua rodando a versão antiga
+      # enquanto o repositório alega a nova, e esse job fica verde porque
+      # testou o lock. Os pull requests de pip do Dependabot fazem exatamente
+      # isso: tocam só o requirements.txt.
       - name: Locks match the requirement files
         run: python scripts/check_locks.py
 
       - name: Install dependencies
         run: pip install -r requirements-dev.lock
 
-      # The test database is built by `Base.metadata.create_all`, so the suite
-      # only ever sees the models and is blind by construction to a migration
-      # that has drifted from them. `alembic check` is the only thing that
-      # compares the two, and without it here three consecutive migrations had
-      # to hand-strip phantom operations out of their autogenerate output.
-      # Building from an empty database also proves the chain itself still runs
-      # end to end, which `alembic check` alone would not.
+      # O banco de teste é construído por `Base.metadata.create_all`, então a
+      # suíte só enxerga os models e é cega, por construção, a uma migration
+      # que tenha se distanciado deles. O `alembic check` é a única coisa que
+      # compara os dois, e sem ele aqui três migrations consecutivas tiveram
+      # que remover manualmente operações fantasmas da saída do autogenerate.
+      # Construir a partir de um banco vazio também prova que a própria chain
+      # ainda roda de ponta a ponta, o que só o `alembic check` não provaria.
       - name: Migrations match the models
         env:
           DATABASE_URL: postgresql+asyncpg://norby_user:norby_pass@localhost:5432/norby_migrations
@@ -85,9 +85,9 @@ jobs:
         run: pytest
 
       - name: pip-audit
-        # PYSEC-2026-1325 is an accepted exception documented in AGENTS.md:
-        # python-jose pulls ecdsa, and Settings.algorithm only allows HS256,
-        # so the vulnerable ECDSA/ECDH signing path is unreachable.
+        # PYSEC-2026-1325 é uma exceção aceita, documentada no AGENTS.md:
+        # python-jose puxa o ecdsa, e Settings.algorithm só permite HS256,
+        # então o caminho de assinatura ECDSA/ECDH vulnerável é inatingível.
         run: pip-audit -r requirements.lock --ignore-vuln PYSEC-2026-1325
 
   frontend:
@@ -117,31 +117,32 @@ jobs:
       - name: Build
         run: npm run build
 
-      # Audits the whole tree, dev included. The dev-only advisories that made
-      # this red on the first run are gone: vitest 2 was pinning its own
-      # vite 5 next to the app's vite 8, and that duplicate copy carried them.
+      # Audita a árvore inteira, dev incluído. Os advisories só de dev que
+      # deixaram isto vermelho na primeira rodada sumiram: o vitest 2 fixava
+      # seu próprio vite 5 ao lado do vite 8 do app, e essa cópia duplicada
+      # carregava eles.
       - name: npm audit (high/critical only)
         run: npm audit --audit-level=high
 
   lighthouse:
     name: Lighthouse budget (production)
     runs-on: ubuntu-latest
-    # The audited URL is the deployed Vercel frontend, not this checkout's
-    # code — checking it on every PR would just re-test whatever is already
-    # live and not what the PR changes. Only push-to-main (post-deploy) is
-    # meaningful; even then there's a race with Vercel's own redeploy time.
+    # A URL auditada é o frontend do Vercel já em produção, não o código deste
+    # checkout — testar isso em todo PR só re-testaria o que já está no ar, e
+    # não o que o PR muda. Só push-to-main (pós-deploy) é significativo; e
+    # mesmo assim há uma corrida com o tempo de redeploy do próprio Vercel.
     if: github.event_name == 'push'
     steps:
       - uses: actions/checkout@v7
 
-      # Thresholds calibrated 2026-08-25 against this same URL, 3 runs, Edge
-      # headless with Lighthouse's default mobile emulation: performance
-      # 0.89/0.94/0.94, accessibility 0.96 on all three. Accessibility is
-      # deterministic, so 0.95 is a real budget. Performance is not, and a
-      # GitHub runner is slower than the machine that measured it, so 0.85
-      # keeps headroom for runner variance while still catching a regression
-      # that 0.70 would have waved through. Re-tighten once the first runs on
-      # main show what the runner actually scores.
+      # Thresholds calibrados em 2026-08-25 contra essa mesma URL, 3 execuções,
+      # Edge headless com a emulação mobile padrão do Lighthouse: performance
+      # 0.89/0.94/0.94, accessibility 0.96 nas três. Accessibility é
+      # determinístico, então 0.95 é um budget real. Performance não é, e um
+      # runner do GitHub é mais lento que a máquina que mediu isso, então 0.85
+      # mantém margem para a variância do runner e ainda pega uma regressão
+      # que 0.70 deixaria passar. Reapertar assim que as primeiras execuções
+      # na main mostrarem o que o runner realmente pontua.
       - name: Run Lighthouse CI
         uses: treosh/lighthouse-ci-action@v12
         with:
