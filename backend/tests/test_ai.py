@@ -2,12 +2,13 @@ import uuid
 from decimal import Decimal
 
 import pytest
+from sqlalchemy import select
 
 from google.genai import chats as genai_chats
 
 import app.services.ai_service as ai
 from app.limiter import limiter
-from app.models.sql_models import User, Wallet
+from app.models.sql_models import AiUsageDaily, User, Wallet
 
 
 def _chat_que_registra(recebido: list):
@@ -339,11 +340,14 @@ async def test_both_gemini_calls_carry_an_output_ceiling(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_an_empty_chat_answer_raises_instead_of_being_stored(monkeypatch):
+async def test_an_empty_chat_answer_raises_instead_of_being_stored(db_session, monkeypatch):
     """O SDK antigo levantava quando a resposta vinha vazia ou bloqueada; este
     devolve None. Sem a guarda, o "" chegaria à rota, seria GRAVADO no
     histórico como mensagem da IA e viraria uma bolha vazia — em vez do 503
-    claro que a rota já sabe dar."""
+    claro que a rota já sabe dar. A guarda mora em `chat_with_ai`, DEPOIS do
+    `_com_cota`: a chamada já aconteceu e já foi debitada (achado de review de
+    2026-09-06, ver `_responder_chat`), então este teste confere o débito
+    também, não só o raise."""
     from types import SimpleNamespace
 
     async def _vazia(self, _mensagem, config=None):
@@ -351,5 +355,17 @@ async def test_an_empty_chat_answer_raises_instead_of_being_stored(monkeypatch):
 
     monkeypatch.setattr(genai_chats.AsyncChat, "send_message", _vazia)
 
+    user = await _novo_usuario(db_session)
     with pytest.raises(ValueError):
-        await ai._responder_chat([], "oi")
+        await ai.chat_with_ai(db_session, str(user.id), "oi", [])
+
+    user_id = user.id  # antes do expire_all, como em test_ai_quota.py
+    db_session.expire_all()
+    uso = (
+        await db_session.execute(
+            select(AiUsageDaily).where(
+                AiUsageDaily.user_id == user_id, AiUsageDaily.day == ai.dia_da_cota()
+            )
+        )
+    ).scalar_one()
+    assert uso.calls == 1

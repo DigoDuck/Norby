@@ -166,6 +166,11 @@ async def test_a_cached_insight_is_served_even_past_the_cap(
     assert segunda.json()["summary_text"] == "a|b|c"
     assert not segunda.json().get("error")
 
+    # "não debita" fica afirmado, não presumido: a 2ª leitura (cache) não soma
+    # nada aos (DAILY_TOKEN_CAP, 0) que o `_gastar` acima gravou.
+    uso = await _uso_de_hoje(db_session, user)
+    assert (uso.tokens, uso.calls) == (ai.DAILY_TOKEN_CAP, 0)
+
 
 @pytest.mark.asyncio
 async def test_an_uncached_insight_past_the_cap_degrades_with_the_cap_message(

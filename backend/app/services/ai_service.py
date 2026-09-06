@@ -85,15 +85,21 @@ def _tokens_usados(resposta) -> int:
     pensa. Sem total, soma os componentes tratando `None` como zero. Sem
     `usage_metadata` (stub de teste, SDK quebrado) conta zero: o teto de
     chamadas continua valendo e segura o dia mesmo assim.
+
+    Os quatro campos são lidos com `getattr(..., None)`, não acesso direto:
+    isto roda DEPOIS da chamada de rede, então um `usage_metadata` com um
+    formato diferente (a migração para a Interactions API) não pode levantar
+    aqui — a chamada já aconteceu e precisa ser debitada de qualquer jeito.
     """
     uso = getattr(resposta, "usage_metadata", None)
     if uso is None:
         return 0
-    if uso.total_token_count is not None:
-        return uso.total_token_count
+    total = getattr(uso, "total_token_count", None)
+    if total is not None:
+        return total
     return (
-        (uso.prompt_token_count or 0)
-        + (uso.candidates_token_count or 0)
+        (getattr(uso, "prompt_token_count", None) or 0)
+        + (getattr(uso, "candidates_token_count", None) or 0)
         + (getattr(uso, "thoughts_token_count", None) or 0)
     )
 
@@ -176,20 +182,21 @@ async def _gerar_json(prompt: str) -> tuple[str, int]:
 
 
 async def _responder_chat(historico: list, mensagem: str) -> tuple[str, int]:
-    """Saída de rede do chat. A outra que os testes stubam."""
+    """Saída de rede do chat. A outra que os testes stubam.
+
+    A guarda de resposta vazia NÃO mora aqui: uma resposta vazia ou bloqueada
+    por safety filter já consumiu uma chamada de verdade e os tokens do
+    prompt — levantar antes de devolver o uso deixaria essa chamada sem
+    débito, um caminho sem teto para quem forjar um prompt que sempre cai no
+    filtro (achado de review de 2026-09-06). Quem levanta é `chat_with_ai`,
+    depois que `_com_cota` já debitou.
+    """
     chat = client.aio.chats.create(model=MODELO, history=historico)
     resposta = await chat.send_message(
         mensagem,
         config=types.GenerateContentConfig(max_output_tokens=MAX_TOKENS_CHAT),
     )
-    if not resposta.text:
-        # Vazia, bloqueada por safety filter ou truncada antes do primeiro
-        # token. Levantar preserva o 503 claro da rota: devolver "" gravaria
-        # uma bolha VAZIA no histórico como se a IA tivesse respondido. O SDK
-        # antigo levantava sozinho aqui; este devolve None, então a guarda
-        # passa a ser nossa.
-        raise ValueError("resposta vazia do Gemini")
-    return resposta.text, _tokens_usados(resposta)
+    return resposta.text or "", _tokens_usados(resposta)
 
 async def _get_user_financial_summary(db: AsyncSession, user_id: str) -> dict:
     """Resumo do mês corrente, reusando os agregados do dashboard.
@@ -371,7 +378,17 @@ async def chat_with_ai(db: AsyncSession, user_id: str, message: str, history: li
         role = "user" if msg.get("role") == "user" else "model"
         chat_history.append(types.Content(role=role, parts=[types.Part(text=content)]))
 
-    return await _com_cota(
+    resposta = await _com_cota(
         db, user_id,
         lambda: _responder_chat(chat_history, f"{system_context}\n\nUsuário: {message}"),
     )
+    if not resposta:
+        # Vazia, bloqueada por safety filter ou truncada antes do primeiro
+        # token. Levantar preserva o 503 claro da rota: devolver "" gravaria
+        # uma bolha VAZIA no histórico como se a IA tivesse respondido. O SDK
+        # antigo levantava sozinho aqui; este devolve None, então a guarda
+        # passa a ser nossa. Fica DEPOIS do `_com_cota` de propósito: a
+        # chamada já aconteceu e já foi debitada, então a guarda não pode
+        # mais impedir o débito — só decide o que a rota faz com o resultado.
+        raise ValueError("resposta vazia do Gemini")
+    return resposta

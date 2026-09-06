@@ -298,6 +298,17 @@ logs de produção por algumas semanas.
 Rotas **autenticadas** usam `user_key` em `app/limiter.py`, chaveando pelo id
 do usuário: `/ai/*` e, desde 2026-08-15, `DELETE /auth/me`.
 
+**Cota diária de IA (#21, ADR 0003):** dois tetos por usuário por dia da cota
+(UTC-8 fixo, o dia em que o Google zera o RPD do projeto): 120k tokens reais do
+`usage_metadata` e 100 chamadas, em `ai_usage_daily` com upsert e sem purga.
+Checagem e débito no helper `_com_cota` do `ai_service`, em volta das duas
+chamadas de rede; insight cacheado não conta. Recusa é
+`PlanRefused("AI_DAILY_CAP_REACHED")` com `resets_at`: o chat a sobe antes do
+503 genérico, o insight cai no 200 degradado com a mensagem. Vale para trial e
+independe de `paywall_enabled`. A chave de produção está no tier gratuito
+(RPD 500 compartilhado por todos os usuários): os 100 são RPD/5. A rajada de
+até 10 chamadas concorrentes no último token é aceita.
+
 Login e cadastro (anônimos) **não seguem mais por IP.** Desde 2026-08-16 usam
 atraso progressivo **por conta**: a chave é o HMAC-SHA256 do email
 normalizado (lower + trim) com o `secret_key` do servidor — o email cru nunca
@@ -375,17 +386,6 @@ protege o token é a entropia dos 48 bytes, não o contador.
   a documentação navegável é um ativo para o portfólio.
 - Usuários criados antes da migration `b2c3d4e5f6a7` têm `privacy_accepted_at`
   nulo. NULL significa "aceite não registrado", nunca "aceitou".
-
-**Cota diária de IA (#21, ADR 0003):** dois tetos por usuário por dia da cota
-(UTC-8 fixo, o dia em que o Google zera o RPD do projeto): 120k tokens reais do
-`usage_metadata` e 100 chamadas, em `ai_usage_daily` com upsert e sem purga.
-Checagem e débito no helper `_com_cota` do `ai_service`, em volta das duas
-chamadas de rede; insight cacheado não conta. Recusa é
-`PlanRefused("AI_DAILY_CAP_REACHED")` com `resets_at`: o chat a sobe antes do
-503 genérico, o insight cai no 200 degradado com a mensagem. Vale para trial e
-independe de `paywall_enabled`. A chave de produção está no tier gratuito
-(RPD 500 compartilhado por todos os usuários): os 100 são RPD/5. A rajada de
-até 10 chamadas concorrentes no último token é aceita.
 
 **Armadilhas já resolvidas (não reintroduzir):**
 - `VITE_API_URL` na Vercel **tem que ser `https://`**. Com `http://`, o Railway

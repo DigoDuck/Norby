@@ -55,8 +55,9 @@ class PlanRefused(Exception):
     """Uma regra de plano recusou a operação.
 
     Carrega o `code` do contrato do ADR 0002 — `WALLET_LIMIT_REACHED`,
-    `WALLET_READ_ONLY`, `AI_REQUIRES_PREMIUM`. Quem traduz para 403 é o handler
-    registrado no main; service neste repo não conhece HTTP.
+    `WALLET_READ_ONLY`, `AI_REQUIRES_PREMIUM`, `AI_DAILY_CAP_REACHED` (ADR
+    0003; o único que também traz `resets_at`). Quem traduz para 403 é o
+    handler registrado no main; service neste repo não conhece HTTP.
 
     O `code` é contrato e NUNCA é reescrito; `message` é livre.
     """
