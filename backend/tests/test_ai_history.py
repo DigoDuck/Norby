@@ -62,8 +62,8 @@ async def test_get_session_404_for_other_user(client, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_session_detail_route_in_openapi(client):
-    spec = (await client.get("/openapi.json")).json()
+async def test_session_detail_route_in_openapi():
+    spec = app.openapi()
     path = spec["paths"]["/ai/chat/sessions/{session_id}"]["get"]
     ref = path["responses"]["200"]["content"]["application/json"]["schema"].get("$ref", "")
     assert ref.endswith("/ChatSessionDetail")

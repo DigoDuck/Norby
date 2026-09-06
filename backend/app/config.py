@@ -49,6 +49,13 @@ class Settings(BaseSettings):
     # e-mail, e caixa de e-mail comprometida é o vetor que este token abre.
     password_reset_expire_minutes: int = 30
 
+    # /docs, /redoc e /openapi.json (issue #29). Default DESLIGADO, ao contrário
+    # de quase todo flag de conveniência: esquecer a variável em produção tem de
+    # deixar o estado SEGURO, não o exposto. O openapi publica todas as rotas,
+    # todos os campos e todos os formatos de erro; com dinheiro de terceiro em
+    # jogo, isso é mapa de graça. Em dev vem ligado pelo `.env.example`.
+    docs_enabled: bool = False
+
     # Flag de rollout do paywall (ADR 0002). Default DESLIGADO: o merge não muda
     # nada em produção, e o paywall acende por variável de ambiente quando o
     # dono decidir. Lido SÓ dentro dos helpers de enforcement — um `if` num

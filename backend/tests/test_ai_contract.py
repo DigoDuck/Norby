@@ -1,9 +1,11 @@
 import pytest
 
+from app.main import app
+
 
 @pytest.mark.asyncio
-async def test_ai_routes_expose_response_models_in_openapi(client):
-    spec = (await client.get("/openapi.json")).json()
+async def test_ai_routes_expose_response_models_in_openapi():
+    spec = app.openapi()
     schemas = spec["components"]["schemas"]
 
     def resp_schema(path, method="get"):
@@ -25,6 +27,6 @@ async def test_ai_routes_expose_response_models_in_openapi(client):
 
 
 @pytest.mark.asyncio
-async def test_ai_chat_documents_503_in_openapi(client):
-    spec = (await client.get("/openapi.json")).json()
+async def test_ai_chat_documents_503_in_openapi():
+    spec = app.openapi()
     assert "503" in spec["paths"]["/ai/chat"]["post"]["responses"]
