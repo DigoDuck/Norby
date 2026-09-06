@@ -33,6 +33,9 @@ describe("rota raiz", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     useAuthStore.getState().logout();
+    // Um teste navega para /admin via pushState; sem isto o próximo teste
+    // herdaria essa URL e o resultado dependeria da ordem de execução.
+    window.history.pushState({}, "", "/");
   });
 
   it("manda para o dashboard quem já tem sessão", async () => {

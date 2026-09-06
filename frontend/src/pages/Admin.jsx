@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Search } from "lucide-react";
 
 import { adminApi } from "@/api/admin";
@@ -12,27 +12,26 @@ import { Input } from "@/components/ui/input";
 // nestes estados não há mais nada a cancelar no Stripe.
 const STATUS_TERMINAIS = new Set(["canceled", "incomplete_expired"]);
 
-// Card de métrica: rótulo em microlabel + número em destaque.
-function MetricCard({ label, value, danger }) {
+// Card de métrica: rótulo em microlabel + número em destaque. `tone` sinaliza
+// o valor sem trocar o layout: "warning" perto do limite, "danger" no limite.
+function MetricCard({ label, value, tone }) {
+  const toneClass =
+    tone === "danger" ? "text-danger" : tone === "warning" ? "text-warning" : "text-content";
   return (
     <div className="glass p-5">
       <p className="microlabel">{label}</p>
-      <p
-        className={`mt-2 text-2xl font-semibold tnum tracking-tight ${
-          danger ? "text-danger" : "text-content"
-        }`}
-      >
-        {value}
-      </p>
+      <p className={`mt-2 text-2xl font-semibold tnum tracking-tight ${toneClass}`}>{value}</p>
     </div>
   );
 }
 
 /**
- * Faixa de acesso do usuário, derivada com o MESMO critério do backend
- * (admin_service.metricas): premium quando `premium_until` está no futuro;
- * trial quando `ai_trial_ends_at` está no futuro e não há premium ativo;
- * vencido quando `premium_until` existe mas já passou; o resto é free.
+ * Faixa de acesso do usuário para a LINHA da lista. Usa os mesmos campos que
+ * `admin_service.metricas` (premium_until/ai_trial_ends_at), mas não é o
+ * mesmo cálculo: as métricas contam cada balde (premium/trial/vencido)
+ * separadamente e eles podem se sobrepor no dado bruto, enquanto aqui, por
+ * linha, o trial só aparece quando não há premium ativo — premium sempre
+ * ganha da exibição de trial.
  */
 function faixaUsuario(user) {
   const agora = new Date();
@@ -49,16 +48,17 @@ function AdminUserRow({ user, isSelf, onChanged }) {
     Boolean(user.subscription_status) && !STATUS_TERMINAIS.has(user.subscription_status);
 
   return (
-    <li
-      data-user-row
-      className="py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
-    >
+    <li className="py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0">
-        <p className="font-medium text-content truncate">{user.name}</p>
+        <div className="flex items-center gap-2">
+          <p className="font-medium text-content truncate">{user.name}</p>
+          {user.is_admin && <span className="microlabel text-accent shrink-0">Admin</span>}
+        </div>
         <p className="text-sm text-content-2 truncate">{user.email}</p>
         <p className="text-xs text-content-3 mt-1">
           {faixaUsuario(user)}
           {user.subscription_status ? ` · ${user.subscription_status}` : ""}
+          {user.cancel_at_period_end ? " · cancela no fim do período" : ""}
         </p>
       </div>
 
@@ -100,7 +100,7 @@ function AdminUserRow({ user, isSelf, onChanged }) {
               <Button
                 variant="outline"
                 size="sm"
-                className="text-danger border-danger/40 hover:bg-danger/10"
+                className="text-danger border-danger/40 hover:bg-danger/10 hover:text-danger"
               >
                 Excluir conta
               </Button>
@@ -122,7 +122,22 @@ export default function Admin() {
   const [users, setUsers] = useState([]);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  // Dois erros, não um: `loadError` só existe enquanto a tela nunca mostrou
+  // dado nenhum (substitui a página, com botão de tentar de novo). Depois da
+  // primeira carga bem-sucedida, uma releitura que falhar (chamada de novo
+  // pelas ações da linha via `onChanged`) vira `refreshError` — a lista e as
+  // métricas continuam montadas (ainda são dados válidos), só um aviso
+  // inline aparece. Sem essa separação, uma falha transitória de releitura
+  // depois de uma exclusão bem-sucedida apagava a tela inteira e trocava o
+  // <h1> por uma frase vermelha, na única tela cujo trabalho é ação
+  // destrutiva de operador.
+  const [loadError, setLoadError] = useState(null);
+  const [refreshError, setRefreshError] = useState(null);
+  // Ref, não estado: só decide qual mensagem de erro usar, nunca é lida no
+  // JSX, e um ref evita fechar `load` sobre um `metrics` desatualizado (o que
+  // obrigaria a listar `metrics` nas deps do useEffect de mount só por causa
+  // deste `if`).
+  const hasLoadedRef = useRef(false);
 
   async function load() {
     try {
@@ -132,9 +147,18 @@ export default function Admin() {
       ]);
       setMetrics(metricsRes.data);
       setUsers(usersRes.data);
-      setError(null);
+      setLoadError(null);
+      setRefreshError(null);
+      hasLoadedRef.current = true;
     } catch (err) {
-      setError(apiErrorMessage(err, "Não foi possível carregar os dados de admin."));
+      const message = apiErrorMessage(err, "Não foi possível carregar os dados de admin.");
+      if (hasLoadedRef.current) {
+        setRefreshError(
+          "Não foi possível atualizar os dados agora. Os números podem estar desatualizados.",
+        );
+      } else {
+        setLoadError(message);
+      }
     } finally {
       setLoading(false);
     }
@@ -168,12 +192,15 @@ export default function Admin() {
     );
   }
 
-  if (error) {
+  if (loadError) {
     return (
-      <div className="max-w-5xl mx-auto">
+      <div className="max-w-5xl mx-auto space-y-4">
         <p role="alert" className="text-danger text-sm">
-          {error}
+          {loadError}
         </p>
+        <Button variant="outline" onClick={load}>
+          Tentar novamente
+        </Button>
       </div>
     );
   }
@@ -182,6 +209,7 @@ export default function Admin() {
     metrics.ai_calls_project_limit > 0
       ? metrics.ai_calls_today / metrics.ai_calls_project_limit
       : 0;
+  const iaTone = iaProporcao >= 1 ? "danger" : iaProporcao >= 0.8 ? "warning" : undefined;
 
   return (
     <div className="max-w-5xl mx-auto space-y-5">
@@ -201,9 +229,15 @@ export default function Admin() {
         <MetricCard
           label="IA hoje"
           value={`${metrics.ai_calls_today} / ${metrics.ai_calls_project_limit}`}
-          danger={iaProporcao >= 0.8}
+          tone={iaTone}
         />
       </div>
+
+      {refreshError && (
+        <p role="alert" className="text-warning text-xs">
+          {refreshError}
+        </p>
+      )}
 
       <div className="glass p-6">
         <div className="flex items-center gap-3 mb-5">

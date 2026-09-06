@@ -39,7 +39,7 @@ function NavItem({ to, icon, label }) {
 
 export default function Sidebar() {
   const user = useAuthStore((s) => s.user);
-  const isAdmin = useAuthStore((s) => Boolean(s.user?.is_admin));
+  const isAdmin = Boolean(user?.is_admin);
   const navigate = useNavigate();
 
   async function handleLogout() {
