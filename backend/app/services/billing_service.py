@@ -266,6 +266,25 @@ async def fetch_subscription(subscription_id: str) -> dict:
     return sub.to_dict()
 
 
+def aplicar_assinatura(user: User, sub: dict) -> None:
+    """Aplica ao usuário uma assinatura lida do Stripe, pelo mesmo `_aplicar`
+    do webhook, e não por uma segunda escrita paralela: duas rotas escrevendo
+    as mesmas colunas divergem, e a divergência aqui é acesso pago errado. O
+    tipo sintetizado escolhe o ramo certo — assinatura terminada tem
+    `ended_at`, que é a única data que vale num cancelamento imediato.
+
+    Usada pela reconciliação preguiçosa e pelo cancelamento feito pelo admin
+    (ADR 0004), que precisa do acesso caindo NA HORA, sem esperar o webhook.
+    """
+    tipo = (
+        "customer.subscription.deleted"
+        if sub.get("status") in STATUS_TERMINAIS
+        else "customer.subscription.updated"
+    )
+    evento = {"id": f"reconcile:{sub.get('id')}", "type": tipo, "data": {"object": sub}}
+    _aplicar(user, evento, _projecao(evento))
+
+
 def precisa_reconciliar(user: User, now: datetime | None = None) -> bool:
     """Gatilho estreito de propósito.
 
@@ -313,19 +332,7 @@ async def reconcile_subscription(user: User, db: AsyncSession) -> bool:
         )
         return False
 
-    # O mesmo `_aplicar` do webhook, e não uma segunda escrita paralela: duas
-    # rotas escrevendo as mesmas colunas divergem, e a divergência aqui é
-    # acesso pago errado. O tipo sintetizado escolhe o ramo certo — assinatura
-    # terminada tem `ended_at`, que é a única data que vale num cancelamento
-    # imediato.
-    tipo = (
-        "customer.subscription.deleted"
-        if sub.get("status") in STATUS_TERMINAIS
-        else "customer.subscription.updated"
-    )
-    evento = {"id": f"reconcile:{user.stripe_subscription_id}", "type": tipo,
-              "data": {"object": sub}}
-    _aplicar(user, evento, _projecao(evento))
+    aplicar_assinatura(user, sub)
 
     # `stripe_event_at` NÃO se move aqui. Ela é a marca d'água de ORDEM dos
     # eventos, e carimbá-la com o nosso relógio faria um webhook legítimo que

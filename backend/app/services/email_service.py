@@ -34,8 +34,8 @@ class EmailNotConfigured(Exception):
     O router já barra isso alto, ANTES de agendar o envio (checagem em
     `auth.py`, resposta 503) — na prática esta exceção é a última linha de
     defesa, só alcançável se a chave sumir entre o pre-check e a BackgroundTask
-    rodar. `_mandar_link` a engole em silêncio, sem logar: a resposta já foi
-    entregue e não há para quem reportar o erro.
+    rodar. `mandar_link_de_recuperacao` a engole em silêncio, sem logar: a
+    resposta já foi entregue e não há para quem reportar o erro.
     """
 
 
