@@ -90,27 +90,32 @@ async def client():
 
 
 @pytest_asyncio.fixture
-async def mongo():
+async def mongo(monkeypatch):
     # Motor liga o cliente ao event loop no primeiro await. Como o cliente de
     # produção é criado no import, ele fica preso ao loop do 1º teste e quebra nos
     # seguintes ("Event loop is closed"). Aqui criamos um cliente fresco no loop
-    # do teste atual e religamos as referências que o account_service usa.
+    # do teste atual e religamos as referências. account_service usa a coleção
+    # direto; ai_service e routers/ai também a importam de `app.database` no
+    # nível do módulo, então precisam do próprio rebind, senão continuam
+    # presos ao cliente de import mesmo com o account_service corrigido.
     from motor.motor_asyncio import AsyncIOMotorClient
     from app import database
     import app.services.account_service as acc
+    import app.services.ai_service as ai_service
+    import app.routers.ai as ai_router
 
     client = AsyncIOMotorClient(database.settings.mongodb_url)
     db = client["norby_db"]
     ai = db["ai_insights"]
     ch = db["chat_history"]
 
-    previous = (acc.ai_insights_collection, acc.chat_history_collection)
-    acc.ai_insights_collection = ai
-    acc.chat_history_collection = ch
+    monkeypatch.setattr(acc, "ai_insights_collection", ai)
+    monkeypatch.setattr(acc, "chat_history_collection", ch)
+    monkeypatch.setattr(ai_service, "ai_insights_collection", ai)
+    monkeypatch.setattr(ai_router, "chat_history_collection", ch)
     try:
         yield {"ai_insights": ai, "chat_history": ch}
     finally:
-        acc.ai_insights_collection, acc.chat_history_collection = previous
         client.close()
 
 
