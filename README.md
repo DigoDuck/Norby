@@ -18,9 +18,9 @@ O Norby junta os lançamentos num lugar só (recorrências incluídas), mantém 
 
 | Camada | Tecnologias |
 |---|---|
-| Backend | FastAPI 0.139 · SQLAlchemy 2.0 (async) + asyncpg · Alembic · Pydantic v2 · python-jose (JWT) · slowapi (rate limit) · uv |
+| Backend | FastAPI 0.141 · SQLAlchemy 2.0 (async) + asyncpg · Alembic · Pydantic v2 · PyJWT (JWT) · slowapi (rate limit) · uv |
 | Bancos | PostgreSQL 16 (núcleo relacional) · MongoDB 7 via Motor (insights e chat da IA) |
-| IA | Google Gemini 3.5 Flash-Lite (`google-generativeai`) |
+| IA | Google Gemini 3.5 Flash-Lite (`google-genai`) |
 | Frontend | React 19 · Vite 8 · TailwindCSS · componentes estilo shadcn/ui · Zustand · React Router v7 · React Hook Form + Zod · axios · Recharts |
 | Testes | pytest + pytest-asyncio (backend) · Vitest + Testing Library (frontend) |
 | Infra | Docker Compose (dev) · Railway (backend, Docker) · Neon (Postgres) · MongoDB Atlas · Vercel (frontend) |
@@ -84,7 +84,9 @@ flowchart LR
 
 - **Auditoria de segurança: o que foi corrigido e o que foi assumido.** O projeto passou por uma revisão de segurança e cada achado virou um commit rastreável. Os dois mais interessantes são de concorrência: a edição simultânea da mesma transação revertia o valor antigo duas vezes e deixava o saldo divergente do registro gravado ([`75e6998`](https://github.com/DigoDuck/Norby/commit/75e6998)), e a rotação de refresh token emitia dois sucessores válidos quando chamada em paralelo ([`f97fff4`](https://github.com/DigoDuck/Norby/commit/f97fff4)). Os dois têm teste que falha sem a correção. Entraram junto limites de valor e tamanho no Pydantic com CHECK constraints espelhadas no Postgres, headers de segurança e CSP, senha obrigatória para excluir a conta, login com tempo constante e o consentimento LGPD persistido com timestamp.
 
-  Duas decisões foram de **não** corrigir, com o motivo registrado no [AGENTS.md](AGENTS.md). Os tokens seguem no `localStorage`: a correção canônica é cookie `HttpOnly`, mas o frontend (`vercel.app`) e a API (`railway.app`) são sites registráveis distintos, então o cookie exigiria `SameSite=None` e seria bloqueado pelo Safari e pelo Chrome, deslogando o usuário a cada recarga. Migrar dependia de domínio próprio, pré-requisito **cumprido em setembro de 2026** com o `norby.com.br`: o front no apex e a API em `api.norby.com.br` são o mesmo site registrável, então o cookie vira `SameSite=Lax` e a correção canônica passou a caber ([#110](https://github.com/DigoDuck/Norby/issues/110)). E o rate limit de login continua por IP: ligar `--forwarded-allow-ips="*"` faria o uvicorn confiar no *primeiro* item do `X-Forwarded-For`, que é justamente o que o cliente controla, tornando o limite spoofável — a correção óbvia seria pior que o problema. As rotas autenticadas passaram a ser chaveadas pelo id do usuário ([`1e8b8bd`](https://github.com/DigoDuck/Norby/commit/1e8b8bd)), o que resolve o caso real sem abrir esse buraco.
+  O refresh token, que ficava no `localStorage` por depender de domínio próprio, migrou para um cookie `HttpOnly; SameSite=Lax; Path=/auth` assim que esse pré-requisito foi **cumprido em setembro de 2026** com o `norby.com.br`: o front no apex e a API em `api.norby.com.br` viraram o mesmo site registrável, o que tirou a necessidade de `SameSite=None` (bloqueado pelo Safari e pelo Chrome) e destravou a correção canônica. O access token passou a viver só em memória, nunca em disco. O porquê da espera e o desenho final estão no [AGENTS.md](AGENTS.md) ([#110](https://github.com/DigoDuck/Norby/issues/110)).
+
+  Uma decisão segue sendo de **não** corrigir, com o motivo registrado no [AGENTS.md](AGENTS.md): o rate limit de login continua por IP. Ligar `--forwarded-allow-ips="*"` faria o uvicorn confiar no *primeiro* item do `X-Forwarded-For`, que é justamente o que o cliente controla, tornando o limite spoofável — a correção óbvia seria pior que o problema. As rotas autenticadas passaram a ser chaveadas pelo id do usuário ([`1e8b8bd`](https://github.com/DigoDuck/Norby/commit/1e8b8bd)), o que resolve o caso real sem abrir esse buraco.
 
 ## Como usei IA no desenvolvimento
 
@@ -147,8 +149,7 @@ Limitações conhecidas, aceitas conscientemente na v1:
 
 - Recorrências só materializam quando o usuário abre o app (sem scheduler server-side).
 - Rate limiting em memória. As rotas autenticadas são limitadas por usuário; login e cadastro, por IP — e atrás do proxy do Railway esse IP é o mesmo para todo mundo, então o balde é compartilhado. Não sobrevive a múltiplas instâncias nem a restart.
-- Access e refresh tokens no `localStorage`, com CSP como mitigação (o porquê está em "Auditoria de segurança").
 - Sem CI e sem linter no backend (o frontend tem ESLint).
 - Fora do escopo da v1: multi-moeda, Open Finance, export CSV/PDF, CRUD de categorias, notificações e metas compartilhadas.
 
-Próximos passos: CI, i18n e a migração dos tokens para cookie `HttpOnly`, que depende de um domínio próprio com API e frontend no mesmo site registrável.
+Próximos passos: CI e i18n.

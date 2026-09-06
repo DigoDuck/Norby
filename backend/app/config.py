@@ -1,3 +1,4 @@
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
 from typing import Literal
@@ -28,6 +29,19 @@ class Settings(BaseSettings):
 
     # CORS — origens permitidas (separadas por vírgula). Default cobre o dev local.
     cors_origins: str = "http://localhost:5173"
+
+    @field_validator("cors_origins")
+    @classmethod
+    def _rejeita_wildcard_cors(cls, v: str) -> str:
+        # Com allow_credentials=True (main.py), "*" faria o navegador aceitar
+        # QUALQUER origem enviando credenciais — e o cookie de refresh, que só
+        # devia ser lido por norby.com.br, ficaria legível por qualquer site.
+        if any(origem.strip() == "*" for origem in v.split(",")):
+            raise ValueError(
+                "CORS_ORIGINS não pode conter '*': com allow_credentials=True "
+                "isso libera qualquer origem a ler o cookie de refresh."
+            )
+        return v
 
     # Stripe (ADR 0001). Default "" DE PROPÓSITO, ao contrário de gemini_api_key:
     # torná-los obrigatórios derrubaria a produção no instante do merge, já que

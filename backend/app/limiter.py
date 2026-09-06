@@ -37,7 +37,7 @@ def user_key(request: Request) -> str:
             sub = payload.get("sub")
             if sub:
                 return f"user:{sub}"
-        except jwt.PyJWTError:
+        except (jwt.PyJWTError, ValueError, TypeError):
             pass
     return get_remote_address(request)
 

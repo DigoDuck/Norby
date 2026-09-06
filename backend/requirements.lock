@@ -32,9 +32,7 @@ colorama==0.4.6 ; sys_platform == 'win32'
     #   click
     #   uvicorn
 cryptography==50.0.0
-    # via
-    #   -r requirements.txt
-    #   google-auth
+    # via google-auth
 deprecated==1.3.1
     # via limits
 distro==1.9.0
