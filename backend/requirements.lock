@@ -65,7 +65,9 @@ httpcore==1.0.9
 httptools==0.8.0
     # via uvicorn
 httpx==0.28.1
-    # via google-genai
+    # via
+    #   -r requirements.txt
+    #   google-genai
 idna==3.18
     # via
     #   anyio

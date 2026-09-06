@@ -13,8 +13,9 @@ import pytest
 from sqlalchemy import select
 
 import app.routers.auth as auth_router
-from app.models.sql_models import PasswordResetToken, RefreshToken, User
+from app.models.sql_models import LoginThrottle, PasswordResetToken, RefreshToken, User
 from app.services.auth_service import _hash_token
+from app.services.throttle_service import email_key_hash
 
 
 @pytest.fixture(autouse=True)
@@ -24,10 +25,8 @@ def brevo_configurado(monkeypatch):
     from app.config import get_settings
 
     settings = get_settings()
-    antes = settings.brevo_api_key
-    settings.brevo_api_key = "xkeysib-teste"
+    monkeypatch.setattr(settings, "brevo_api_key", "xkeysib-teste")
     yield settings
-    settings.brevo_api_key = antes
 
 
 @pytest.fixture
@@ -73,6 +72,20 @@ async def test_answers_the_same_for_an_unknown_email(client, enviados):
     # tem conta no Norby, a mesma enumeração que o login evita.
     assert a.status_code == b.status_code == 202
     assert a.json() == b.json()
+
+
+@pytest.mark.asyncio
+async def test_forgot_password_is_case_insensitive_on_email(client, enviados):
+    # A rota é a única das quatro (register/login/PUT me/forgot-password) que
+    # não normalizava caixa: quem se cadastrou como "Joao@x.com" e digitava
+    # "joao@x.com" aqui recebia 202 e nenhum e-mail (fix round 2, issue #22).
+    email, _ = await registrar(client)
+    outra_caixa = email.upper()
+
+    res = await client.post("/auth/forgot-password", json={"email": outra_caixa})
+
+    assert res.status_code == 202
+    assert enviados[-1]["para"] == email
 
 
 @pytest.mark.asyncio
@@ -186,6 +199,32 @@ async def test_an_expired_token_is_refused(client, enviados, db_session):
     assert res.status_code == 400
 
 
+@pytest.mark.asyncio
+async def test_reset_clears_the_victims_throttle(client, enviados, db_session):
+    # Sem isso, uma vítima sob ataque (alguém errando a senha dela 1x/min)
+    # continuava recebendo 429 do check_throttle mesmo depois de trocar a
+    # senha — a única saída que a issue #22 prometia pra vítima não saía do
+    # papel (fix round 2).
+    email, _ = await registrar(client, senha="secret123")
+    await client.post("/auth/forgot-password", json={"email": email})
+    token = link_do(enviados)
+
+    # Arma o throttle igual a test_auth_throttle.py: contador alto direto na
+    # tabela, sem esperar as falhas de verdade.
+    db_session.add(LoginThrottle(
+        key_hash=email_key_hash(email), failure_count=20, last_failure_at=datetime.now(timezone.utc),
+    ))
+    await db_session.commit()
+
+    reset = await client.post(
+        "/auth/reset-password", json={"token": token, "new_password": "novasenha1"}
+    )
+    assert reset.status_code == 204
+
+    res = await client.post("/auth/login", json={"email": email, "password": "novasenha1"})
+    assert res.status_code == 200
+
+
 # --- O token no banco --------------------------------------------------------
 
 
@@ -237,6 +276,8 @@ async def test_without_a_brevo_key_it_refuses_loudly(client, brevo_configurado):
 
 @pytest.mark.asyncio
 async def test_the_email_carries_a_link_to_the_reset_page(client, enviados):
+    from app.config import get_settings
+
     email, _ = await registrar(client)
     await client.post("/auth/forgot-password", json={"email": email})
 
@@ -244,8 +285,10 @@ async def test_the_email_carries_a_link_to_the_reset_page(client, enviados):
     assert enviados[-1]["para"] == email
     assert "/redefinir-senha?token=" in html
     # A pessoa precisa saber que o link morre, senão um link expirado parece
-    # um link quebrado e vira chamado de suporte.
-    assert "30 minutos" in html
+    # um link quebrado e vira chamado de suporte. O número vem de
+    # `settings.password_reset_expire_minutes`, não de um literal no texto.
+    minutos = get_settings().password_reset_expire_minutes
+    assert f"{minutos} minutos" in html
 
 
 @pytest.mark.asyncio

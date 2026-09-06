@@ -1,9 +1,10 @@
+import asyncio
 import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
 
 from jose import jwt
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
@@ -16,8 +17,21 @@ from app.services.password_service import (  # noqa: F401
     needs_update,
     verify_password,
 )
+# throttle_service não importa auth_service (sem ciclo): reset_password chama
+# record_success para tirar a vítima do balde de força bruta ao redefinir.
+from app.services.throttle_service import record_success
 
 settings = get_settings()
+
+
+async def find_user_by_email(email: str, db: AsyncSession) -> User | None:
+    """Busca por `func.lower(User.email)`, o mesmo critério usado em toda
+    comparação de email do app (fix round 1, issue #22): "Joao@x.com" e
+    "joao@x.com" são a MESMA conta.
+    """
+    normalized = email.strip().lower()
+    return await db.scalar(select(User).where(func.lower(User.email) == normalized))
+
 
 def verify_and_upgrade(plain: str, hashed: str) -> tuple[bool, str | None]:
     """Verifica a senha e devolve um hash novo quando o esquema está obsoleto."""
@@ -193,7 +207,9 @@ async def reset_password(raw: str, nova_senha: str, db: AsyncSession) -> bool:
         return False
 
     registro.used_at = datetime.now(timezone.utc)
-    user.password_hash = hash_password(nova_senha)
+    # bcrypt é bloqueante (~100-300ms): offload para thread, como auth.py já
+    # faz em register/login/delete.
+    user.password_hash = await asyncio.to_thread(hash_password, nova_senha)
 
     # Os OUTROS links pendentes desta pessoa morrem junto. Pedir três e-mails e
     # usar um não pode deixar dois links vivos numa caixa de entrada.
@@ -211,4 +227,9 @@ async def reset_password(raw: str, nova_senha: str, db: AsyncSession) -> bool:
         .values(revoked=True)
     )
     await db.commit()
+
+    # A vítima de força bruta (check_throttle roda antes da senha na rota de
+    # login, ver AGENTS.md) precisa de uma saída: redefinir a senha zera o
+    # contador da conta, senão o 429 sobrevive à própria correção.
+    await record_success(user.email, db)
     return True

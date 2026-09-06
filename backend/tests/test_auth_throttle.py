@@ -87,9 +87,9 @@ async def test_stale_rows_are_purged_on_write(client, db_session):
     from datetime import datetime, timedelta, timezone
 
     from app.models.sql_models import LoginThrottle
-    from app.services.throttle_service import _key_hash
+    from app.services.throttle_service import email_key_hash
 
-    stale_key = _key_hash("velho@test.com")
+    stale_key = email_key_hash("velho@test.com")
     stale = LoginThrottle(
         key_hash=stale_key,
         failure_count=5,
@@ -225,7 +225,7 @@ async def test_after_waiting_the_retry_after_window_the_attempt_goes_through(cli
     from sqlalchemy import select
 
     from app.models.sql_models import LoginThrottle
-    from app.services.throttle_service import _key_hash
+    from app.services.throttle_service import email_key_hash
 
     email = "espera@test.com"
     for _ in range(3):
@@ -239,7 +239,7 @@ async def test_after_waiting_the_retry_after_window_the_attempt_goes_through(cli
     # Simula a espera empurrando last_failure_at pra trás, sem dormir de
     # verdade no teste.
     row = (
-        await db_session.execute(select(LoginThrottle).where(LoginThrottle.key_hash == _key_hash(email)))
+        await db_session.execute(select(LoginThrottle).where(LoginThrottle.key_hash == email_key_hash(email)))
     ).scalar_one()
     row.last_failure_at = datetime.now(timezone.utc) - timedelta(seconds=retry_after + 1)
     await db_session.commit()
@@ -253,11 +253,11 @@ async def test_wait_is_capped_at_60_seconds(client, db_session):
     from datetime import datetime, timezone
 
     from app.models.sql_models import LoginThrottle
-    from app.services.throttle_service import _key_hash
+    from app.services.throttle_service import email_key_hash
 
     email = "capado@test.com"
     db_session.add(LoginThrottle(
-        key_hash=_key_hash(email), failure_count=20, last_failure_at=datetime.now(timezone.utc),
+        key_hash=email_key_hash(email), failure_count=20, last_failure_at=datetime.now(timezone.utc),
     ))
     await db_session.commit()
 
@@ -276,11 +276,11 @@ async def test_retry_after_stays_capped_when_the_clock_walks_backwards(client, d
     from datetime import datetime, timedelta, timezone
 
     from app.models.sql_models import LoginThrottle
-    from app.services.throttle_service import _key_hash
+    from app.services.throttle_service import email_key_hash
 
     email = "relogio-torto@test.com"
     db_session.add(LoginThrottle(
-        key_hash=_key_hash(email),
+        key_hash=email_key_hash(email),
         failure_count=20,
         last_failure_at=datetime.now(timezone.utc) + timedelta(minutes=5),
     ))
@@ -300,11 +300,11 @@ async def test_repeated_429_does_not_extend_the_wait(client, db_session):
     from datetime import datetime, timezone
 
     from app.models.sql_models import LoginThrottle
-    from app.services.throttle_service import _key_hash
+    from app.services.throttle_service import email_key_hash
 
     email = "sempre-bloqueado@test.com"
     db_session.add(LoginThrottle(
-        key_hash=_key_hash(email), failure_count=10, last_failure_at=datetime.now(timezone.utc),
+        key_hash=email_key_hash(email), failure_count=10, last_failure_at=datetime.now(timezone.utc),
     ))
     await db_session.commit()
 
@@ -337,7 +337,7 @@ async def test_concurrent_first_failures_do_not_500_or_lose_count(db_session):
     from sqlalchemy import select
 
     from app.models.sql_models import LoginThrottle
-    from app.services.throttle_service import _key_hash, record_failure
+    from app.services.throttle_service import email_key_hash, record_failure
     from tests.conftest import TestSessionLocal
 
     email = "concorrente@test.com"
@@ -352,6 +352,6 @@ async def test_concurrent_first_failures_do_not_500_or_lose_count(db_session):
     await asyncio.gather(*[_fail() for _ in range(5)])
 
     row = (
-        await db_session.execute(select(LoginThrottle).where(LoginThrottle.key_hash == _key_hash(email)))
+        await db_session.execute(select(LoginThrottle).where(LoginThrottle.key_hash == email_key_hash(email)))
     ).scalar_one()
     assert row.failure_count == 5

@@ -6,6 +6,7 @@ from slowapi.util import get_remote_address
 from starlette.requests import Request
 
 from app.config import get_settings
+from app.services.throttle_service import email_key_hash
 
 settings = get_settings()
 
@@ -68,8 +69,10 @@ def reset_email_key(request: Request) -> str:
     DE ENTRADA de quem está sendo alvo — sem isso, alguém dispara o formulário
     contra o mesmo endereço e transforma o Norby em ferramenta de mailbomb.
 
-    O endereço cru nunca vira chave: só o sha256 dele, para o balde do slowapi
-    (em memória, mas ainda assim) não virar uma lista de e-mails cadastrados.
+    Mesmo `email_key_hash` do throttle_service: strip + lower + HMAC-SHA256
+    com o secret do servidor, não um hash puro. sha256 sozinho é reversível
+    por dicionário (é só rehashear cada e-mail candidato); o HMAC exige o
+    secret, que não sai do servidor.
 
     O router carimba request.state.reset_email numa dependency que roda antes
     deste decorator, porque o key_func é síncrono e não vê o corpo parseado.
@@ -77,4 +80,4 @@ def reset_email_key(request: Request) -> str:
     email = getattr(request.state, "reset_email", "")
     if not email:
         return get_remote_address(request)
-    return hashlib.sha256(email.lower().encode()).hexdigest()
+    return email_key_hash(email)

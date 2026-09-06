@@ -16,6 +16,7 @@ google-genai==2.22.0
 email-validator==2.3.0
 bcrypt==5.0.0
 slowapi==0.1.10
+httpx==0.28.1  # email_service (Brevo)
 # Billing (ADR 0001). O SDK entra por causa da verificação de assinatura do
 # webhook: ela precisa ser timing-safe e checar a tolerância de timestamp
 # contra replay, e isso não é lugar para HMAC feito à mão.
