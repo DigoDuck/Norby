@@ -5,4 +5,5 @@ export const aiApi = {
   chat: (data) => api.post("/ai/chat", data),
   getSessions: () => api.get("/ai/chat/sessions"),
   getSession: (id) => api.get(`/ai/chat/sessions/${encodeURIComponent(id)}`),
+  getUsage: () => api.get("/ai/usage"),
 };

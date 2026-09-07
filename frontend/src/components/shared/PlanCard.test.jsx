@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 
 import { billingApi } from "@/api/billing";
 import { authApi } from "@/api/auth";
+import { aiApi } from "@/api/ai";
 import { useAuthStore } from "@/store/authStore";
 import { PRECO_MENSAL } from "@/lib/plano";
 import PlanCard from "./PlanCard";
@@ -18,6 +19,13 @@ vi.mock("@/api/billing", () => ({
 
 vi.mock("@/api/auth", () => ({
   authApi: { me: vi.fn() },
+}));
+
+vi.mock("@/api/ai", () => ({
+  // Rejeita por padrão: testes que não são sobre o medidor não precisam
+  // mockar sucesso, e a rejeição silenciosa é o próprio comportamento
+  // esperado de uma falha de rede (o medidor some, sem virar erro na tela).
+  aiApi: { getUsage: vi.fn(() => Promise.reject(new Error("not mocked"))) },
 }));
 
 const LIBERADO = {
@@ -190,5 +198,66 @@ describe("PlanCard", () => {
     expect(screen.getByRole("button", { name: "Gerenciar assinatura" })).toBeInTheDocument();
     const cartao = screen.getByText("Plano").closest("div.glass");
     expect(cartao.textContent).not.toContain(PRECO_MENSAL);
+  });
+});
+
+describe("PlanCard, medidor de uso de IA", () => {
+  // Card visível (subscription_status truthy) e com IA liberada, para o
+  // medidor ter onde aparecer.
+  const PREMIUM_COM_IA = {
+    ...LIBERADO,
+    ai_allowed: true,
+    subscription_status: "active",
+    premium_until: new Date(Date.now() + 20 * 86400000).toISOString(),
+  };
+
+  it("mostra o uso do dia", async () => {
+    aiApi.getUsage.mockResolvedValue({
+      data: {
+        tokens: 2100,
+        calls: 3,
+        token_cap: 120000,
+        call_cap: 100,
+        resets_at: "2026-09-07T05:00:00Z",
+      },
+    });
+    renderCard(PREMIUM_COM_IA);
+
+    const barra = await screen.findByRole("progressbar", { name: /uso da ia hoje/i });
+    // Razão de chamadas (3%) é maior que a de tokens (1,75%): a barra segue a
+    // chamada, não os tokens.
+    expect(barra).toHaveAttribute("aria-valuenow", "3");
+
+    const cartao = screen.getByText("Plano").closest("div.glass");
+    expect(cartao.textContent).toContain("3 de 100 conversas");
+    expect(cartao.textContent).toContain("2.100 de 120.000 tokens");
+  });
+
+  it("a barra segue o teto mais próximo de estourar", async () => {
+    aiApi.getUsage.mockResolvedValue({
+      data: {
+        tokens: 110000,
+        calls: 5,
+        token_cap: 120000,
+        call_cap: 100,
+        resets_at: "2026-09-07T05:00:00Z",
+      },
+    });
+    renderCard(PREMIUM_COM_IA);
+
+    // Tokens a 91,6% dominam a chamada a 5%: a barra tem de refletir o teto
+    // mais perto de estourar, não a média nem o primeiro dos dois.
+    const barra = await screen.findByRole("progressbar", { name: /uso da ia hoje/i });
+    expect(barra).toHaveAttribute("aria-valuenow", "92");
+  });
+
+  it("sem acesso à IA o medidor não aparece", async () => {
+    renderCard({ ...LIBERADO, ai_allowed: false, wallet_cap_applies: true });
+
+    // Espera o cartão terminar de montar antes de afirmar ausência: sem isto
+    // um efeito que disparasse tarde passaria despercebido.
+    await screen.findByText("Plano");
+    expect(aiApi.getUsage).not.toHaveBeenCalled();
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
   });
 });
