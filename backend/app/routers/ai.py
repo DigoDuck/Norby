@@ -5,7 +5,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.dependencies import get_db, get_current_user, require_ai_access
 from app.limiter import limiter, user_key
 from app.models.sql_models import User
-from app.services.ai_service import get_or_generate_insight, chat_with_ai
+from app.services.ai_service import (
+    get_or_generate_insight,
+    chat_with_ai,
+    uso_de_hoje,
+    cota_zera_em,
+    DAILY_TOKEN_CAP,
+    DAILY_CALL_CAP,
+)
 from app.services.plan_service import PlanRefused
 from app.schemas.ai import (
     ChatMessage,
@@ -13,6 +20,7 @@ from app.schemas.ai import (
     ChatResponse,
     ChatSessionSummary,
     ChatSessionDetail,
+    AiUsageResponse,
 )
 from app.database import chat_history_collection
 import logging
@@ -44,7 +52,28 @@ async def get_dashboard_insight(
             "suggested_action": None,
             "error": "IA temporariamente indisponível"
         }
-        
+
+
+@router.get("/usage", response_model=AiUsageResponse)
+@limiter.limit("30/minute", key_func=user_key)
+async def get_usage(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Contadores do dia + os dois tetos. `get_current_user`, e não
+    `require_ai_access`: ler o próprio consumo não gasta token, e recusar
+    obrigaria a tela a tratar 403 para mostrar um número inofensivo."""
+    tokens, calls = await uso_de_hoje(db, str(current_user.id))
+    return {
+        "tokens": tokens,
+        "calls": calls,
+        "token_cap": DAILY_TOKEN_CAP,
+        "call_cap": DAILY_CALL_CAP,
+        "resets_at": cota_zera_em(),
+    }
+
+
 @router.post(
     "/chat",
     response_model=ChatResponse,

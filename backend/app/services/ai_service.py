@@ -104,8 +104,8 @@ def _tokens_usados(resposta) -> int:
     )
 
 
-async def _exigir_cota(db: AsyncSession, user_id: str) -> None:
-    """Recusa ANTES da chamada se o dia já estourou um dos dois tetos.
+async def uso_de_hoje(db: AsyncSession, user_id: str) -> tuple[int, int]:
+    """(tokens, chamadas) do dia da cota. Zero quando ainda não há linha.
 
     select de colunas, não `db.get`: nada passa pelo identity map, então uma
     leitura nunca devolve contadores velhos de um upsert anterior na mesma
@@ -119,11 +119,15 @@ async def _exigir_cota(db: AsyncSession, user_id: str) -> None:
             )
         )
     ).one_or_none()
-    if linha and (linha.tokens >= DAILY_TOKEN_CAP or linha.calls >= DAILY_CALL_CAP):
-        # Sem texto do usuário: id e contadores bastam para ver quem bate no teto.
+    return (linha.tokens, linha.calls) if linha else (0, 0)
+
+
+async def _exigir_cota(db: AsyncSession, user_id: str) -> None:
+    """Recusa ANTES da chamada se o dia já estourou um dos dois tetos."""
+    tokens, calls = await uso_de_hoje(db, user_id)
+    if tokens >= DAILY_TOKEN_CAP or calls >= DAILY_CALL_CAP:
         logger.warning(
-            "Cota diária de IA atingida (user=%s, tokens=%d, calls=%d)",
-            user_id, linha.tokens, linha.calls,
+            "Cota diária de IA atingida (user=%s, tokens=%d, calls=%d)", user_id, tokens, calls
         )
         raise PlanRefused("AI_DAILY_CAP_REACHED", DAILY_CAP_MESSAGE, resets_at=cota_zera_em())
 
