@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 import { transactionsApi } from "@/api/transactions";
@@ -42,6 +42,10 @@ function pagina(qtd, total, prefixo = "") {
 describe("Transactions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("pede a primeira página com limit e offset explícitos e renderiza os itens recebidos", async () => {
@@ -106,30 +110,6 @@ describe("Transactions", () => {
     expect(await screen.findByText(/120/)).toBeInTheDocument();
   });
 
-  it("avisa que a busca cobre só a página atual mesmo quando encontra resultados nela", async () => {
-    // Bug real: com 120 transações e busca batendo em 2 na página 1 e mais 9
-    // nas páginas seguintes, o usuário via só as 2 e não sabia que faltavam.
-    // O aviso não pode depender de filtered.length === 0.
-    transactionsApi.list.mockResolvedValue(pagina(50, 120, "p1-"));
-
-    render(
-      <MemoryRouter>
-        <Transactions />
-      </MemoryRouter>,
-    );
-
-    await screen.findAllByText("Item p1-0");
-    fireEvent.change(screen.getByLabelText(/buscar transações/i), {
-      target: { value: "p1-0" },
-    });
-
-    // A busca encontrou resultado (não é o caso de "zero resultados").
-    expect(screen.getAllByText("Item p1-0").length).toBeGreaterThan(0);
-    expect(
-      await screen.findByText(/busca cobre só as transações desta página/i),
-    ).toBeInTheDocument();
-  });
-
   it("mantém a paginação utilizável quando a resposta não traz X-Total-Count, contanto que a página venha cheia", async () => {
     // Backend/proxy sem o header: sem isso a página ficava travada em 50 itens
     // sem controles e sem aviso, mesmo tendo mais dados por trás.
@@ -150,6 +130,61 @@ describe("Transactions", () => {
     expect(proxima).toBeEnabled();
     // Sem total conhecido, o contador não pode inventar um "de X".
     expect(screen.getByText("1–50")).toBeInTheDocument();
+  });
+
+  it("busca consulta o servidor depois da espera", async () => {
+    transactionsApi.list.mockResolvedValue(pagina(50, 50, "p1-"));
+
+    render(
+      <MemoryRouter>
+        <Transactions />
+      </MemoryRouter>,
+    );
+
+    await screen.findAllByText("Item p1-0");
+    transactionsApi.list.mockClear();
+    vi.useFakeTimers();
+
+    fireEvent.change(screen.getByLabelText(/buscar transações/i), {
+      target: { value: "feira" },
+    });
+
+    // Antes de a espera terminar, nenhuma chamada nova.
+    expect(transactionsApi.list).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+
+    expect(transactionsApi.list).toHaveBeenCalledWith(
+      expect.objectContaining({ q: "feira" }),
+    );
+  });
+
+  it("busca curta não consulta", async () => {
+    transactionsApi.list.mockResolvedValue(pagina(50, 50, "p1-"));
+
+    render(
+      <MemoryRouter>
+        <Transactions />
+      </MemoryRouter>,
+    );
+
+    await screen.findAllByText("Item p1-0");
+    transactionsApi.list.mockClear();
+    vi.useFakeTimers();
+
+    fireEvent.change(screen.getByLabelText(/buscar transações/i), {
+      target: { value: "f" },
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+
+    expect(transactionsApi.list).not.toHaveBeenCalledWith(
+      expect.objectContaining({ q: expect.anything() }),
+    );
   });
 
   it("não mostra faixa invertida quando, sem X-Total-Count, a página seguinte vem vazia", async () => {
