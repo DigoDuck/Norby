@@ -449,6 +449,11 @@ async def test_search_treats_wildcards_as_text_and_stays_scoped_to_the_user(make
     dela = await alice.get("/transactions/", params={"q": "feira"})
     assert [t["description"] for t in dela.json()] == ["Feira da semana"]
 
+    # Mesmo curinga, mas no filtro `category` pré-existente: sem escape ele
+    # também casaria com tudo, o mesmo "listar tudo" disfarçado que o `q` evita.
+    curinga_categoria = await alice.get("/transactions/", params={"category": "%"})
+    assert curinga_categoria.json() == []
+
 
 @pytest.mark.asyncio
 async def test_search_does_not_break_on_a_null_description(make_auth_client):

@@ -92,7 +92,7 @@ async def list_transactions(
     filters = [Transaction.user_id == current_user.id]
 
     if category:
-        filters.append(Transaction.category.ilike(f"%{category}%"))
+        filters.append(Transaction.category.ilike(f"%{_escapar_like(category)}%", escape="\\"))
     if q:
         # Descrição é nula em muita transação: `translate(NULL)` é NULL e NULL
         # LIKE nunca é verdadeiro, então o `or_` resolve sozinho, sem coalesce.

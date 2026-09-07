@@ -65,4 +65,8 @@ async def test_usage_is_readable_without_ai_access(make_auth_client, db_session,
     user.ai_trial_ends_at = datetime.now(timezone.utc) - timedelta(days=1)
     await db_session.commit()
 
+    # Prova que o portão está mesmo fechado neste setup (senão o 200 abaixo
+    # não provaria nada: passaria igual se a fixture do paywall parasse de
+    # funcionar em silêncio).
+    assert (await alice.get("/ai/insight")).status_code == 403
     assert (await alice.get("/ai/usage")).status_code == 200
