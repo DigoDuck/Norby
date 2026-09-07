@@ -48,6 +48,12 @@ export default function Transactions() {
   const [editing, setEditing] = useState(null);
   const [serverError, setServerError] = useState(null);
   const [search, setSearch] = useState("");
+  // Termo cuja RESPOSTA está na tela, que não é o mesmo que o digitado: entre
+  // a tecla e o fim do debounce a lista ainda é a anterior. Anunciar a partir
+  // do texto digitado faz o leitor de tela ouvir uma contagem que não é da
+  // busca que a pessoa acabou de escrever — no segundo caractere ele leria a
+  // contagem da lista sem filtro nenhum.
+  const [buscaAplicada, setBuscaAplicada] = useState("");
   const [filterType, setFilterType] = useState("");
   const [offset, setOffset] = useState(0);
   const [total, setTotal] = useState(0);
@@ -96,6 +102,7 @@ export default function Transactions() {
       setTotal(headerTotal != null ? Number(headerTotal) : res.data.length);
       setTotalConhecido(headerTotal != null);
       setOffset(novoOffset);
+      setBuscaAplicada(params.q ?? "");
       setServerError(null);
     } catch (err) {
       if (seq !== requisicaoAtual.current) return; // resposta obsoleta
@@ -290,14 +297,16 @@ export default function Transactions() {
   // pior que não dizer nada, porque cria uma expectativa e a abandona.
   const textoStatus = loading
     ? "Carregando…"
-    : search.trim().length >= 2
+    : buscaAplicada
       ? transactions.length === 0
         ? "Nenhuma transação encontrada para essa busca."
         : `${totalDaBusca} ${totalDaBusca === 1 ? "transação encontrada" : "transações encontradas"}`
-      // Espaço INQUEBRÁVEL, escrito como escape para não virar um espaço comum
-      // numa edição distraída: texto só de espaço branco colapsa no HTML e o
-      // parágrafo fica com altura zero, que é a tabela pulando a cada carga.
-      : " ";
+      // Espaço INQUEBRÁVEL, escrito como escape porque o caractere cru é
+      // invisível: some numa edição distraída ou num formatador que apara
+      // espaços, e o ESLint não pega perda de espaço irregular dentro de
+      // string. Texto só de espaço branco colapsa no HTML, o parágrafo fica
+      // com altura zero, e a tabela volta a pular a cada carga.
+      : "\u00A0";
 
   return (
     <div className="space-y-6">
@@ -502,10 +511,23 @@ export default function Transactions() {
           </div>
         </div>
 
-        {/* Sempre montado (só o texto troca): sem isso a tabela pulava ~20px
-            a cada load, e o desmonte/remonte não é confiável para leitor de
-            tela anunciar — role="status" precisa do nó já existir no DOM. */}
-        <p role="status" className="pb-2 text-xs text-content-3 truncate">
+        {/* Duas responsabilidades, dois elementos.
+
+            A linha VISÍVEL só mostra o carregamento, e é sempre montada: sem
+            isso a tabela pulava ~20px a cada carga. O texto dela é curto, então
+            nunca precisa de reticências. `aria-hidden` porque quem anuncia é a
+            região abaixo, e ouvir "Carregando…" duas vezes é ruído.
+
+            O ANÚNCIO vive numa região só para leitor de tela, onde a frase pode
+            ter o tamanho que precisar sem disputar espaço com a tabela. Juntar
+            os dois num elemento só custava caro: a 320px de largura a frase de
+            busca vazia era cortada com reticências. O nó existe desde o começo
+            porque role="status" não anuncia de forma confiável um nó que acaba
+            de ser montado. */}
+        <p aria-hidden="true" className="pb-2 text-xs text-content-3">
+          {loading ? "Carregando…" : "\u00A0"}
+        </p>
+        <p role="status" className="sr-only">
           {textoStatus}
         </p>
 

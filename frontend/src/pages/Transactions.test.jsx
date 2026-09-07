@@ -243,6 +243,30 @@ describe("Transactions", () => {
     );
   });
 
+  it("não anuncia contagem da busca anterior enquanto a pessoa ainda digita", async () => {
+    // O debounce faz existir uma janela em que o texto digitado já tem 2
+    // caracteres mas a lista na tela ainda é a de antes. Derivar o anúncio do
+    // que está sendo digitado faria o leitor de tela ler "50 transações
+    // encontradas" — a contagem da lista SEM filtro — assim que o segundo
+    // caractere aparecesse.
+    transactionsApi.list.mockResolvedValue(pagina(50, 50, "p1-"));
+
+    render(
+      <MemoryRouter>
+        <Transactions />
+      </MemoryRouter>,
+    );
+
+    await screen.findAllByText("Item p1-0");
+    vi.useFakeTimers();
+
+    fireEvent.change(screen.getByLabelText(/buscar transações/i), {
+      target: { value: "me" },
+    });
+    // Sem avançar o tempo: a busca ainda não saiu.
+    expect(screen.getByRole("status")).not.toHaveTextContent(/encontrad/i);
+  });
+
   it("anuncia no role=status a contagem quando a busca encontra resultados", async () => {
     transactionsApi.list
       .mockResolvedValueOnce(pagina(50, 50, "p1-")) // mount
