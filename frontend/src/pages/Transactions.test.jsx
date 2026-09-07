@@ -217,6 +217,56 @@ describe("Transactions", () => {
     );
   });
 
+  it("anuncia no role=status quando a busca não encontra nada", async () => {
+    transactionsApi.list
+      .mockResolvedValueOnce(pagina(50, 50, "p1-")) // mount
+      .mockResolvedValueOnce({ data: [], headers: { "x-total-count": "0" } }); // busca vazia
+
+    render(
+      <MemoryRouter>
+        <Transactions />
+      </MemoryRouter>,
+    );
+
+    await screen.findAllByText("Item p1-0");
+    vi.useFakeTimers();
+
+    fireEvent.change(screen.getByLabelText(/buscar transações/i), {
+      target: { value: "xyznaoexiste" },
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Nenhuma transação encontrada para essa busca.",
+    );
+  });
+
+  it("anuncia no role=status a contagem quando a busca encontra resultados", async () => {
+    transactionsApi.list
+      .mockResolvedValueOnce(pagina(50, 50, "p1-")) // mount
+      .mockResolvedValueOnce(pagina(7, 7, "busca-")); // busca com 7 resultados
+
+    render(
+      <MemoryRouter>
+        <Transactions />
+      </MemoryRouter>,
+    );
+
+    await screen.findAllByText("Item p1-0");
+    vi.useFakeTimers();
+
+    fireEvent.change(screen.getByLabelText(/buscar transações/i), {
+      target: { value: "mercado" },
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+
+    expect(screen.getByRole("status")).toHaveTextContent("7 transações encontradas");
+  });
+
   it("não mostra faixa invertida quando, sem X-Total-Count, a página seguinte vem vazia", async () => {
     // Heurística do modo fallback: "página veio cheia, habilita Próxima". Com
     // um total que é múltiplo exato de PAGE_SIZE isso é falso positivo — a

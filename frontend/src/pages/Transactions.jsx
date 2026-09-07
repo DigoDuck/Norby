@@ -282,6 +282,23 @@ export default function Transactions() {
     ? offset + PAGE_SIZE < total
     : transactions.length === PAGE_SIZE;
 
+  // Mesma fonte que a legenda de paginação usa — nunca inventar um segundo
+  // número que possa discordar dela.
+  const totalDaBusca = totalConhecido ? total : transactions.length;
+  // Texto do role="status": anuncia o INÍCIO (carregando) e o RESULTADO da
+  // busca, não só o início — dizer que começou e nunca dizer o que achou é
+  // pior que não dizer nada, porque cria uma expectativa e a abandona.
+  const textoStatus = loading
+    ? "Carregando…"
+    : search.trim().length >= 2
+      ? transactions.length === 0
+        ? "Nenhuma transação encontrada para essa busca."
+        : `${totalDaBusca} ${totalDaBusca === 1 ? "transação encontrada" : "transações encontradas"}`
+      // Espaço INQUEBRÁVEL, escrito como escape para não virar um espaço comum
+      // numa edição distraída: texto só de espaço branco colapsa no HTML e o
+      // parágrafo fica com altura zero, que é a tabela pulando a cada carga.
+      : " ";
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
@@ -488,8 +505,8 @@ export default function Transactions() {
         {/* Sempre montado (só o texto troca): sem isso a tabela pulava ~20px
             a cada load, e o desmonte/remonte não é confiável para leitor de
             tela anunciar — role="status" precisa do nó já existir no DOM. */}
-        <p role="status" className="pb-2 text-xs text-content-3">
-          {loading ? "Carregando…" : " "}
+        <p role="status" className="pb-2 text-xs text-content-3 truncate">
+          {textoStatus}
         </p>
 
         <table className="hidden w-full md:table">
@@ -633,11 +650,12 @@ export default function Transactions() {
           ))}
         </div>
 
+        {/* Texto genérico de propósito: a frase específica de busca ("...para
+            essa busca.") já mora no role="status" logo acima — repeti-la aqui
+            faria um leitor de tela ouvir a mesma sentença duas vezes. */}
         {transactions.length === 0 && (
           <div className="text-center py-12 text-content-3 text-sm">
-            {search.trim().length >= 2
-              ? "Nenhuma transação encontrada para essa busca."
-              : "Nenhuma transação encontrada."}
+            Nenhuma transação encontrada.
           </div>
         )}
 
