@@ -187,6 +187,36 @@ describe("Transactions", () => {
     );
   });
 
+  it("a busca sobrevive à paginação: 'Próxima' carrega com o termo ativo", async () => {
+    transactionsApi.list
+      .mockResolvedValueOnce(pagina(50, 50, "p1-")) // mount
+      .mockResolvedValueOnce(pagina(50, 120, "busca-")) // resultado da busca
+      .mockResolvedValueOnce(pagina(50, 120, "busca2-")); // após "Próxima"
+
+    render(
+      <MemoryRouter>
+        <Transactions />
+      </MemoryRouter>,
+    );
+
+    await screen.findAllByText("Item p1-0");
+    vi.useFakeTimers();
+
+    fireEvent.change(screen.getByLabelText(/buscar transações/i), {
+      target: { value: "mercado" },
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    expect(screen.getAllByText("Item busca-0").length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole("button", { name: /próxima/i }));
+
+    expect(transactionsApi.list).toHaveBeenLastCalledWith(
+      expect.objectContaining({ q: "mercado", offset: 50 }),
+    );
+  });
+
   it("não mostra faixa invertida quando, sem X-Total-Count, a página seguinte vem vazia", async () => {
     // Heurística do modo fallback: "página veio cheia, habilita Próxima". Com
     // um total que é múltiplo exato de PAGE_SIZE isso é falso positivo — a

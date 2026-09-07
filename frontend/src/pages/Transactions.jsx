@@ -117,11 +117,15 @@ export default function Transactions() {
   }, [filterType]);
 
   // Parâmetros do filtro de tipo + busca ativa, para toda chamada de load()
-  // que precisa preservá-los (paginação, reload após criar/editar/excluir).
-  function filtroAtivo() {
+  // que precisa preservá-los (paginação, reload após criar/editar/excluir,
+  // debounce da busca, clique nos botões de tipo). `tipo` é parametrizável
+  // porque o clique no botão de tipo passa o valor NOVO antes de setFilterType
+  // refletir no state — os demais chamadores usam o filtro atual por padrão.
+  // `trim()`: dois espaços não é uma busca válida.
+  function filtroAtivo(tipo = filterType) {
     return {
-      ...(filterType ? { type: filterType } : {}),
-      ...(search.length >= 2 ? { q: search } : {}),
+      ...(tipo ? { type: tipo } : {}),
+      ...(search.trim().length >= 2 ? { q: search.trim() } : {}),
     };
   }
 
@@ -150,14 +154,13 @@ export default function Transactions() {
       return;
     }
     const id = setTimeout(() => {
-      const tipo = filterTypeRef.current;
-      const params = {
-        ...(tipo ? { type: tipo } : {}),
-        ...(search.length >= 2 ? { q: search } : {}),
-      };
-      load(params, 0);
+      load(filtroAtivo(filterTypeRef.current), 0);
     }, 300);
     return () => clearTimeout(id);
+    // filtroAtivo de propósito fora: é recriada a cada render, e incluí-la
+    // reagendaria a busca a cada render (não só quando `search` muda). O tipo
+    // mais recente já chega pela ref, lida dentro do timeout, não do closure.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
 
   // Auto-seleciona a única carteira, sem sobrescrever uma escolha já feita nem
@@ -456,6 +459,7 @@ export default function Transactions() {
               placeholder="Buscar..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+              maxLength={100}
               className="pl-9 bg-surface border-line/10 text-content placeholder:text-content-3"
             />
           </div>
@@ -467,13 +471,7 @@ export default function Transactions() {
                 aria-pressed={filterType === t}
                 onClick={() => {
                   setFilterType(t);
-                  load(
-                    {
-                      ...(t ? { type: t } : {}),
-                      ...(search.length >= 2 ? { q: search } : {}),
-                    },
-                    0,
-                  );
+                  load(filtroAtivo(t), 0);
                 }}
                 className={`rounded-xl px-3 py-2 text-sm transition-colors ${
                   filterType === t
@@ -487,9 +485,12 @@ export default function Transactions() {
           </div>
         </div>
 
-        {loading && (
-          <p className="pb-2 text-xs text-content-3">Carregando…</p>
-        )}
+        {/* Sempre montado (só o texto troca): sem isso a tabela pulava ~20px
+            a cada load, e o desmonte/remonte não é confiável para leitor de
+            tela anunciar — role="status" precisa do nó já existir no DOM. */}
+        <p role="status" className="pb-2 text-xs text-content-3">
+          {loading ? "Carregando…" : " "}
+        </p>
 
         <table className="hidden w-full md:table">
           <thead>
@@ -634,7 +635,7 @@ export default function Transactions() {
 
         {transactions.length === 0 && (
           <div className="text-center py-12 text-content-3 text-sm">
-            {search.length >= 2
+            {search.trim().length >= 2
               ? "Nenhuma transação encontrada para essa busca."
               : "Nenhuma transação encontrada."}
           </div>

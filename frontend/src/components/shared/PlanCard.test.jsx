@@ -229,8 +229,8 @@ describe("PlanCard, medidor de uso de IA", () => {
     expect(barra).toHaveAttribute("aria-valuenow", "3");
 
     const cartao = screen.getByText("Plano").closest("div.glass");
-    expect(cartao.textContent).toContain("3");
-    expect(cartao.textContent).toContain("100");
+    expect(cartao.textContent).toContain("3 de 100 conversas");
+    expect(cartao.textContent).toContain("2.100 de 120.000 tokens");
   });
 
   it("a barra segue o teto mais próximo de estourar", async () => {

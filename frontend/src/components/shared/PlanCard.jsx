@@ -152,6 +152,14 @@ export default function PlanCard() {
   const percentUso = Math.min(100, Math.round(razaoUso * 100));
   const corBarra =
     razaoUso >= 1 ? "bg-danger" : razaoUso >= 0.8 ? "bg-warning" : "bg-accent-fill";
+  // A cor não pode ser o único canal do estado (PRODUCT.md, semântica de cor):
+  // aria-valuetext nomeia a porcentagem e, perto do teto, também em palavra.
+  const textoValor =
+    razaoUso >= 1
+      ? `${percentUso}% — no teto`
+      : razaoUso >= 0.8
+        ? `${percentUso}% — perto do teto`
+        : `${percentUso}%`;
 
   return (
     <div className="glass p-6">
@@ -173,9 +181,10 @@ export default function PlanCard() {
             aria-valuenow={percentUso}
             aria-valuemin={0}
             aria-valuemax={100}
+            aria-valuetext={textoValor}
           >
             <div
-              className={`h-full rounded-full ${corBarra} transition-all duration-500`}
+              className={`h-full rounded-full ${corBarra} transition-[width] duration-200 ease-out`}
               style={{ width: `${percentUso}%` }}
             />
           </div>
