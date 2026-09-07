@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Query, HTTPException, status, Response
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from uuid import UUID
 from datetime import date
 from typing import Optional
@@ -12,6 +12,34 @@ from app.services.wallet_service import get_owned_wallet
 from app.services.goal_service import current_month_range
 
 router = APIRouter(prefix="/transactions", tags=["Transactions"])
+
+
+# Busca sem acento e sem caixa, do lado do banco (issue #24).
+#
+# `translate` em vez da extensão `unaccent` por três motivos: não exige
+# CREATE EXTENSION, que o Neon pode recusar e derrubaria o deploy; é
+# IMMUTABLE, então um índice funcional em cima dela é possível no dia em que
+# o volume pedir (a `unaccent` é STABLE e precisaria de um invólucro); e o
+# conjunto de caracteres do pt-BR cabe numa constante. As duas strings TÊM
+# que ter o mesmo comprimento.
+_ACENTOS = "áàâãäéèêëíìîïóòôõöúùûüç"
+_SEM_ACENTO = "aaaaaeeeeiiiiooooouuuuc"
+_TABELA = str.maketrans(_ACENTOS, _SEM_ACENTO)
+
+
+def normalizar(texto: str) -> str:
+    """Mesma normalização do lado do Python, para o termo buscado."""
+    return texto.lower().translate(_TABELA)
+
+
+def _escapar_like(texto: str) -> str:
+    """`%` e `_` são curingas do LIKE. Sem escapar, buscar `%` casa com TUDO —
+    um 'listar tudo' disfarçado de busca."""
+    return texto.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def _sem_acento(coluna):
+    return func.translate(func.lower(coluna), _ACENTOS, _SEM_ACENTO)
 
 
 # ponytail: locks são adquiridos na ordem transação → carteira antiga → carteira
@@ -54,6 +82,7 @@ async def list_transactions(
     # Faixa obrigatória: sem ela, date(year, month, 1) levanta ValueError para
     # ano fora do suportado e o erro vira 500 no handler global.
     year: Optional[int] = Query(None, ge=1900, le=2100),
+    q: Optional[str] = Query(None, max_length=100),
     limit: int = Query(200, ge=1, le=500),
     offset: int = Query(0, ge=0),
     current_user: User = Depends(get_current_user),
@@ -64,6 +93,16 @@ async def list_transactions(
 
     if category:
         filters.append(Transaction.category.ilike(f"%{category}%"))
+    if q:
+        # Descrição é nula em muita transação: `translate(NULL)` é NULL e NULL
+        # LIKE nunca é verdadeiro, então o `or_` resolve sozinho, sem coalesce.
+        alvo = f"%{_escapar_like(normalizar(q))}%"
+        filters.append(
+            or_(
+                _sem_acento(Transaction.description).like(alvo, escape="\\"),
+                _sem_acento(Transaction.category).like(alvo, escape="\\"),
+            )
+        )
     if type:
         filters.append(Transaction.type == type)
     # month e year andam juntos. Aceitar um sozinho devolvia 200 com o filtro

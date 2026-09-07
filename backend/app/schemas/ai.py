@@ -43,3 +43,17 @@ class ChatMessage(BaseModel):
     # UUID em vez de str: o tipo nativo já valida formato e tamanho, e o código
     # sempre gerou str(uuid4()) — o formato no Mongo não muda.
     session_id: UUID | None = None
+
+
+class AiUsageResponse(BaseModel):
+    """Uso do dia e os dois tetos, para o medidor de Configurações (#25).
+
+    Os tetos vão na resposta em vez de serem constantes no frontend: eles são
+    decisão do backend (ADR 0003) e mudam por PR lá, não aqui.
+    """
+
+    tokens: int
+    calls: int
+    token_cap: int
+    call_cap: int
+    resets_at: datetime

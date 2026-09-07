@@ -357,3 +357,111 @@ async def test_total_count_respects_filters(make_auth_client):
     res = await ac.get("/transactions/?type=INCOME")
 
     assert res.headers["x-total-count"] == "1"
+
+
+async def _carteira(ac, nome="Main"):
+    res = await ac.post("/wallets/", json={"name": nome, "balance": "1000.00"})
+    assert res.status_code == 201, res.text
+    return res.json()["id"]
+
+
+async def _transacao(ac, wallet_id, *, category, description, amount="10.00"):
+    res = await ac.post(
+        "/transactions/",
+        json={
+            "wallet_id": wallet_id,
+            "type": "EXPENSE",
+            "amount": amount,
+            "category": category,
+            "description": description,
+            "date": "2026-09-01",
+        },
+    )
+    assert res.status_code == 201, res.text
+    return res.json()["id"]
+
+
+@pytest.mark.asyncio
+async def test_search_matches_description_and_category(make_auth_client):
+    alice = await make_auth_client("Alice")
+    w = await _carteira(alice)
+    await _transacao(alice, w, category="Mercado", description="Feira da semana")
+    await _transacao(alice, w, category="Transporte", description="Uber para o centro")
+
+    por_descricao = await alice.get("/transactions/", params={"q": "feira"})
+    assert [t["description"] for t in por_descricao.json()] == ["Feira da semana"]
+
+    por_categoria = await alice.get("/transactions/", params={"q": "transp"})
+    assert [t["category"] for t in por_categoria.json()] == ["Transporte"]
+
+
+@pytest.mark.asyncio
+async def test_search_ignores_case_and_accents(make_auth_client):
+    # As categorias reais do app têm acento ("Alimentação", "Saúde", "Salário")
+    # e quem digita no celular normalmente não põe. Sem isto a busca não acha
+    # justamente as categorias que o próprio app criou.
+    alice = await make_auth_client("Alice")
+    w = await _carteira(alice)
+    await _transacao(alice, w, category="Alimentação", description="Almoço no Sabor & Saúde")
+
+    for termo in ("alimentacao", "ALIMENTAÇÃO", "saude", "almoco"):
+        res = await alice.get("/transactions/", params={"q": termo})
+        assert len(res.json()) == 1, (termo, res.text)
+
+
+@pytest.mark.asyncio
+async def test_search_combines_with_the_existing_filters_and_the_total(make_auth_client):
+    # Busca DENTRO do filtro ativo, não no lugar dele. E o X-Total-Count conta
+    # o resultado da busca: sem isso a paginação diria "1 de 7 páginas" para um
+    # resultado de uma linha.
+    alice = await make_auth_client("Alice")
+    w = await _carteira(alice)
+    await _transacao(alice, w, category="Mercado", description="Feira da semana")
+    receita = await alice.post(
+        "/transactions/",
+        json={
+            "wallet_id": w, "type": "INCOME", "amount": "50.00",
+            "category": "Mercado", "description": "Feira devolvida", "date": "2026-09-01",
+        },
+    )
+    assert receita.status_code == 201, receita.text
+
+    res = await alice.get("/transactions/", params={"q": "feira", "type": "EXPENSE"})
+    assert len(res.json()) == 1
+    assert res.json()[0]["type"] == "EXPENSE"
+    assert res.headers["X-Total-Count"] == "1"
+
+
+@pytest.mark.asyncio
+async def test_search_treats_wildcards_as_text_and_stays_scoped_to_the_user(make_auth_client):
+    # `%` sem escape casaria com tudo, transformando a busca num "listar tudo"
+    # disfarçado. E a busca nunca pode furar o escopo do dono.
+    alice = await make_auth_client("Alice")
+    bob = await make_auth_client("Bob")
+    wa = await _carteira(alice)
+    wb = await _carteira(bob, "Bob Main")
+    await _transacao(alice, wa, category="Mercado", description="Feira da semana")
+    await _transacao(bob, wb, category="Mercado", description="Feira do Bob")
+
+    curinga = await alice.get("/transactions/", params={"q": "%"})
+    assert curinga.json() == []
+
+    dela = await alice.get("/transactions/", params={"q": "feira"})
+    assert [t["description"] for t in dela.json()] == ["Feira da semana"]
+
+
+@pytest.mark.asyncio
+async def test_search_does_not_break_on_a_null_description(make_auth_client):
+    # `translate(NULL)` é NULL e NULL LIKE nunca é verdadeiro: uma transação
+    # sem descrição não pode quebrar a busca nem aparecer como falso positivo.
+    alice = await make_auth_client("Alice")
+    w = await _carteira(alice)
+    await _transacao(alice, w, category="Mercado", description=None)
+
+    por_categoria = await alice.get("/transactions/", params={"q": "mercado"})
+    assert por_categoria.status_code == 200
+    assert len(por_categoria.json()) == 1
+
+    por_termo_qualquer = await alice.get("/transactions/", params={"q": "feira"})
+    assert por_termo_qualquer.status_code == 200
+    assert por_termo_qualquer.json() == []
