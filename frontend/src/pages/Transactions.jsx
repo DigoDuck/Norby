@@ -51,6 +51,7 @@ export default function Transactions() {
   const [filterType, setFilterType] = useState("");
   const [offset, setOffset] = useState(0);
   const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
   // false quando o header X-Total-Count não chegou (backend antigo, proxy,
   // CORS mal configurado): nesse caso `total` é só o length da página, não o
   // total real, e a UI não pode tratá-lo como se fosse.
@@ -81,6 +82,7 @@ export default function Transactions() {
 
   async function load(params = {}, novoOffset = 0) {
     const seq = ++requisicaoAtual.current;
+    setLoading(true);
     try {
       const res = await transactionsApi.list({
         ...params,
@@ -98,7 +100,33 @@ export default function Transactions() {
     } catch (err) {
       if (seq !== requisicaoAtual.current) return; // resposta obsoleta
       setServerError(apiErrorMessage(err, "Não foi possível carregar as transações."));
+    } finally {
+      if (seq === requisicaoAtual.current) setLoading(false);
     }
+  }
+
+  // Espelha `filterType` numa ref: o efeito de busca abaixo depende só de
+  // `search` (não de `filterType`), então o setTimeout já agendado por uma
+  // digitação precisa enxergar o filtro de tipo MAIS RECENTE quando disparar,
+  // não o que existia no instante em que foi agendado. A escrita mora num
+  // efeito à parte porque refs não podem ser lidas nem escritas durante o
+  // render (react-hooks/refs).
+  const filterTypeRef = useRef(filterType);
+  useEffect(() => {
+    filterTypeRef.current = filterType;
+  }, [filterType]);
+
+  // Parâmetros do filtro de tipo + busca ativa, para toda chamada de load()
+  // que precisa preservá-los (paginação, reload após criar/editar/excluir,
+  // debounce da busca, clique nos botões de tipo). `tipo` é parametrizável
+  // porque o clique no botão de tipo passa o valor NOVO antes de setFilterType
+  // refletir no state — os demais chamadores usam o filtro atual por padrão.
+  // `trim()`: dois espaços não é uma busca válida.
+  function filtroAtivo(tipo = filterType) {
+    return {
+      ...(tipo ? { type: tipo } : {}),
+      ...(search.trim().length >= 2 ? { q: search.trim() } : {}),
+    };
   }
 
   useEffect(() => {
@@ -111,6 +139,29 @@ export default function Transactions() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
   }, []);
+
+  // Busca no servidor, com espera de 300ms. Antes disto a busca era no
+  // CLIENTE, filtrando só a página já carregada (no máximo PAGE_SIZE itens
+  // por vez) — quem tivesse a transação numa página seguinte buscava e não
+  // achava nada, sem qualquer aviso de que havia mais dados fora da vista.
+  // Abaixo de 2 caracteres não busca: volta pra lista normal (sem `q`).
+  const primeiraRenderizacao = useRef(true);
+  useEffect(() => {
+    if (primeiraRenderizacao.current) {
+      // O mount já dispara load() acima; sem este corte o efeito repetiria a
+      // MESMA primeira página de novo, 300ms depois, à toa.
+      primeiraRenderizacao.current = false;
+      return;
+    }
+    const id = setTimeout(() => {
+      load(filtroAtivo(filterTypeRef.current), 0);
+    }, 300);
+    return () => clearTimeout(id);
+    // filtroAtivo de propósito fora: é recriada a cada render, e incluí-la
+    // reagendaria a busca a cada render (não só quando `search` muda). O tipo
+    // mais recente já chega pela ref, lida dentro do timeout, não do closure.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search]);
 
   // Auto-seleciona a única carteira, sem sobrescrever uma escolha já feita nem
   // atrapalhar a edição.
@@ -143,7 +194,7 @@ export default function Transactions() {
   // Delete desloca offsets (o item some e os seguintes sobem uma posição) —
   // voltar pra página 1 evita mostrar uma página com buracos. Mantido de
   // propósito, ver onSubmit para o caso de edição (que preserva a página).
-  const reload = () => load(filterType ? { type: filterType } : {}, 0);
+  const reload = () => load(filtroAtivo(), 0);
 
   const walletOptions = wallets.map((w) => ({ value: w.id, label: w.name }));
 
@@ -207,7 +258,7 @@ export default function Transactions() {
       // Editar não muda quantos itens existem: preserva a página atual em vez
       // de reload() (que sempre volta pra página 1).
       if (wasEditing) {
-        load(filterType ? { type: filterType } : {}, offset);
+        load(filtroAtivo(), offset);
       } else {
         reload();
       }
@@ -221,10 +272,8 @@ export default function Transactions() {
     reload();
   }
 
-  // A busca é client-side sobre a página carregada, não sobre todo o
-  // histórico. Se houver mais páginas, precisamos avisar em vez de afirmar
-  // que a transação não existe. Sem total conhecido (header ausente), uma
-  // página cheia é o sinal disponível de que pode haver mais.
+  // Sem total conhecido (header ausente), uma página cheia é o sinal
+  // disponível de que pode haver mais além dela.
   const haMaisPaginas = totalConhecido
     ? total > transactions.length
     : transactions.length === PAGE_SIZE;
@@ -232,12 +281,6 @@ export default function Transactions() {
   const podeAvancar = totalConhecido
     ? offset + PAGE_SIZE < total
     : transactions.length === PAGE_SIZE;
-
-  const filtered = transactions.filter(
-    (t) =>
-      t.category.toLowerCase().includes(search.toLowerCase()) ||
-      t.description?.toLowerCase().includes(search.toLowerCase()),
-  );
 
   return (
     <div className="space-y-6">
@@ -416,6 +459,7 @@ export default function Transactions() {
               placeholder="Buscar..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+              maxLength={100}
               className="pl-9 bg-surface border-line/10 text-content placeholder:text-content-3"
             />
           </div>
@@ -427,7 +471,7 @@ export default function Transactions() {
                 aria-pressed={filterType === t}
                 onClick={() => {
                   setFilterType(t);
-                  load(t ? { type: t } : {}, 0);
+                  load(filtroAtivo(t), 0);
                 }}
                 className={`rounded-xl px-3 py-2 text-sm transition-colors ${
                   filterType === t
@@ -440,6 +484,13 @@ export default function Transactions() {
             ))}
           </div>
         </div>
+
+        {/* Sempre montado (só o texto troca): sem isso a tabela pulava ~20px
+            a cada load, e o desmonte/remonte não é confiável para leitor de
+            tela anunciar — role="status" precisa do nó já existir no DOM. */}
+        <p role="status" className="pb-2 text-xs text-content-3">
+          {loading ? "Carregando…" : " "}
+        </p>
 
         <table className="hidden w-full md:table">
           <thead>
@@ -455,7 +506,7 @@ export default function Transactions() {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((t) => (
+            {transactions.map((t) => (
               <tr
                 key={t.id}
                 className="border-b border-line/5 last:border-0 hover:bg-state/[0.03] transition-colors"
@@ -521,7 +572,7 @@ export default function Transactions() {
         </table>
 
         <div className="space-y-3 md:hidden">
-          {filtered.map((t) => (
+          {transactions.map((t) => (
             <article key={t.id} className="inset-panel p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -582,47 +633,35 @@ export default function Transactions() {
           ))}
         </div>
 
-        {/* Independente do resultado ter vindo vazio: a busca só olha a página
-            carregada, então "poucos resultados" é tão enganoso quanto "zero". */}
-        {search && haMaisPaginas && (
-          <p className="pt-2 text-center text-xs text-content-3">
-            A busca cobre só as transações desta página. Pode haver mais resultados em outras páginas.
-          </p>
-        )}
-
-        {filtered.length === 0 && (
+        {transactions.length === 0 && (
           <div className="text-center py-12 text-content-3 text-sm">
-            Nenhuma transação encontrada.
+            {search.trim().length >= 2
+              ? "Nenhuma transação encontrada para essa busca."
+              : "Nenhuma transação encontrada."}
           </div>
         )}
 
         {(haMaisPaginas || offset > 0) && (
           <div className="flex items-center justify-between gap-4 pt-2">
             <p className="text-sm text-content-2 tnum">
-              {search
-                ? "Busca ativa: contagem total oculta"
-                : totalConhecido
-                  ? `${offset + 1}–${Math.min(offset + PAGE_SIZE, total)} de ${total}`
-                  : transactions.length === 0
-                    ? "Nenhuma transação nesta página"
-                    : `${offset + 1}–${offset + transactions.length}`}
+              {totalConhecido
+                ? `${offset + 1}–${Math.min(offset + PAGE_SIZE, total)} de ${total}`
+                : transactions.length === 0
+                  ? "Nenhuma transação nesta página"
+                  : `${offset + 1}–${offset + transactions.length}`}
             </p>
             <div className="flex gap-2">
               <Button
                 variant="ghost"
                 disabled={offset === 0}
-                onClick={() =>
-                  load(filterType ? { type: filterType } : {}, offset - PAGE_SIZE)
-                }
+                onClick={() => load(filtroAtivo(), offset - PAGE_SIZE)}
               >
                 Anterior
               </Button>
               <Button
                 variant="ghost"
                 disabled={!podeAvancar}
-                onClick={() =>
-                  load(filterType ? { type: filterType } : {}, offset + PAGE_SIZE)
-                }
+                onClick={() => load(filtroAtivo(), offset + PAGE_SIZE)}
               >
                 Próxima
               </Button>
