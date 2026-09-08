@@ -18,7 +18,7 @@ httpx==0.28.1  # email_service (Brevo)
 # Billing (ADR 0001). O SDK entra por causa da verificação de assinatura do
 # webhook: ela precisa ser timing-safe e checar a tolerância de timestamp
 # contra replay, e isso não é lugar para HMAC feito à mão.
-stripe==15.5.1
+stripe==15.6.1
 
 # Foto de perfil (issue #35): redimensiona no servidor para 128x128 WebP.
 # python-multipart é o que o FastAPI usa para ler multipart/form-data.
