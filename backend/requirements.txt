@@ -2,7 +2,7 @@ fastapi==0.141.1
 uvicorn[standard]==0.30.6
 sqlalchemy[asyncio]==2.0.52
 asyncpg==0.30.0
-alembic==1.19.1
+alembic==1.20.0
 motor==3.7.1
 PyJWT==2.13.0  # JWT HS256 do access token. Substituiu o python-jose (issue #29): sem ecdsa, sem cryptography.
 python-dotenv==1.2.3
