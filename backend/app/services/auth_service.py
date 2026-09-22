@@ -46,9 +46,12 @@ def verify_and_upgrade(plain: str, hashed: str) -> tuple[bool, str | None]:
 # não revela se o e-mail está cadastrado. Calculado uma vez no import (~200ms).
 _DUMMY_HASH = hash_password("norby-dummy-password-nunca-usada")
 
-def create_access_token(user_id: str) -> str:
+def create_access_token(user_id: str, epoch: int) -> str:
+    # `epoch` obrigatório (sem default): todo chamador precisa decidir o valor
+    # explicitamente, para um novo caminho de emissão não esquecer o claim e
+    # reabrir o buraco do #156 em silêncio.
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.access_token_expire_minutes) # Define um tempo de expiração pro token
-    payload = {"sub": str(user_id), "exp": expire}
+    payload = {"sub": str(user_id), "exp": expire, "ep": epoch}
     return jwt.encode(payload, settings.secret_key, algorithm=settings.algorithm) # Cria o token final
 
 
@@ -117,7 +120,7 @@ async def rotate_refresh_token(raw: str, db: AsyncSession) -> tuple[str, str, Us
             return None
         new_refresh = _new_refresh(str(user.id), db)
         await db.commit()
-        return create_access_token(str(user.id)), new_refresh, user
+        return create_access_token(str(user.id), user.token_epoch), new_refresh, user
 
     if record.expires_at <= datetime.now(timezone.utc):
         return None
@@ -131,7 +134,7 @@ async def rotate_refresh_token(raw: str, db: AsyncSession) -> tuple[str, str, Us
     new_refresh = _new_refresh(str(user.id), db)
     await db.commit()
 
-    return create_access_token(str(user.id)), new_refresh, user
+    return create_access_token(str(user.id), user.token_epoch), new_refresh, user
 
 async def revoke_refresh_token(raw: str, db: AsyncSession) -> None:
     """Revoga o refresh do logout. Token já rotacionado é sinal de roubo.
@@ -239,6 +242,12 @@ async def reset_password(raw: str, nova_senha: str, db: AsyncSession) -> bool:
     # bcrypt é bloqueante (~100-300ms): offload para thread, como auth.py já
     # faz em register/login/delete.
     user.password_hash = await asyncio.to_thread(hash_password, nova_senha)
+    # #156: o refresh revogado abaixo não alcança o access token já emitido —
+    # ele não passa pelo Postgres, só pela assinatura, e seguiria válido até
+    # expirar sozinho (até 15min). Incrementar o epoch aqui, na MESMA
+    # transação da troca de senha, fecha essa janela: o claim `ep` do token
+    # antigo nunca mais bate com o que get_current_user lê da linha.
+    user.token_epoch += 1
 
     # Os OUTROS links pendentes desta pessoa morrem junto. Pedir três e-mails e
     # usar um não pode deixar dois links vivos numa caixa de entrada.

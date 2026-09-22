@@ -129,6 +129,29 @@ async def test_me_with_valid_token(client):
 
 
 @pytest.mark.asyncio
+async def test_token_without_an_epoch_claim_is_accepted_for_a_fresh_user(client, db_session):
+    # #156: compat com token antigo. Um token assinado sem o claim `ep` (como
+    # todos antes desta feature) precisa continuar valendo para quem nunca
+    # sofreu bump — get_current_user trata claim ausente como epoch 0, que é
+    # também o default da coluna para conta nova.
+    from sqlalchemy import select
+    from app.models.sql_models import User
+
+    reg = await client.post("/auth/register", json=REG)
+    user = await db_session.scalar(select(User).where(User.email == REG["email"]))
+    assert user.token_epoch == 0
+
+    s = get_settings()
+    token_sem_ep = jwt.encode(
+        {"sub": str(user.id), "exp": datetime.now(timezone.utc) + timedelta(minutes=5)},
+        s.secret_key,
+        algorithm=s.algorithm,
+    )
+    res = await client.get("/auth/me", headers={"Authorization": f"Bearer {token_sem_ep}"})
+    assert res.status_code == 200
+
+
+@pytest.mark.asyncio
 async def test_login_runs_bcrypt_even_for_unknown_email(client, monkeypatch):
     # Sem o hash dummy, e-mail inexistente retorna sem passar por bcrypt: a
     # diferença de tempo (~200ms) revela quais e-mails estão cadastrados.
@@ -504,6 +527,34 @@ async def test_update_me_email_change_ok_even_if_notice_email_fails(
     )
     assert res.status_code == 200
     assert res.json()["email"] == "novo2@test.com"
+
+
+@pytest.mark.asyncio
+async def test_update_me_email_change_invalidates_the_old_access_token(make_auth_client):
+    # #156: a revogação de refresh (teste acima) não derruba o access token
+    # da aba atual, que segue assinado e válido até expirar sozinho. O bump
+    # de token_epoch fecha essa janela — a MESMA aba que trocou o e-mail
+    # perde acesso na próxima chamada, e só um login novo (que emite um token
+    # com o epoch atual) volta a funcionar.
+    ac = await make_auth_client("Alice")
+
+    res = await ac.put(
+        "/auth/me",
+        json={"email": "novo4@test.com", "current_password": "secret123"},
+    )
+    assert res.status_code == 200
+
+    # `ac` ainda carrega o token ANTIGO: update_me não devolve um novo.
+    ainda_com_token_velho = await ac.get("/auth/me")
+    assert ainda_com_token_velho.status_code == 401
+
+    login_novo = await ac.post(
+        "/auth/login", json={"email": "novo4@test.com", "password": "secret123"}
+    )
+    assert login_novo.status_code == 200
+    ac.headers["Authorization"] = f"Bearer {login_novo.json()['access_token']}"
+    funciona = await ac.get("/auth/me")
+    assert funciona.status_code == 200
 
 
 @pytest.mark.asyncio

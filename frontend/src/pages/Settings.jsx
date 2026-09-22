@@ -68,6 +68,10 @@ export default function Settings() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState(null);
+  // #156: troca de e-mail bem-sucedida sobe o token_epoch no servidor, que
+  // mata o access token desta aba na hora. Sem aviso, a próxima chamada
+  // qualquer bateria num 401 mudo e jogaria a pessoa pra "/" sem explicação.
+  const [emailChangedNotice, setEmailChangedNotice] = useState(false);
 
   const [photoError, setPhotoError] = useState("");
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -165,6 +169,20 @@ export default function Settings() {
         ? { ...form, current_password: currentPassword }
         : form;
       const res = await authApi.updateProfile(payload);
+
+      if (emailChanged) {
+        // Não chama updateUser aqui: o token desta aba já está morto no
+        // servidor, e authApi.logout() abaixo vai limpar o store inteiro em
+        // seguida — atualizar o e-mail no store só para apagá-lo depois é
+        // trabalho que ninguém vê.
+        setEmailChangedNotice(true);
+        setTimeout(async () => {
+          await authApi.logout();
+          navigate("/");
+        }, 1800);
+        return;
+      }
+
       updateUser(res.data); // só atualiza o store após sucesso no backend
       setCurrentPassword("");
       setSaved(true);
@@ -306,8 +324,15 @@ export default function Settings() {
           <p role="alert" className="text-danger text-xs mt-3">{error}</p>
         )}
 
+        {emailChangedNotice && (
+          <p role="status" className="text-accent text-xs mt-3">
+            E-mail alterado. Entre novamente com o novo endereço.
+          </p>
+        )}
+
         <Button
           onClick={handleSave}
+          disabled={emailChangedNotice}
           className="mt-5 bg-accent-fill text-accent-contrast hover:bg-accent-fill/90 font-medium"
         >
           <Save size={15} /> {saved ? "Salvo!" : "Salvar alterações"}

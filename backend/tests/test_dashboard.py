@@ -40,7 +40,7 @@ async def test_dashboard_summary_aggregates_over_all_transactions(db_session, cl
     db_session.add_all(txs)
     await db_session.commit()
 
-    token = create_access_token(str(user.id))
+    token = create_access_token(str(user.id), user.token_epoch)
     res = await client.get("/dashboard/summary", headers={"Authorization": f"Bearer {token}"})
     assert res.status_code == 200, res.text
     body = res.json()

@@ -153,7 +153,7 @@ async def register(
     await db.refresh(user)
     await record_success(payload.email, db)
 
-    access = create_access_token(str(user.id))
+    access = create_access_token(str(user.id), user.token_epoch)
     refresh = await create_refresh_token(str(user.id), db)
     _set_refresh_cookie(response, refresh)
     return Token(access_token=access, user=UserResponse.model_validate(user))
@@ -199,7 +199,7 @@ async def login(
         await db.commit()
     await record_success(payload.email, db)
 
-    access = create_access_token(str(user.id))
+    access = create_access_token(str(user.id), user.token_epoch)
     refresh = await create_refresh_token(str(user.id), db)
     _set_refresh_cookie(response, refresh)
     return Token(access_token=access, user=UserResponse.model_validate(user))
@@ -334,6 +334,11 @@ async def update_me(
             .where(RefreshToken.user_id == current_user.id, RefreshToken.revoked.is_(False))
             .values(revoked=True)
         )
+        # #156: o refresh revogado acima não derruba o access token da aba
+        # atual, que não passa pelo Postgres. Subir o epoch na MESMA
+        # transação fecha essa janela — a próxima checagem de get_current_user
+        # já rejeita o token emitido com o epoch antigo.
+        current_user.token_epoch += 1
 
     try:
         await db.commit()
@@ -348,9 +353,9 @@ async def update_me(
     await db.refresh(current_user)
 
     if email_mudando:
-        # Ponto único de sucesso da troca de e-mail — Task 3 (bump do
-        # token_epoch, #156) entra aqui também. A revogação acima já está
-        # commitada; só falta o aviso, que é best-effort.
+        # Ponto único de sucesso da troca de e-mail. A revogação de refresh e
+        # o bump do token_epoch (#156) já estão commitados, dentro do bloco
+        # `if email_mudando:` lá em cima; só falta o aviso, que é best-effort.
         try:
             await enviar_email(
                 para=email_antigo,

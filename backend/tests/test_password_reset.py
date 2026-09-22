@@ -142,6 +142,26 @@ async def test_the_password_actually_changes(client, enviados):
 
 
 @pytest.mark.asyncio
+async def test_reset_invalidates_an_access_token_issued_before_it(client, enviados):
+    # #156: o refresh token já cai (teste abaixo), mas o access token de 15min
+    # emitido ANTES do reset continuava valendo até expirar por conta própria —
+    # ele não passa pelo Postgres, só pela assinatura. O epoch por usuário
+    # fecha essa janela: reset_password incrementa `token_epoch`, e o claim
+    # `ep` do token antigo (gravado no momento da emissão) nunca mais bate.
+    email, body = await registrar(client)
+    token_antigo = body["access_token"]
+
+    await client.post("/auth/forgot-password", json={"email": email})
+    await client.post(
+        "/auth/reset-password",
+        json={"token": link_do(enviados), "new_password": "novasenha1"},
+    )
+
+    res = await client.get("/auth/me", headers={"Authorization": f"Bearer {token_antigo}"})
+    assert res.status_code == 401
+
+
+@pytest.mark.asyncio
 async def test_reset_revokes_every_session(client, enviados, db_session):
     email, _ = await registrar(client)
     refresh = client.cookies.get(COOKIE)

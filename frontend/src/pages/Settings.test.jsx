@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 import { accountApi } from "@/api/account";
@@ -178,6 +178,43 @@ describe("Settings, step-up de senha na troca de e-mail (#153)", () => {
         current_password: "secret123",
       }),
     );
+  });
+
+  it("e-mail alterado com sucesso avisa e desloga em vez de deixar a aba morrer num 401 mudo (#156)", async () => {
+    // A troca sobe o token_epoch no servidor e mata o access token desta aba
+    // na hora. Sem este aviso, a próxima chamada qualquer bateria 401 e o
+    // interceptor jogaria a pessoa pra "/" sem explicação nenhuma.
+    authApi.updateProfile.mockResolvedValue({
+      data: { name: "Alice", email: "novo@test.com" },
+    });
+    authApi.logout.mockResolvedValue(undefined);
+    vi.useFakeTimers();
+    renderSettings();
+
+    fireEvent.change(screen.getByLabelText("E-mail"), {
+      target: { value: "novo@test.com" },
+    });
+    fireEvent.change(
+      screen.getByLabelText("Senha atual (necessária para trocar o e-mail)"),
+      { target: { value: "secret123" } },
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Salvar alterações/ }));
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "E-mail alterado. Entre novamente com o novo endereço.",
+    );
+    // Não some sozinho: continua visível até o logout de fato acontecer.
+    expect(authApi.logout).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1800);
+    });
+    expect(authApi.logout).toHaveBeenCalled();
+
+    vi.useRealTimers();
   });
 
   it("mostra 'Senha incorreta' quando o backend recusa a senha do step-up", async () => {
