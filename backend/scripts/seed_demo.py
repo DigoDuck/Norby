@@ -28,6 +28,7 @@ import random
 import secrets
 import sys
 from datetime import date, datetime
+from urllib.parse import urlparse
 
 import httpx
 
@@ -36,11 +37,20 @@ EMAIL = os.getenv("SEED_EMAIL", "demo@norby.dev")
 NAME = os.getenv("SEED_NAME", "Ana Ribeiro")
 
 
+def _is_local_host(url: str) -> bool:
+    """True só para localhost/127.0.0.1 de fato, não para qualquer URL que
+    contenha a substring (fix round 1: "http://localhost.evil.com" continha
+    "://localhost" e passava pelo bypass da senha obrigatória). Usa o
+    hostname já parseado pela lib e compara por igualdade exata.
+    """
+    return urlparse(url).hostname in ("localhost", "127.0.0.1")
+
+
 def _password() -> str:
     given = os.getenv("SEED_PASSWORD")
     if given:
         return given
-    if "://localhost" in API or "://127.0.0.1" in API:
+    if _is_local_host(API):
         gerada = secrets.token_urlsafe(12)
         print(f"SEED_PASSWORD não definida — gerando uma para {EMAIL}: {gerada}")
         return gerada
