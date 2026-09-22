@@ -28,7 +28,7 @@ def _settings_limpo(**extra) -> Settings:
     return Settings(
         database_url="postgresql://localhost/norby",
         mongodb_url="mongodb://localhost/norby",
-        secret_key="test-secret",
+        secret_key="test-secret-with-at-least-32-chars",
         gemini_api_key="test-key",
         _env_file=None,
         **extra,
