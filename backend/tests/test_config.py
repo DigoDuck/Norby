@@ -55,6 +55,22 @@ def test_settings_rejects_short_secret_key():
         )
 
 
+def test_settings_error_does_not_leak_secret_key_value():
+    # Final-review fix: o Pydantic ecoa `input_value` na mensagem por padrão.
+    # Sem hide_input_in_errors, um SECRET_KEY curto de produção vazaria em
+    # texto puro no log do Railway quando o boot falha na validação.
+    valor_secreto = "MyRealButShortProdKey123"
+    with pytest.raises(ValidationError) as exc_info:
+        Settings(
+            database_url="postgresql://localhost/norby",
+            mongodb_url="mongodb://localhost/norby",
+            secret_key=valor_secreto,
+            gemini_api_key="test-key",
+            _env_file=None,
+        )
+    assert valor_secreto not in str(exc_info.value)
+
+
 def test_settings_rejects_placeholder_webhook_secret():
     # #154: mesmo raciocínio do secret_key, para o segredo do webhook Stripe.
     with pytest.raises(ValidationError):

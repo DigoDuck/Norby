@@ -116,7 +116,14 @@ class Settings(BaseSettings):
     # lugar não dá pra esquecer, oito dão.
     paywall_enabled: bool = False
 
-    model_config = SettingsConfigDict(env_file="../.env", extra="ignore")
+    # hide_input_in_errors: por padrão o Pydantic ecoa o valor recebido na
+    # mensagem de erro. Sem isso, um SECRET_KEY de produção curto demais
+    # aparece em texto puro no log do Railway quando o boot falha na
+    # validação acima — o log vira o próprio vazamento que o validador tenta
+    # evitar.
+    model_config = SettingsConfigDict(
+        env_file="../.env", extra="ignore", hide_input_in_errors=True
+    )
 
     @property
     def cors_origins_list(self) -> list[str]:
