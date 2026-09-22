@@ -34,6 +34,13 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
 logger = logging.getLogger("norby.auth")
 settings = get_settings()
 
+# O rate limit de upload de foto é por usuário (10/minuto); não trava
+# CONCORRÊNCIA entre usuários diferentes. Cada decode ainda custa dezenas de
+# MB (teto de pixels em photo_service.py), então N uploads simultâneos de N
+# usuários diferentes podiam empilhar no mesmo worker e estourar memória
+# (#155). O semáforo é de módulo, não por request, para valer entre usuários.
+_SEMAFORO_DECODE_FOTO = asyncio.Semaphore(2)
+
 
 def _throttled(retry_after: int) -> HTTPException:
     return HTTPException(
@@ -332,7 +339,17 @@ async def upload_my_photo(
 
     try:
         # Bloqueante (decodifica e reescala): vai para thread, como o bcrypt.
-        current_user.photo = await asyncio.to_thread(processar_foto, corpo)
+        # O semáforo limita quantos decodes rodam ao mesmo tempo no processo
+        # inteiro — o rate limit acima é por usuário e não segura isso (#155).
+        # ponytail: asyncio.to_thread não é cancelável — se o request for
+        # cancelado (cliente cai, timeout do proxy), o `async with` libera a
+        # vaga do semáforo mas a thread do decode continua rodando até o fim,
+        # então o nº real de decodes simultâneos pode passar de 2; e quem
+        # está esperando a vaga segura o corpo (até 2 MB) na memória sem
+        # limite de tempo de fila. Upgrade: ThreadPoolExecutor(max_workers=2)
+        # dedicado, que dá cancelamento/timeout de fila de verdade.
+        async with _SEMAFORO_DECODE_FOTO:
+            current_user.photo = await asyncio.to_thread(processar_foto, corpo)
     except PhotoTooLarge as erro:
         raise HTTPException(status_code=413, detail=str(erro))
     except PhotoInvalid as erro:
@@ -403,7 +420,13 @@ async def delete_my_photo(
 
 
 @router.get("/me/export")
+# export_data carrega TODAS as linhas do usuário de uma vez (sem LIMIT) e o
+# jsonable_encoder + JSONResponse ainda duplicam o dict em memória: um free
+# account cheio de transações exportado em paralelo derruba o worker (#158).
+# O teto por usuário mata a amplificação sem precisar tornar o export streaming.
+@limiter.limit("5/hour", key_func=user_key)
 async def export_my_data(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):

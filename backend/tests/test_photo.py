@@ -114,7 +114,7 @@ def test_a_decompression_bomb_is_refused():
 
 
 def test_an_image_under_pillows_own_limit_but_over_ours_is_refused():
-    """O teto de 40 MP é NOSSO, e mais apertado que o do Pillow (~178 MP).
+    """O teto de 12 MP é NOSSO, e mais apertado que o do Pillow (~178 MP).
 
     64 MP em RGB são ~190 MB de bitmap, que num container pequeno é OOM. Sem
     este teste o teto podia ser removido sem nada ficar vermelho — o teste da
@@ -124,6 +124,28 @@ def test_an_image_under_pillows_own_limit_but_over_ours_is_refused():
     Image.new("L", (8000, 8000)).save(grande, format="PNG")
     with pytest.raises(PhotoInvalid):
         processar_foto(grande.getvalue())
+
+
+def test_just_above_the_pixel_cap_is_refused():
+    """#155: o teto caiu de 40 MP para 12 MP — o que um 128x128 precisa.
+
+    4001x3000 = 12.003.000 pixels, um único pixel acima do teto. PNG de cor
+    sólida cabe folgado no teto de bytes, então é o teto de PIXELS que tem de
+    barrar, não o de bytes.
+    """
+    acima = io.BytesIO()
+    Image.new("RGB", (4001, 3000), (10, 20, 30)).save(acima, format="PNG")
+    with pytest.raises(PhotoInvalid):
+        processar_foto(acima.getvalue())
+
+
+def test_a_12mp_phone_jpeg_is_still_accepted():
+    # 4000x3000 = 12.000.000, exatamente no teto: uma foto de celular comum
+    # não pode passar a ser recusada pela baixa do teto de 40 para 12 MP.
+    dentro = io.BytesIO()
+    Image.new("RGB", (4000, 3000), (120, 130, 140)).save(dentro, format="JPEG")
+    saida = processar_foto(dentro.getvalue())
+    assert Image.open(io.BytesIO(saida)).size == (LADO, LADO)
 
 
 def test_a_valid_image_in_a_format_we_do_not_accept_is_refused():

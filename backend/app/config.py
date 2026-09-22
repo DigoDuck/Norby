@@ -15,6 +15,22 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 7
 
+    @field_validator("secret_key")
+    @classmethod
+    def _rejeita_secret_key_fraca(cls, v: str) -> str:
+        # #154: o placeholder do .env.example é público neste repo — quem
+        # copia o template sem trocar assina JWT com uma chave que qualquer
+        # leitor conhece, e forja token de qualquer usuário. Menos de 32
+        # caracteres também é fraco demais pra assinatura HS256.
+        if v == "mude_para_uma_chave_segura_de_32_caracteres":
+            raise ValueError(
+                "SECRET_KEY ainda é o placeholder do .env.example — gere uma "
+                "chave real (python -c \"import secrets; print(secrets.token_urlsafe(32))\")."
+            )
+        if len(v) < 32:
+            raise ValueError("SECRET_KEY precisa ter pelo menos 32 caracteres.")
+        return v
+
     # #110: o refresh token viaja num cookie HttpOnly do host da API, restrito
     # a /auth. `Secure` acompanha o esquema da app: em produção é https; em
     # localhost o navegador recusaria um cookie Secure sobre http.
@@ -50,6 +66,21 @@ class Settings(BaseSettings):
     # até o #26 provisionar a conta.
     stripe_secret_key: str = ""
     stripe_webhook_secret: str = ""
+
+    @field_validator("stripe_webhook_secret")
+    @classmethod
+    def _rejeita_webhook_secret_placeholder(cls, v: str) -> str:
+        # #154: o placeholder do .env.example também é público. Vazio continua
+        # OK (webhook desligado, endpoint responde 503) — só o valor de
+        # exemplo específico é recusado, porque com ele qualquer leitor do
+        # repo assina um evento Stripe falso e credita premium_until de graça.
+        if v == "whsec_test_local_only_not_a_real_secret":
+            raise ValueError(
+                "STRIPE_WEBHOOK_SECRET ainda é o placeholder do .env.example — "
+                "use o whsec_ real do painel Stripe ou deixe vazio."
+            )
+        return v
+
     # O preço recorrente criado no painel (#26). Vazio = billing não
     # provisionado, e o endpoint de checkout recusa com 503 em vez de tentar
     # criar sessão contra um preço que não existe.
@@ -85,7 +116,14 @@ class Settings(BaseSettings):
     # lugar não dá pra esquecer, oito dão.
     paywall_enabled: bool = False
 
-    model_config = SettingsConfigDict(env_file="../.env", extra="ignore")
+    # hide_input_in_errors: por padrão o Pydantic ecoa o valor recebido na
+    # mensagem de erro. Sem isso, um SECRET_KEY de produção curto demais
+    # aparece em texto puro no log do Railway quando o boot falha na
+    # validação acima — o log vira o próprio vazamento que o validador tenta
+    # evitar.
+    model_config = SettingsConfigDict(
+        env_file="../.env", extra="ignore", hide_input_in_errors=True
+    )
 
     @property
     def cors_origins_list(self) -> list[str]:

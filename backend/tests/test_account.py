@@ -29,6 +29,28 @@ async def test_export_contains_own_data_only(make_auth_client, mongo):
 
 
 @pytest.mark.asyncio
+async def test_export_rate_limit_is_per_user(make_auth_client, mongo):
+    from app.limiter import limiter
+
+    alice = await make_auth_client("Alice")
+
+    # A fixture global desliga o limiter. Religamos só depois do cadastro para
+    # medir exclusivamente o balde do GET /auth/me/export (issue #158).
+    limiter.reset()
+    limiter.enabled = True
+    try:
+        for _ in range(5):
+            res = await alice.get("/auth/me/export")
+            assert res.status_code == 200
+
+        res = await alice.get("/auth/me/export")
+        assert res.status_code == 429
+    finally:
+        limiter.enabled = False
+        limiter.reset()
+
+
+@pytest.mark.asyncio
 async def test_delete_requires_confirmation(make_auth_client):
     alice = await make_auth_client("Alice")
     res = await alice.request(
