@@ -515,6 +515,75 @@ async def test_update_me_name_only_needs_no_password(make_auth_client):
 
 
 @pytest.mark.asyncio
+async def test_update_me_case_only_email_change_needs_no_password(make_auth_client):
+    # Fix round 1: "mudou" tem que ser comparado NORMALIZADO, o mesmo
+    # critério que a checagem de duplicado já usa (func.lower()). Sem isso,
+    # só corrigir a CAIXA do próprio e-mail (Alice@x.com -> alice@x.com)
+    # exigia senha, revogava toda sessão e mandava um aviso de segurança à
+    # toa — nada mudou de fato.
+    ac = await make_auth_client("Alice")
+    antes = (await ac.get("/auth/me")).json()
+    # Só a PARTE LOCAL em caixa alta: o `EmailStr` do Pydantic sempre grava o
+    # domínio em minúsculas (case-insensitive por definição de DNS), então
+    # forçar caixa alta ali não sobreviveria à validação e quebraria a
+    # asserção de "armazenamento mantido" abaixo por um motivo alheio a
+    # este teste.
+    local, dominio = antes["email"].split("@")
+    so_caixa = f"{local.upper()}@{dominio}"
+
+    res = await ac.put("/auth/me", json={"email": so_caixa})
+    assert res.status_code == 200
+    # Comportamento de armazenamento mantido: a caixa nova digitada é a que
+    # fica gravada — só o critério de "precisa de senha" ignora caixa.
+    assert res.json()["email"] == so_caixa
+
+
+@pytest.mark.asyncio
+async def test_update_me_email_change_failure_rolls_back_email_and_revocation_together(
+    make_auth_client, db_session, monkeypatch,
+):
+    # Fix round 1: a troca de e-mail e a revogação de refresh tokens têm que
+    # estar na MESMA transação. Com dois commits separados, o primeiro
+    # (troca de e-mail) podia ter sucesso e o segundo (revogação) falhar,
+    # deixando o e-mail já trocado com os refresh tokens ainda vivos — o
+    # estado exato que o #153 existe para evitar. Forçamos o ÚNICO commit da
+    # rota a falhar e provamos que as duas escritas desaparecem JUNTAS.
+    from sqlalchemy import select
+    from sqlalchemy.exc import IntegrityError
+    from sqlalchemy.ext.asyncio import AsyncSession
+    from app.models.sql_models import RefreshToken
+
+    ac = await make_auth_client("Alice")
+    antes = (await ac.get("/auth/me")).json()
+
+    async def _boom(self):
+        raise IntegrityError("UPDATE users SET email=... (simulado)", {}, Exception("simulado"))
+
+    monkeypatch.setattr(AsyncSession, "commit", _boom)
+
+    res = await ac.put(
+        "/auth/me",
+        json={"email": "novo@test.com", "current_password": "secret123"},
+    )
+    assert res.status_code == 400
+    assert res.json()["detail"] == "Email já cadastrado"
+
+    # Restaura o commit real ANTES de consultar: as chamadas abaixo (via `ac`
+    # e via `db_session`) precisam de um commit/select funcionando de verdade.
+    monkeypatch.undo()
+
+    depois = await ac.get("/auth/me")
+    assert depois.json()["email"] == antes["email"]
+
+    tokens = (
+        await db_session.execute(
+            select(RefreshToken).where(RefreshToken.user_id == antes["id"])
+        )
+    ).scalars().all()
+    assert tokens and not any(t.revoked for t in tokens)
+
+
+@pytest.mark.asyncio
 async def test_update_me_rate_limit_is_per_user(make_auth_client):
     # Issue #160: sem teto, uma conta testava uma wordlist inteira de e-mails
     # movendo o próprio e-mail pra frente e pra trás, à velocidade do HTTP.

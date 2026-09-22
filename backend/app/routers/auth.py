@@ -276,9 +276,17 @@ async def update_me(
 
     # func.lower(): fix round 1 (issue #22) — "Joao@x.com" e "joao@x.com" são
     # a MESMA conta, senão trocar só a caixa do próprio email bateria
-    # falso-positivo contra si mesmo.
+    # falso-positivo contra si mesmo. Fix round 1 do #153: "mudou" também
+    # precisa comparar NORMALIZADO pelo mesmo motivo — sem isto, só trocar a
+    # CAIXA do próprio e-mail (Alice@x.com -> alice@x.com) exigia senha,
+    # revogava toda sessão e mandava aviso de segurança à toa. A CAIXA nova
+    # continua sendo gravada (setattr abaixo usa `new_email` cru, não o
+    # normalizado): só o critério de "mudou" é que ignora caixa.
     new_email = data.get("email")
-    email_mudando = bool(new_email and new_email != current_user.email)
+    normalized_new_email = new_email.strip().lower() if new_email else None
+    email_mudando = bool(
+        normalized_new_email and normalized_new_email != current_user.email.strip().lower()
+    )
 
     if email_mudando:
         # Step-up de senha (issue #153): sem isto, um access token roubado (15
@@ -296,10 +304,9 @@ async def update_me(
         if not password_ok:
             raise HTTPException(status_code=401, detail="Senha incorreta")
 
-        normalized_email = new_email.strip().lower()
         existing = await db.execute(
             select(User).where(
-                func.lower(User.email) == normalized_email,
+                func.lower(User.email) == normalized_new_email,
                 User.id != current_user.id,
             )
         )
@@ -313,31 +320,37 @@ async def update_me(
     for field, value in data.items():
         setattr(current_user, field, value)
 
+    if email_mudando:
+        # Fix round 1: revoga na MESMA transação da troca de e-mail, dentro
+        # do ÚNICO commit logo abaixo. Dois commits separados (um para a
+        # troca, outro para a revogação) deixavam o e-mail já trocado com os
+        # refresh tokens ainda vivos se o segundo falhasse — exatamente o
+        # estado que o #153 existe para evitar. Mesma query do
+        # reset_password (auth_service.py): quem trocou de e-mail pode ter
+        # feito isso porque a conta foi comprometida, e um refresh de 7 dias
+        # sobrevivendo à troca anularia o motivo de tê-la feito.
+        await db.execute(
+            update(RefreshToken)
+            .where(RefreshToken.user_id == current_user.id, RefreshToken.revoked.is_(False))
+            .values(revoked=True)
+        )
+
     try:
         await db.commit()
     except IntegrityError:
         # Corrida equivalente à do cadastro: duas trocas de email pro mesmo
         # endereço (caixas diferentes) em paralelo. Índice único no banco
-        # barra a segunda; sem o catch, viraria 500.
+        # barra a segunda; sem o catch, viraria 500. O rollback desfaz a
+        # troca de e-mail E a revogação de refresh tokens juntas, porque as
+        # duas estão na mesma transação.
         await db.rollback()
         raise HTTPException(status_code=400, detail="Email já cadastrado")
     await db.refresh(current_user)
 
     if email_mudando:
         # Ponto único de sucesso da troca de e-mail — Task 3 (bump do
-        # token_epoch, #156) entra aqui também.
-        #
-        # Revoga TODOS os refresh tokens vivos, mesma query do reset_password
-        # (auth_service.py): quem trocou de e-mail pode ter feito isso porque
-        # a conta foi comprometida, e um refresh de 7 dias sobrevivendo à
-        # troca anularia o motivo de tê-la feito.
-        await db.execute(
-            update(RefreshToken)
-            .where(RefreshToken.user_id == current_user.id, RefreshToken.revoked.is_(False))
-            .values(revoked=True)
-        )
-        await db.commit()
-
+        # token_epoch, #156) entra aqui também. A revogação acima já está
+        # commitada; só falta o aviso, que é best-effort.
         try:
             await enviar_email(
                 para=email_antigo,

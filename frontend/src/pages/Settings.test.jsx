@@ -130,6 +130,32 @@ describe("Settings, step-up de senha na troca de e-mail (#153)", () => {
     );
   });
 
+  it("corrigir só a CAIXA do próprio e-mail não pede senha", async () => {
+    // Fix round 1: o mesmo critério normalizado do backend — só a caixa
+    // mudar (alice@test.com -> ALICE@test.com) não é uma troca de fato.
+    authApi.updateProfile.mockResolvedValue({
+      data: { name: "Alice", email: "ALICE@test.com" },
+    });
+    renderSettings();
+
+    fireEvent.change(screen.getByLabelText("E-mail"), {
+      target: { value: "ALICE@test.com" },
+    });
+
+    expect(
+      screen.queryByLabelText("Senha atual (necessária para trocar o e-mail)"),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Salvar alterações/ }));
+
+    await waitFor(() =>
+      expect(authApi.updateProfile).toHaveBeenCalledWith({
+        name: "Alice",
+        email: "ALICE@test.com",
+      }),
+    );
+  });
+
   it("e-mail alterado pede a senha atual e a envia como current_password", async () => {
     authApi.updateProfile.mockResolvedValue({
       data: { name: "Alice", email: "novo@test.com" },

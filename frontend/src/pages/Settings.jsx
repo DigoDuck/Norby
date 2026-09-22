@@ -60,7 +60,11 @@ export default function Settings() {
   });
   // Issue #153: trocar o e-mail exige a senha atual (step-up), o mesmo
   // contrato do DELETE /auth/me. Nome sozinho continua sem fricção.
-  const emailChanged = form.email !== (user?.email || "");
+  // Fix round 1: comparação NORMALIZADA (o backend também compara por
+  // caixa), senão só corrigir a CAIXA do próprio e-mail (Alice@x.com ->
+  // alice@x.com) pedia senha à toa aqui, mesmo o servidor não indo exigi-la.
+  const emailChanged =
+    form.email.trim().toLowerCase() !== (user?.email || "").trim().toLowerCase();
   const [currentPassword, setCurrentPassword] = useState("");
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState(null);
