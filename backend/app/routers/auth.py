@@ -341,6 +341,13 @@ async def upload_my_photo(
         # Bloqueante (decodifica e reescala): vai para thread, como o bcrypt.
         # O semáforo limita quantos decodes rodam ao mesmo tempo no processo
         # inteiro — o rate limit acima é por usuário e não segura isso (#155).
+        # ponytail: asyncio.to_thread não é cancelável — se o request for
+        # cancelado (cliente cai, timeout do proxy), o `async with` libera a
+        # vaga do semáforo mas a thread do decode continua rodando até o fim,
+        # então o nº real de decodes simultâneos pode passar de 2; e quem
+        # está esperando a vaga segura o corpo (até 2 MB) na memória sem
+        # limite de tempo de fila. Upgrade: ThreadPoolExecutor(max_workers=2)
+        # dedicado, que dá cancelamento/timeout de fila de verdade.
         async with _SEMAFORO_DECODE_FOTO:
             current_user.photo = await asyncio.to_thread(processar_foto, corpo)
     except PhotoTooLarge as erro:
