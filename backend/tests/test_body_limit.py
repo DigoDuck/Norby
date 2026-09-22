@@ -49,6 +49,18 @@ async def test_a_chunked_body_without_content_length_over_the_cap_is_refused(cli
 
 
 @pytest.mark.asyncio
+async def test_a_declared_content_length_over_the_cap_is_refused(client):
+    # Achado da revisão final: faltava um teste pro ramo do Content-Length
+    # DECLARADO (body_size_limit.py, a checagem antes de chamar `self.app`) —
+    # é o ramo que mais dispara em produção, já que navegador, curl e o
+    # próprio Stripe sempre mandam o header. `content=bytes` (não gerador) faz
+    # o httpx calcular e enviar o Content-Length sozinho.
+    resposta = await client.post("/auth/login", content=b"x" * (BODY_SIZE_LIMIT + 1))
+    assert resposta.status_code == 413
+    assert resposta.json()["detail"] == "Corpo grande demais"
+
+
+@pytest.mark.asyncio
 async def test_the_webhook_gets_the_same_cap_even_with_a_secret_configured(
     client, monkeypatch
 ):
