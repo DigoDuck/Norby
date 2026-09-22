@@ -11,14 +11,21 @@ schemas, escopo por usuário) e o mesmo script serve local e prod trocando
 SEED_API_URL. Escrever no banco duplicaria a regra dos routers e ia derivar.
 
     docker exec norby_backend python scripts/seed_demo.py
-    SEED_API_URL=https://api.norby.com.br python scripts/seed_demo.py
+    SEED_API_URL=https://api.norby.com.br SEED_PASSWORD=<senha forte> python scripts/seed_demo.py
 
     python scripts/seed_demo.py --check   # valida os dados gerados, sem servidor
 
 Recusa rodar se a conta já tiver carteiras, para não empilhar dados repetidos.
+
+Senha (#159): contra localhost, sem SEED_PASSWORD, gera uma aleatória e
+imprime — dev não precisa decorar nada. Contra qualquer outro host (produção
+inclusive), exige SEED_PASSWORD explícita: sem isso, "demo12345" documentado
+neste arquivo público vira a senha de uma conta em produção que qualquer
+leitor do repo consegue logar, gastar cota de IA compartilhada ou apagar.
 """
 import os
 import random
+import secrets
 import sys
 from datetime import date, datetime
 
@@ -26,8 +33,24 @@ import httpx
 
 API = os.getenv("SEED_API_URL", "http://localhost:8000").rstrip("/")
 EMAIL = os.getenv("SEED_EMAIL", "demo@norby.dev")
-PASSWORD = os.getenv("SEED_PASSWORD", "demo12345")
 NAME = os.getenv("SEED_NAME", "Ana Ribeiro")
+
+
+def _password() -> str:
+    given = os.getenv("SEED_PASSWORD")
+    if given:
+        return given
+    if "://localhost" in API or "://127.0.0.1" in API:
+        gerada = secrets.token_urlsafe(12)
+        print(f"SEED_PASSWORD não definida — gerando uma para {EMAIL}: {gerada}")
+        return gerada
+    sys.exit(
+        "SEED_PASSWORD é obrigatória fora de localhost "
+        f"(SEED_API_URL={API}) — sem ela a senha ficaria pública neste script."
+    )
+
+
+PASSWORD = _password()
 
 MONTHS = 6  # o dashboard plota os 6 últimos meses COM dados (desc + limit 6)
 
