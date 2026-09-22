@@ -53,6 +53,7 @@ export default function Settings() {
   const nomeId = useId();
   const emailId = useId();
   const senhaEmailId = useId();
+  const senhaEmailErrorId = useId();
   const fotoId = useId();
   const [form, setForm] = useState({
     name: user?.name || "",
@@ -68,10 +69,11 @@ export default function Settings() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState(null);
-  // #156: troca de e-mail bem-sucedida sobe o token_epoch no servidor, que
-  // mata o access token desta aba na hora. Sem aviso, a próxima chamada
-  // qualquer bateria num 401 mudo e jogaria a pessoa pra "/" sem explicação.
-  const [emailChangedNotice, setEmailChangedNotice] = useState(false);
+  // Só true quando `error` é especificamente a recusa de senha do step-up
+  // (#153): é o que decide se o campo de senha ganha aria-invalid/describedby,
+  // e não qualquer erro de salvar (429, e-mail duplicado etc. não são sobre
+  // este campo).
+  const [senhaInvalida, setSenhaInvalida] = useState(false);
 
   const [photoError, setPhotoError] = useState("");
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -137,8 +139,14 @@ export default function Settings() {
       a.download = "norby-meus-dados.json";
       a.click();
       URL.revokeObjectURL(url);
-    } catch {
-      setDangerError("Não foi possível exportar seus dados. Tente novamente.");
+    } catch (err) {
+      // O corpo do 429 do slowapi é {"error": ...}, não {"detail": ...}, então
+      // apiErrorMessage cairia no fallback genérico — mapeado à mão aqui.
+      setDangerError(
+        err.response?.status === 429
+          ? "Muitas tentativas. Tente de novo mais tarde."
+          : "Não foi possível exportar seus dados. Tente novamente.",
+      );
     } finally {
       setExporting(false);
     }
@@ -164,6 +172,7 @@ export default function Settings() {
 
   async function handleSave() {
     setError(null);
+    setSenhaInvalida(false);
     try {
       const payload = emailChanged
         ? { ...form, current_password: currentPassword }
@@ -171,15 +180,14 @@ export default function Settings() {
       const res = await authApi.updateProfile(payload);
 
       if (emailChanged) {
-        // Não chama updateUser aqui: o token desta aba já está morto no
-        // servidor, e authApi.logout() abaixo vai limpar o store inteiro em
-        // seguida — atualizar o e-mail no store só para apagá-lo depois é
-        // trabalho que ninguém vê.
-        setEmailChangedNotice(true);
-        setTimeout(async () => {
-          await authApi.logout();
-          navigate("/");
-        }, 1800);
+        // #156: a troca sobe o token_epoch no servidor, que mata o access
+        // token desta aba na hora — a próxima chamada qualquer bateria num
+        // 401 mudo. Não chama updateUser: o logout abaixo já limpa o store
+        // inteiro. Mesmo padrão de RedefinirSenha.jsx -> Auth.jsx: desloga e
+        // manda o state que o Auth.jsx lê para mostrar o aviso, já que esta
+        // tela não fica no ar tempo nenhum para mostrar nada.
+        await authApi.logout();
+        navigate("/", { replace: true, state: { emailAlterado: true } });
         return;
       }
 
@@ -188,13 +196,18 @@ export default function Settings() {
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (err) {
-      // 401 só é "senha incorreta" quando a senha era de fato exigida — o
-      // mesmo status por outro motivo não pode confundir a pessoa.
-      setError(
-        emailChanged && err.response?.status === 401
-          ? "Senha incorreta"
-          : apiErrorMessage(err, "Não foi possível salvar."),
-      );
+      if (err.response?.status === 429) {
+        // O corpo do 429 do slowapi é {"error": ...}, não {"detail": ...},
+        // então apiErrorMessage cairia no fallback genérico.
+        setError("Muitas tentativas. Tente de novo mais tarde.");
+      } else if (emailChanged && err.response?.status === 401) {
+        // 401 só é "senha incorreta" quando a senha era de fato exigida — o
+        // mesmo status por outro motivo não pode confundir a pessoa.
+        setError("Senha incorreta.");
+        setSenhaInvalida(true);
+      } else {
+        setError(apiErrorMessage(err, "Não foi possível salvar."));
+      }
     }
   }
 
@@ -314,6 +327,8 @@ export default function Settings() {
                 type="password"
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
+                aria-invalid={senhaInvalida ? "true" : undefined}
+                aria-describedby={senhaInvalida ? senhaEmailErrorId : undefined}
                 className={shadcnInputCls}
               />
             </div>
@@ -321,18 +336,13 @@ export default function Settings() {
         </div>
 
         {error && (
-          <p role="alert" className="text-danger text-xs mt-3">{error}</p>
-        )}
-
-        {emailChangedNotice && (
-          <p role="status" className="text-accent text-xs mt-3">
-            E-mail alterado. Entre novamente com o novo endereço.
+          <p id={senhaEmailErrorId} role="alert" className="text-danger text-xs mt-3">
+            {error}
           </p>
         )}
 
         <Button
           onClick={handleSave}
-          disabled={emailChangedNotice}
           className="mt-5 bg-accent-fill text-accent-contrast hover:bg-accent-fill/90 font-medium"
         >
           <Save size={15} /> {saved ? "Salvo!" : "Salvar alterações"}

@@ -318,6 +318,31 @@ async def test_logout_with_rotated_token_revokes_successor(client):
 
 
 @pytest.mark.asyncio
+async def test_logout_cascade_kills_a_predecessor_still_inside_the_rotation_grace(client):
+    # Revisão do #156: a mesma query antiga da cascata (`revoked IS false`)
+    # também é usada aqui (SEC-01). r0 chega ao logout já revogado por uma
+    # rotação normal segundos antes — a cascata não precisa "tocá-lo" de
+    # novo, mas o revoked_at daquela rotação normal sobrevive intacto, e
+    # continua dentro da janela de graça. Reapresentar r0 depois da cascata
+    # ainda caía no ramo "dentro da janela" de rotate_refresh_token, que
+    # devolve um par novo — a cascata que prometia derrubar tudo não era
+    # terminal para o próprio token que a disparou.
+    await _register(client)
+    r0 = client.cookies.get(COOKIE)
+    await client.post("/auth/refresh")  # rotaciona r0 -> r1; r0.revoked_at fica recente
+
+    client.cookies.clear()
+    client.cookies.set(COOKIE, r0)
+    cascata = await client.post("/auth/logout")  # r0 já revogado -> dispara a cascata de roubo
+    assert cascata.status_code == 204
+
+    client.cookies.clear()
+    client.cookies.set(COOKIE, r0)
+    ressuscitado = await client.post("/auth/refresh")
+    assert ressuscitado.status_code == 401
+
+
+@pytest.mark.asyncio
 async def test_login_sets_an_httponly_refresh_cookie(client):
     await _register(client)
     res = await client.post("/auth/login", json={"email": REG["email"], "password": REG["password"]})

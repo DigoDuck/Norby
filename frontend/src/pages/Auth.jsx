@@ -126,11 +126,18 @@ export default function Auth() {
   // de setState num efeito: o valor já nasce certo no primeiro render, sem
   // precisar de outro render nem de suprimir a regra do hook.
   const [senhaRedefinida] = useState(() => Boolean(location.state?.senhaRedefinida));
+  // Mesmo caminho, para a troca de e-mail (#156): Settings.jsx desloga e
+  // navega pra cá em vez de mostrar algo na própria tela, porque o
+  // token_epoch já matou o access token daquela aba no momento em que a
+  // troca teve sucesso.
+  const [emailAlterado] = useState(() => Boolean(location.state?.emailAlterado));
 
   // Limpa o state do histórico (mesmo idioma do atalho de tipo em
   // Transactions.jsx) para o aviso não voltar ao navegar para trás.
   useEffect(() => {
-    if (location.state?.senhaRedefinida) navigate(location.pathname, { replace: true });
+    if (location.state?.senhaRedefinida || location.state?.emailAlterado) {
+      navigate(location.pathname, { replace: true });
+    }
   }, [location, navigate]);
 
   const schema = mode === "login" ? loginSchema : registerSchema;
@@ -319,6 +326,15 @@ export default function Auth() {
                 className="mt-5 rounded-xl border border-accent/20 bg-accent/10 p-3 text-sm text-accent"
               >
                 Senha redefinida. Entre com a nova senha.
+              </div>
+            )}
+
+            {emailAlterado && (
+              <div
+                role="status"
+                className="mt-5 rounded-xl border border-accent/20 bg-accent/10 p-3 text-sm text-accent"
+              >
+                E-mail alterado. Entre com o novo endereço.
               </div>
             )}
 

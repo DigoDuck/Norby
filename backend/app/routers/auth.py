@@ -7,11 +7,11 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse, Response
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import func, select, update
+from sqlalchemy import func, select
 from app.config import get_settings
 from app.dependencies import get_db, get_current_user
 from app.limiter import limiter, user_key, refresh_token_key, reset_email_key
-from app.models.sql_models import RefreshToken, User
+from app.models.sql_models import User
 from app.schemas.user import (
     UserRegister, UserLogin, UserUpdate, Token, TokenPair,
     DeleteAccountRequest, UserResponse, ForgotPassword, ResetPassword,
@@ -19,7 +19,8 @@ from app.schemas.user import (
 from app.services.auth_service import (
     hash_password, verify_password, verify_and_upgrade, create_access_token,
     create_refresh_token, rotate_refresh_token, revoke_refresh_token,
-    create_password_reset, find_user_by_email, reset_password, _DUMMY_HASH,
+    create_password_reset, find_user_by_email, reset_password,
+    revoke_all_refresh_tokens, _DUMMY_HASH,
 )
 from app.services.account_service import delete_account, export_data
 from app.services.photo_service import MAX_BYTES, PhotoInvalid, PhotoTooLarge, processar_foto
@@ -253,6 +254,26 @@ async def logout(
 async def me(current_user: User = Depends(get_current_user)):
     return current_user
 
+
+async def mandar_aviso_de_troca_de_email(email_antigo: str, novo_email: str) -> None:
+    """Roda DEPOIS da resposta, via BackgroundTasks — mesmo motivo do envio de
+    recuperação (mandar_link_de_recuperacao, mais abaixo): a troca já está
+    commitada, então nada aqui pode atrasar nem desfazer a resposta do PUT.
+
+    Sem log de falha próprio: `enviar_email` já loga (email_service.py); uma
+    segunda linha aqui só duplicaria a mesma falha com o motivo cortado
+    (`EmailFailed`/`EmailNotConfigured` não guardam o `assunto`).
+    """
+    try:
+        await enviar_email(
+            para=email_antigo,
+            assunto="Seu e-mail do Norby foi alterado",
+            html=html_aviso_troca_email(novo_email),
+        )
+    except (EmailFailed, EmailNotConfigured):
+        pass
+
+
 @router.put("/me", response_model=UserResponse)
 # Issue #160: sem teto, "400 email já cadastrado" vs "200" é um oráculo de
 # enumeração testável à velocidade do HTTP, movendo o próprio e-mail pra
@@ -265,6 +286,7 @@ async def me(current_user: User = Depends(get_current_user)):
 async def update_me(
     request: Request,
     payload: UserUpdate,
+    background: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -275,13 +297,18 @@ async def update_me(
     data.pop("current_password", None)
 
     # func.lower(): fix round 1 (issue #22) — "Joao@x.com" e "joao@x.com" são
-    # a MESMA conta, senão trocar só a caixa do próprio email bateria
-    # falso-positivo contra si mesmo. Fix round 1 do #153: "mudou" também
-    # precisa comparar NORMALIZADO pelo mesmo motivo — sem isto, só trocar a
-    # CAIXA do próprio e-mail (Alice@x.com -> alice@x.com) exigia senha,
+    # a MESMA conta, o mesmo critério usado em toda comparação de e-mail do
+    # app. Fix round 1 do #153: "mudou" também precisa comparar NORMALIZADO
+    # pelo mesmo motivo — sem isto, só trocar a CAIXA do próprio e-mail
+    # (Alice@x.com -> alice@x.com) já contava como mudança, exigia senha,
     # revogava toda sessão e mandava aviso de segurança à toa. A CAIXA nova
     # continua sendo gravada (setattr abaixo usa `new_email` cru, não o
     # normalizado): só o critério de "mudou" é que ignora caixa.
+    #
+    # (O falso-positivo "e-mail já cadastrado" contra a PRÓPRIA conta, na
+    # consulta de duplicado logo abaixo, não vem do func.lower() — vem de
+    # `User.id != current_user.id`, que exclui a própria linha do match.
+    # func.lower() só resolve a comparação insensível a caixa.)
     new_email = data.get("email")
     normalized_new_email = new_email.strip().lower() if new_email else None
     email_mudando = bool(
@@ -325,20 +352,17 @@ async def update_me(
         # do ÚNICO commit logo abaixo. Dois commits separados (um para a
         # troca, outro para a revogação) deixavam o e-mail já trocado com os
         # refresh tokens ainda vivos se o segundo falhasse — exatamente o
-        # estado que o #153 existe para evitar. Mesma query do
+        # estado que o #153 existe para evitar. Mesmo helper do
         # reset_password (auth_service.py): quem trocou de e-mail pode ter
         # feito isso porque a conta foi comprometida, e um refresh de 7 dias
         # sobrevivendo à troca anularia o motivo de tê-la feito.
-        await db.execute(
-            update(RefreshToken)
-            .where(RefreshToken.user_id == current_user.id, RefreshToken.revoked.is_(False))
-            .values(revoked=True)
-        )
+        await revoke_all_refresh_tokens(current_user.id, db)
         # #156: o refresh revogado acima não derruba o access token da aba
         # atual, que não passa pelo Postgres. Subir o epoch na MESMA
         # transação fecha essa janela — a próxima checagem de get_current_user
-        # já rejeita o token emitido com o epoch antigo.
-        current_user.token_epoch += 1
+        # já rejeita o token emitido com o epoch antigo. Expressão SQL, não
+        # `+= 1` em Python: mesmo motivo do reset_password.
+        current_user.token_epoch = User.token_epoch + 1
 
     try:
         await db.commit()
@@ -356,16 +380,9 @@ async def update_me(
         # Ponto único de sucesso da troca de e-mail. A revogação de refresh e
         # o bump do token_epoch (#156) já estão commitados, dentro do bloco
         # `if email_mudando:` lá em cima; só falta o aviso, que é best-effort.
-        try:
-            await enviar_email(
-                para=email_antigo,
-                assunto="Seu e-mail do Norby foi alterado",
-                html=html_aviso_troca_email(current_user.email),
-            )
-        except (EmailFailed, EmailNotConfigured) as erro:
-            # Best-effort: a troca já está commitada, e Brevo ausente em
-            # dev/teste (ou fora do ar) não pode desfazer uma mudança real.
-            logger.error("falha ao avisar troca de email: %s", erro)
+        # Via BackgroundTasks, mesmo padrão de mandar_link_de_recuperacao
+        # abaixo: o envio não pode segurar a resposta do PUT.
+        background.add_task(mandar_aviso_de_troca_de_email, email_antigo, current_user.email)
 
     return current_user
 

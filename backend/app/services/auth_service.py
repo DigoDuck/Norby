@@ -4,7 +4,7 @@ import secrets
 from datetime import datetime, timedelta, timezone
 
 import jwt  # PyJWT. Era: from jose import jwt
-from sqlalchemy import func, select, update
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
@@ -77,6 +77,36 @@ async def create_refresh_token(user_id: str, db: AsyncSession) -> str:
     await db.commit()
     return raw
 
+
+async def revoke_all_refresh_tokens(user_id, db: AsyncSession) -> None:
+    """Cascata TERMINAL: usada nos 4 pontos que precisam derrubar toda sessão
+    de um usuário — as duas cascatas de roubo abaixo (rotação e logout com
+    token já rotacionado) e os dois eventos de credencial (reset_password,
+    troca de e-mail). NÃO commita: quem chama decide a transação.
+
+    `revoked.is_(False)` sozinho (a query antiga, duplicada nos 4 pontos)
+    tinha um buraco: um sucessor rotacionado há menos de ROTATION_REUSE_GRACE
+    já está com `revoked=True`, então a query nem o tocava, e seu
+    `revoked_at` recente sobrevivia à cascata. Reapresentar esse token depois
+    ainda caía no ramo "dentro da janela" de `rotate_refresh_token` — que
+    releria o epoch ATUAL do usuário e devolveria um par novo, revivendo a
+    sessão que a cascata (ou o reset/troca de e-mail) dizia ter encerrado.
+    `or_(revoked IS false, revoked_at IS NOT NULL)` cobre as duas formas de
+    "ainda não é terminal": nunca revogado, ou revogado mas com graça viva.
+    Zerar `revoked_at` no UPDATE é o que torna terminal — sem `revoked_at`,
+    a próxima reapresentação cai fora do `IS NOT NULL` da janela e nunca mais
+    volta.
+    """
+    await db.execute(
+        update(RefreshToken)
+        .where(
+            RefreshToken.user_id == user_id,
+            or_(RefreshToken.revoked.is_(False), RefreshToken.revoked_at.is_not(None)),
+        )
+        .values(revoked=True, revoked_at=None)
+    )
+
+
 async def rotate_refresh_token(raw: str, db: AsyncSession) -> tuple[str, str, User] | None:
     """Valida, revoga o antigo e emite o par novo em uma transação só.
 
@@ -101,16 +131,10 @@ async def rotate_refresh_token(raw: str, db: AsyncSession) -> tuple[str, str, Us
         if not dentro_da_janela:
             # Token já rotacionado sendo reapresentado fora da janela é sinal
             # de roubo. Revogar todas as sessões evita manter um sucessor
-            # comprometido ativo. `revoked_at` fica NULL aqui de propósito: é
-            # um cascateamento, não uma rotação individual, e não pode virar
-            # elegível para a própria janela de tolerância se alguém
-            # reapresentar uma dessas sessões momentos depois (o cascateamento
-            # tem que ser terminal, sem ressuscitar nada).
-            await db.execute(
-                update(RefreshToken)
-                .where(RefreshToken.user_id == record.user_id, RefreshToken.revoked.is_(False))
-                .values(revoked=True)
-            )
+            # comprometido ativo — cascata TERMINAL, ver o docstring de
+            # revoke_all_refresh_tokens (cobre também quem estava dentro da
+            # PRÓPRIA janela de graça no instante da cascata).
+            await revoke_all_refresh_tokens(record.user_id, db)
             await db.commit()
             return None
         # Dentro da janela: sucessor NOVO para quem ficou com o antecessor. O
@@ -155,21 +179,13 @@ async def revoke_refresh_token(raw: str, db: AsyncSession) -> None:
     if record is None:
         return
 
-    # `revoked_at` fica de fora nos dois pontos abaixo, de propósito: o logout
-    # nunca consulta a janela de tolerância (#130, SEC-01), e se gravasse o
-    # instante aqui um refresh apresentado segundos depois do logout leria
-    # esse instante recente e ganharia a graça de uma rotação legítima — a
-    # sessão encerrada voltaria à vida. `revoked_at` só tem sentido para a
-    # rotação individual normal, que é a única fonte de reuso tolerável.
+    # Cascata TERMINAL (ver revoke_all_refresh_tokens): o logout nunca
+    # consulta a janela de tolerância (#130, SEC-01), e ela zera todo
+    # `revoked_at` do usuário de propósito — um refresh apresentado segundos
+    # depois não pode ler um instante recente e ganhar a graça de uma
+    # rotação legítima, o que ressuscitaria a sessão encerrada.
     if record.revoked:
-        await db.execute(
-            update(RefreshToken)
-            .where(
-                RefreshToken.user_id == record.user_id,
-                RefreshToken.revoked.is_(False),
-            )
-            .values(revoked=True)
-        )
+        await revoke_all_refresh_tokens(record.user_id, db)
         await db.commit()
         return
 
@@ -247,7 +263,12 @@ async def reset_password(raw: str, nova_senha: str, db: AsyncSession) -> bool:
     # expirar sozinho (até 15min). Incrementar o epoch aqui, na MESMA
     # transação da troca de senha, fecha essa janela: o claim `ep` do token
     # antigo nunca mais bate com o que get_current_user lê da linha.
-    user.token_epoch += 1
+    # Expressão SQL (`User.token_epoch + 1`), não `+= 1` em Python: o UPDATE
+    # soma no próprio banco, sem depender do valor que esta sessão carregava
+    # na memória (que já é o mais atual aqui, mas manter os dois pontos do
+    # bump — este e o de auth.py — na mesma forma evita um deles silenciosamente
+    # virar uma corrida se algum dia deixar de ser o caso).
+    user.token_epoch = User.token_epoch + 1
 
     # Os OUTROS links pendentes desta pessoa morrem junto. Pedir três e-mails e
     # usar um não pode deixar dois links vivos numa caixa de entrada.
@@ -259,11 +280,7 @@ async def reset_password(raw: str, nova_senha: str, db: AsyncSession) -> bool:
         )
         .values(used_at=datetime.now(timezone.utc))
     )
-    await db.execute(
-        update(RefreshToken)
-        .where(RefreshToken.user_id == user.id, RefreshToken.revoked.is_(False))
-        .values(revoked=True)
-    )
+    await revoke_all_refresh_tokens(user.id, db)
     await db.commit()
 
     # A vítima de força bruta (check_throttle roda antes da senha na rota de

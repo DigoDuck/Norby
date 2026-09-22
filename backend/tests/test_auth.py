@@ -558,6 +558,33 @@ async def test_update_me_email_change_invalidates_the_old_access_token(make_auth
 
 
 @pytest.mark.asyncio
+async def test_email_change_cascades_over_a_predecessor_still_inside_the_rotation_grace(
+    make_auth_client,
+):
+    # Revisão do #156: mesmo buraco do teste equivalente em
+    # test_password_reset.py, mas pelo lado da troca de e-mail. A query
+    # antiga da cascata (`revoked IS false`) não tocava um sucessor
+    # rotacionado há menos de ROTATION_REUSE_GRACE — ele já está com
+    # revoked=True, e seu revoked_at recente sobrevivia à troca. Determinístico:
+    # só precisa rotacionar uma vez antes do PUT.
+    cookie = get_settings().refresh_cookie_name
+    ac = await make_auth_client("Alice")
+    r0 = ac.cookies.get(cookie)
+    await ac.post("/auth/refresh")  # rotaciona r0 -> r1; r0.revoked_at fica recente
+
+    res = await ac.put(
+        "/auth/me",
+        json={"email": "novo6@test.com", "current_password": "secret123"},
+    )
+    assert res.status_code == 200
+
+    ac.cookies.clear()
+    ac.cookies.set(cookie, r0)
+    ressuscitado = await ac.post("/auth/refresh")
+    assert ressuscitado.status_code == 401
+
+
+@pytest.mark.asyncio
 async def test_update_me_name_only_needs_no_password(make_auth_client):
     ac = await make_auth_client("Alice")
     res = await ac.put("/auth/me", json={"name": "Nome Novo"})

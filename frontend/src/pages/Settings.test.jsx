@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 import { accountApi } from "@/api/account";
@@ -22,6 +22,16 @@ vi.mock("@/api/auth", () => ({
     updateProfile: vi.fn(),
   },
 }));
+
+// #156: o Save de e-mail navega pra "/" com um state que o Auth.jsx lê para
+// mostrar o aviso — precisa de um spy em `useNavigate` para essa asserção,
+// que o MemoryRouter sozinho não dá. `importOriginal` mantém o resto do
+// módulo (MemoryRouter, Link) intacto.
+const navigateMock = vi.fn();
+vi.mock("react-router-dom", async (importOriginal) => {
+  const actual = await importOriginal();
+  return { ...actual, useNavigate: () => navigateMock };
+});
 
 function renderSettings() {
   render(
@@ -84,6 +94,21 @@ describe("Settings", () => {
     );
 
     expect(await screen.findByText("Senha incorreta.")).toBeInTheDocument();
+  });
+
+  it("mapeia 429 na exportação para uma mensagem específica em vez do fallback genérico", async () => {
+    // Mesmo motivo do save de perfil: o corpo do 429 do slowapi é
+    // {"error": ...}, não {"detail": ...}.
+    accountApi.exportData.mockRejectedValue({
+      response: { status: 429, data: { error: "rate limited" } },
+    });
+    renderSettings();
+
+    fireEvent.click(screen.getByRole("button", { name: /Exportar/ }));
+
+    expect(
+      await screen.findByText("Muitas tentativas. Tente de novo mais tarde."),
+    ).toBeInTheDocument();
   });
 
   it("dá nome acessível a todos os campos da tela", () => {
@@ -180,15 +205,16 @@ describe("Settings, step-up de senha na troca de e-mail (#153)", () => {
     );
   });
 
-  it("e-mail alterado com sucesso avisa e desloga em vez de deixar a aba morrer num 401 mudo (#156)", async () => {
+  it("e-mail alterado com sucesso desloga e leva à tela de entrada com o aviso, sem tocar o store (#156)", async () => {
     // A troca sobe o token_epoch no servidor e mata o access token desta aba
-    // na hora. Sem este aviso, a próxima chamada qualquer bateria 401 e o
-    // interceptor jogaria a pessoa pra "/" sem explicação nenhuma.
+    // na hora. Em vez de mostrar algo aqui (que morreria junto quando a
+    // sessão cair), o mesmo padrão de RedefinirSenha.jsx -> Auth.jsx: desloga
+    // e manda o state que o Auth.jsx lê para mostrar o aviso.
     authApi.updateProfile.mockResolvedValue({
       data: { name: "Alice", email: "novo@test.com" },
     });
     authApi.logout.mockResolvedValue(undefined);
-    vi.useFakeTimers();
+    const updateUserSpy = vi.spyOn(useAuthStore.getState(), "updateUser");
     renderSettings();
 
     fireEvent.change(screen.getByLabelText("E-mail"), {
@@ -200,37 +226,50 @@ describe("Settings, step-up de senha na troca de e-mail (#153)", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: /Salvar alterações/ }));
 
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
+    await waitFor(() => expect(authApi.logout).toHaveBeenCalled());
+    expect(navigateMock).toHaveBeenCalledWith("/", {
+      replace: true,
+      state: { emailAlterado: true },
     });
-    expect(screen.getByRole("status")).toHaveTextContent(
-      "E-mail alterado. Entre novamente com o novo endereço.",
-    );
-    // Não some sozinho: continua visível até o logout de fato acontecer.
-    expect(authApi.logout).not.toHaveBeenCalled();
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(1800);
-    });
-    expect(authApi.logout).toHaveBeenCalled();
-
-    vi.useRealTimers();
+    // O token já está morto no servidor e o logout acima vai limpar o store
+    // inteiro: atualizar o e-mail aqui só para apagá-lo em seguida não serve
+    // a ninguém.
+    expect(updateUserSpy).not.toHaveBeenCalled();
   });
 
-  it("mostra 'Senha incorreta' quando o backend recusa a senha do step-up", async () => {
+  it("mostra 'Senha incorreta.' e associa o erro ao campo quando o backend recusa a senha do step-up", async () => {
     authApi.updateProfile.mockRejectedValue({ response: { status: 401 } });
     renderSettings();
 
     fireEvent.change(screen.getByLabelText("E-mail"), {
       target: { value: "novo@test.com" },
     });
-    fireEvent.change(
-      screen.getByLabelText("Senha atual (necessária para trocar o e-mail)"),
-      { target: { value: "errada" } },
-    );
+    const senha = screen.getByLabelText("Senha atual (necessária para trocar o e-mail)");
+    fireEvent.change(senha, { target: { value: "errada" } });
     fireEvent.click(screen.getByRole("button", { name: /Salvar alterações/ }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Senha incorreta");
+    const alerta = await screen.findByRole("alert");
+    expect(alerta).toHaveTextContent("Senha incorreta.");
+    // O campo aponta para o próprio erro: leitor de tela lê os dois juntos ao
+    // focar, em vez de só ouvir "inválido" sem saber por quê.
+    expect(senha).toHaveAttribute("aria-invalid", "true");
+    expect(senha).toHaveAttribute("aria-describedby", alerta.id);
+  });
+
+  it("mapeia 429 para uma mensagem específica em vez do fallback genérico do apiErrorMessage", async () => {
+    // O corpo do 429 do slowapi é {"error": ...}, não {"detail": ...}:
+    // apiErrorMessage não acha nada ali e cairia no fallback genérico sem
+    // este mapeamento explícito.
+    authApi.updateProfile.mockRejectedValue({
+      response: { status: 429, data: { error: "rate limited" } },
+    });
+    renderSettings();
+
+    fireEvent.click(screen.getByRole("button", { name: /Salvar alterações/ }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Muitas tentativas. Tente de novo mais tarde.",
+    );
   });
 });
 
