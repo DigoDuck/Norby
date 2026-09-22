@@ -5,6 +5,7 @@ from contextvars import ContextVar
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.requests import ClientDisconnect
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from app.routers import auth, wallets, transactions, ai, recurring, goals, dashboard, billing, admin
@@ -12,6 +13,7 @@ from app.services.plan_service import PlanRefused
 from app.services.wallet_service import WalletNotFound
 from app.config import get_settings
 from app.limiter import limiter
+from app.body_size_limit import BodySizeLimitMiddleware
 
 # --- Logging com request-id para correlacionar os logs de uma requisição ---
 request_id_ctx: ContextVar[str] = ContextVar("request_id", default="-")
@@ -88,6 +90,19 @@ async def request_context(request: Request, call_next):
     request.state.request_id = rid
     try:
         response = await call_next(request)
+    except ClientDisconnect:
+        # Não é bug da aplicação: o BodySizeLimitMiddleware devolve
+        # `http.disconnect` de propósito ao recusar um corpo grande demais
+        # (ver body_size_limit.py), e o mesmo também acontece se o cliente
+        # cair a conexão de verdade no meio da leitura. `logger.exception`
+        # aqui gravaria um traceback de ERROR a cada recusa 413 — a resposta
+        # de baixo (413, ou nada, se o cliente já sumiu) é o que importa;
+        # esta resposta genérica só é enviada quando ainda há alguém do outro
+        # lado para recebê-la.
+        logger.info("Conexão encerrada antes do fim da leitura do corpo")
+        response = JSONResponse(
+            status_code=500, content={"detail": "Erro interno do servidor"}
+        )
     except Exception:
         logger.exception("Erro não tratado")
         response = JSONResponse(
@@ -97,6 +112,11 @@ async def request_context(request: Request, call_next):
         request_id_ctx.reset(token)
     return response
 
+
+# Registrado ANTES do CORS (que é adicionado depois = fica por fora, ver
+# comentário abaixo) para que o CORS ainda envolva este e some os headers de
+# Access-Control-* na resposta 413, igual a qualquer outra resposta da API.
+app.add_middleware(BodySizeLimitMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
