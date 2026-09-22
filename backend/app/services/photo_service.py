@@ -18,8 +18,10 @@ MAX_BYTES = 2 * 1024 * 1024
 # Teto de PIXELS, que é diferente do teto de bytes. Um PNG de poucos KB pode
 # decodificar para centenas de megapixels e derrubar o processo por memória
 # antes de qualquer validação nossa rodar — o teto de bytes não protege disso.
-# 40 MP passa folgado por qualquer foto de celular (48 MP é topo de linha).
-MAX_PIXELS = 40_000_000
+# 12 MP é o que uma saída de 128x128 precisa (cobre qualquer foto de celular);
+# 40 MP era folgado demais — decodificar + exif_transpose + convert("RGB") de
+# um PNG de poucos KB nesse tamanho chegava a ~190 MB de bitmap (#155).
+MAX_PIXELS = 12_000_000
 
 # Só o que dá para receber de um seletor de arquivo de verdade. O formato é
 # lido do CONTEÚDO pelo Pillow; o content-type declarado no upload não é levado
@@ -52,9 +54,18 @@ def processar_foto(dados: bytes) -> bytes:
         if largura * altura > MAX_PIXELS:
             raise PhotoInvalid("Imagem grande demais")
 
+        if img.format == "JPEG":
+            # JPEG decodifica em escala (1/2, 1/4, 1/8) via DCT nativo do
+            # formato: pedir de saída direto perto do que `fit` vai produzir
+            # evita alocar o bitmap no tamanho cheio só para descartar quase
+            # tudo dele no corte (#155). Só JPEG suporta draft; os outros
+            # formatos seguem no tamanho aberto mesmo.
+            img.draft("RGB", (LADO * 4, LADO * 4))
+
         # exif_transpose ANTES do corte: sem isso a foto de retrato tirada no
-        # celular sai deitada, porque a rotação vive só no EXIF.
-        img = ImageOps.exif_transpose(img)
+        # celular sai deitada, porque a rotação vive só no EXIF. `in_place`
+        # evita a cópia extra do bitmap que a versão sem ele faz (#155).
+        ImageOps.exif_transpose(img, in_place=True)
         # `fit` corta pelo centro em vez de achatar. Espremer um retrato para
         # quadrado deforma o rosto, que é o único conteúdo que importa aqui.
         img = ImageOps.fit(img.convert("RGB"), (LADO, LADO))

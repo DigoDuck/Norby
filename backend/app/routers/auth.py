@@ -34,6 +34,13 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
 logger = logging.getLogger("norby.auth")
 settings = get_settings()
 
+# O rate limit de upload de foto é por usuário (10/minuto); não trava
+# CONCORRÊNCIA entre usuários diferentes. Cada decode ainda custa dezenas de
+# MB (teto de pixels em photo_service.py), então N uploads simultâneos de N
+# usuários diferentes podiam empilhar no mesmo worker e estourar memória
+# (#155). O semáforo é de módulo, não por request, para valer entre usuários.
+_SEMAFORO_DECODE_FOTO = asyncio.Semaphore(2)
+
 
 def _throttled(retry_after: int) -> HTTPException:
     return HTTPException(
@@ -332,7 +339,10 @@ async def upload_my_photo(
 
     try:
         # Bloqueante (decodifica e reescala): vai para thread, como o bcrypt.
-        current_user.photo = await asyncio.to_thread(processar_foto, corpo)
+        # O semáforo limita quantos decodes rodam ao mesmo tempo no processo
+        # inteiro — o rate limit acima é por usuário e não segura isso (#155).
+        async with _SEMAFORO_DECODE_FOTO:
+            current_user.photo = await asyncio.to_thread(processar_foto, corpo)
     except PhotoTooLarge as erro:
         raise HTTPException(status_code=413, detail=str(erro))
     except PhotoInvalid as erro:
