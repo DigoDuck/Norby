@@ -61,6 +61,15 @@ class BodySizeLimitMiddleware:
     webhook, que lê o corpo à mão). Por isso a resposta é mandada por `send()`
     diretamente, e o `receive`/`send` de baixo são substituídos para o app não
     continuar nem mandar uma segunda resposta por cima da nossa.
+
+    Isso garante que o CLIENTE só vê o 413 — mas não evita que, por baixo, o
+    `http.disconnect` devolvido vire `ClientDisconnect` dentro do
+    `request.body()`/`request.stream()` de quem estava lendo (o webhook, ou o
+    parsing de corpo do FastAPI), suba até o `request_context` em `main.py` e
+    monte ali um 500 que o `send_apos_recusa` acima engole antes de chegar ao
+    fio. Esse 500 interno é inofensivo (nunca sai da API), mas por isso o
+    `request_context` trata `ClientDisconnect` à parte, sem `logger.exception`
+    — senão toda recusa 413 também gravava um traceback de ERROR no log.
     """
 
     def __init__(self, app: ASGIApp) -> None:

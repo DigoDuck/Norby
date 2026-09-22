@@ -6,6 +6,7 @@ o worker único por OOM antes de qualquer rota/`@limiter.limit` rodar — nem
 """
 
 import io
+import logging
 
 import pytest
 from PIL import Image
@@ -63,6 +64,29 @@ async def test_the_webhook_gets_the_same_cap_even_with_a_secret_configured(
     )
     assert resposta.status_code == 413
     assert resposta.json()["detail"] == "Corpo grande demais"
+
+
+@pytest.mark.asyncio
+async def test_refusing_an_oversized_webhook_does_not_log_an_error(
+    client, monkeypatch, caplog
+):
+    # Fix round 1: recusar em 413 fazia o `http.disconnect` sintético do
+    # middleware virar `ClientDisconnect` dentro do `request.body()` do
+    # webhook, subir até o `request_context` (main.py) e gravar um
+    # `logger.exception("Erro não tratado")` de ERROR com traceback — a CADA
+    # recusa 413, não só numa falha de verdade. O `request_context` agora
+    # trata `ClientDisconnect` à parte; nenhum registro ERROR pode sair daqui.
+    monkeypatch.setattr(get_settings(), "stripe_webhook_secret", "segredo_de_teste")
+    with caplog.at_level(logging.INFO, logger="norby"):
+        resposta = await client.post(
+            "/billing/webhook",
+            content=_pedacos(BODY_SIZE_LIMIT + 1024),
+            headers={"Stripe-Signature": "t=1,v1=lixo"},
+        )
+    assert resposta.status_code == 413
+    assert not any(r.levelno >= logging.ERROR for r in caplog.records), [
+        r.getMessage() for r in caplog.records if r.levelno >= logging.ERROR
+    ]
 
 
 @pytest.mark.asyncio
