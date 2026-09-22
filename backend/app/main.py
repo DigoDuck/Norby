@@ -12,6 +12,7 @@ from app.services.plan_service import PlanRefused
 from app.services.wallet_service import WalletNotFound
 from app.config import get_settings
 from app.limiter import limiter
+from app.body_size_limit import BodySizeLimitMiddleware
 
 # --- Logging com request-id para correlacionar os logs de uma requisição ---
 request_id_ctx: ContextVar[str] = ContextVar("request_id", default="-")
@@ -97,6 +98,11 @@ async def request_context(request: Request, call_next):
         request_id_ctx.reset(token)
     return response
 
+
+# Registrado ANTES do CORS (que é adicionado depois = fica por fora, ver
+# comentário abaixo) para que o CORS ainda envolva este e some os headers de
+# Access-Control-* na resposta 413, igual a qualquer outra resposta da API.
+app.add_middleware(BodySizeLimitMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
