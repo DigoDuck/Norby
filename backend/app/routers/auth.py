@@ -413,7 +413,13 @@ async def delete_my_photo(
 
 
 @router.get("/me/export")
+# export_data carrega TODAS as linhas do usuário de uma vez (sem LIMIT) e o
+# jsonable_encoder + JSONResponse ainda duplicam o dict em memória: um free
+# account cheio de transações exportado em paralelo derruba o worker (#158).
+# O teto por usuário mata a amplificação sem precisar tornar o export streaming.
+@limiter.limit("5/hour", key_func=user_key)
 async def export_my_data(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):

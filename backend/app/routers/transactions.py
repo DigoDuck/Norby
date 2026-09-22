@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends, Query, HTTPException, status, Response
+from fastapi import APIRouter, Depends, Query, HTTPException, status, Response, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, or_, select
 from uuid import UUID
 from datetime import date
 from typing import Optional
 from app.dependencies import get_db, get_current_user
+from app.limiter import limiter, user_key
 from app.models.sql_models import User, Transaction, TransactionType, Wallet
 from app.schemas.transaction import TransactionCreate, TransactionUpdate, TransactionResponse
 from app.services.transaction_service import apply_delta, revert_delta
@@ -136,7 +137,12 @@ async def list_transactions(
 
 
 @router.post("/", response_model=TransactionResponse, status_code=status.HTTP_201_CREATED)
+# Sem teto, uma carteira free podia ser enchida de transações em paralelo e
+# depois exportada, estourando a memória do worker (#158, mesma causa do
+# limite no /auth/me/export). 120/min é folgado para uso normal.
+@limiter.limit("120/minute", key_func=user_key)
 async def create_transaction(
+    request: Request,
     payload: TransactionCreate,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
