@@ -117,3 +117,18 @@ def html_recuperacao(link: str) -> str:
   <p>O link vale por {minutos} minutos e só pode ser usado uma vez.</p>
   <p>Se não foi você que pediu, ignore este e-mail: sua senha continua a mesma.</p>
 </div>"""
+
+
+def html_aviso_troca_email(novo_email: str) -> str:
+    """Aviso de troca de e-mail (issue #153), mandado para o endereço ANTIGO.
+
+    SEM link, de propósito: isto é uma notificação de segurança, não uma
+    ação — oferecer "clique aqui se não foi você" ensinaria a própria pessoa a
+    clicar em links assim, exatamente o hábito que um aviso de segurança devia
+    quebrar. Quem desconfiar entra em contato com o suporte por fora do e-mail.
+    """
+    return f"""<div style="font-family:system-ui,-apple-system,Segoe UI,sans-serif;line-height:1.6">
+  <p>O e-mail da sua conta Norby foi alterado para <strong>{novo_email}</strong>.</p>
+  <p>Por segurança, todas as sessões ativas foram encerradas — será preciso entrar novamente.</p>
+  <p>Se não foi você quem fez essa troca, entre em contato com o nosso suporte imediatamente.</p>
+</div>"""

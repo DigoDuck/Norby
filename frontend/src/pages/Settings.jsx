@@ -52,11 +52,16 @@ export default function Settings() {
   // árvore sem duplicar id, que quebraria a associação label/campo.
   const nomeId = useId();
   const emailId = useId();
+  const senhaEmailId = useId();
   const fotoId = useId();
   const [form, setForm] = useState({
     name: user?.name || "",
     email: user?.email || "",
   });
+  // Issue #153: trocar o e-mail exige a senha atual (step-up), o mesmo
+  // contrato do DELETE /auth/me. Nome sozinho continua sem fricção.
+  const emailChanged = form.email !== (user?.email || "");
+  const [currentPassword, setCurrentPassword] = useState("");
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState(null);
 
@@ -152,12 +157,22 @@ export default function Settings() {
   async function handleSave() {
     setError(null);
     try {
-      const res = await authApi.updateProfile(form);
+      const payload = emailChanged
+        ? { ...form, current_password: currentPassword }
+        : form;
+      const res = await authApi.updateProfile(payload);
       updateUser(res.data); // só atualiza o store após sucesso no backend
+      setCurrentPassword("");
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (err) {
-      setError(apiErrorMessage(err, "Não foi possível salvar."));
+      // 401 só é "senha incorreta" quando a senha era de fato exigida — o
+      // mesmo status por outro motivo não pode confundir a pessoa.
+      setError(
+        emailChanged && err.response?.status === 401
+          ? "Senha incorreta"
+          : apiErrorMessage(err, "Não foi possível salvar."),
+      );
     }
   }
 
@@ -263,9 +278,29 @@ export default function Settings() {
               className={shadcnInputCls}
             />
           </div>
+
+          {/* Step-up (#153): só aparece quando o e-mail digitado difere do
+              atual, mesmo padrão visual do campo de senha da exclusão de
+              conta abaixo. */}
+          {emailChanged && (
+            <div className="sm:col-span-2">
+              <label htmlFor={senhaEmailId} className="block text-xs font-medium text-content-2 mb-2">
+                Senha atual (necessária para trocar o e-mail)
+              </label>
+              <Input
+                id={senhaEmailId}
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                className={shadcnInputCls}
+              />
+            </div>
+          )}
         </div>
 
-        {error && <p className="text-danger text-xs mt-3">{error}</p>}
+        {error && (
+          <p role="alert" className="text-danger text-xs mt-3">{error}</p>
+        )}
 
         <Button
           onClick={handleSave}

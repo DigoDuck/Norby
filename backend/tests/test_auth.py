@@ -392,3 +392,148 @@ async def test_update_me_enforces_the_same_floor_as_register(make_auth_client):
     ok = await ac.put("/auth/me", json={"name": "Al"})
     assert ok.status_code == 200
 
+
+# --- Step-up de senha na troca de e-mail (issue #153) -----------------------
+
+
+@pytest.mark.asyncio
+async def test_update_me_email_change_without_password_401(make_auth_client):
+    ac = await make_auth_client("Alice")
+    antes = (await ac.get("/auth/me")).json()
+
+    res = await ac.put("/auth/me", json={"email": "novo@test.com"})
+    assert res.status_code == 401
+    assert res.json()["detail"] == "Senha incorreta"
+
+    # Linha intacta: sem senha, o e-mail não pode ter mudado no banco.
+    depois = (await ac.get("/auth/me")).json()
+    assert depois["email"] == antes["email"]
+
+
+@pytest.mark.asyncio
+async def test_update_me_email_change_wrong_password_401(make_auth_client):
+    ac = await make_auth_client("Alice")
+    antes = (await ac.get("/auth/me")).json()
+
+    res = await ac.put(
+        "/auth/me",
+        json={"email": "novo@test.com", "current_password": "senha-errada"},
+    )
+    assert res.status_code == 401
+    assert res.json()["detail"] == "Senha incorreta"
+
+    depois = (await ac.get("/auth/me")).json()
+    assert depois["email"] == antes["email"]
+
+
+@pytest.mark.asyncio
+async def test_update_me_email_change_wrong_password_does_not_leak_duplicate_email(
+    make_auth_client,
+):
+    # Issue #160: a checagem de senha vem ANTES da consulta de e-mail
+    # duplicado. Se viesse depois, "senha errada" em cima de um e-mail já
+    # cadastrado ainda responderia 400 (e não 401), um oráculo de enumeração
+    # de graça, sem gastar tentativa nenhuma de senha.
+    dona = await make_auth_client("Dona")
+    email_ja_usado = (await dona.get("/auth/me")).json()["email"]
+
+    atacante = await make_auth_client("Mal")
+    res = await atacante.put(
+        "/auth/me",
+        json={"email": email_ja_usado, "current_password": "senha-errada"},
+    )
+    assert res.status_code == 401
+    assert res.json()["detail"] == "Senha incorreta"
+
+
+@pytest.mark.asyncio
+async def test_update_me_email_change_ok_revokes_refresh_tokens_and_notifies_old_address(
+    make_auth_client, db_session, monkeypatch,
+):
+    import app.routers.auth as auth_router
+    from sqlalchemy import select
+    from app.models.sql_models import RefreshToken
+
+    caixa = []
+
+    async def _fake_enviar(*, para, assunto, html):
+        caixa.append({"para": para, "assunto": assunto, "html": html})
+        return "msg-1"
+
+    monkeypatch.setattr(auth_router, "enviar_email", _fake_enviar)
+
+    ac = await make_auth_client("Alice")
+    antes = (await ac.get("/auth/me")).json()
+    old_email = antes["email"]
+
+    res = await ac.put(
+        "/auth/me",
+        json={"email": "novo@test.com", "current_password": "secret123"},
+    )
+    assert res.status_code == 200
+    assert res.json()["email"] == "novo@test.com"
+
+    tokens = (
+        await db_session.execute(
+            select(RefreshToken).where(RefreshToken.user_id == antes["id"])
+        )
+    ).scalars().all()
+    assert tokens  # o cadastro em make_auth_client já emite um refresh token
+    assert all(t.revoked for t in tokens)
+
+    assert caixa and caixa[-1]["para"] == old_email
+
+
+@pytest.mark.asyncio
+async def test_update_me_email_change_ok_even_if_notice_email_fails(
+    make_auth_client, monkeypatch,
+):
+    # Brevo ausente em dev/teste não pode desfazer uma troca já commitada.
+    import app.routers.auth as auth_router
+    from app.services.email_service import EmailNotConfigured
+
+    async def _fake_enviar(*, para, assunto, html):
+        raise EmailNotConfigured()
+
+    monkeypatch.setattr(auth_router, "enviar_email", _fake_enviar)
+
+    ac = await make_auth_client("Alice")
+    res = await ac.put(
+        "/auth/me",
+        json={"email": "novo2@test.com", "current_password": "secret123"},
+    )
+    assert res.status_code == 200
+    assert res.json()["email"] == "novo2@test.com"
+
+
+@pytest.mark.asyncio
+async def test_update_me_name_only_needs_no_password(make_auth_client):
+    ac = await make_auth_client("Alice")
+    res = await ac.put("/auth/me", json={"name": "Nome Novo"})
+    assert res.status_code == 200
+    assert res.json()["name"] == "Nome Novo"
+
+
+@pytest.mark.asyncio
+async def test_update_me_rate_limit_is_per_user(make_auth_client):
+    # Issue #160: sem teto, uma conta testava uma wordlist inteira de e-mails
+    # movendo o próprio e-mail pra frente e pra trás, à velocidade do HTTP.
+    from app.limiter import limiter
+
+    ac = await make_auth_client("Alice")
+
+    # A fixture global desliga o limiter. Religamos só depois do cadastro para
+    # medir exclusivamente o balde do PUT /auth/me.
+    limiter.reset()
+    limiter.enabled = True
+    try:
+        for _ in range(10):
+            res = await ac.put("/auth/me", json={"name": "Nome Novo"})
+            assert res.status_code == 200
+
+        estourou = await ac.put("/auth/me", json={"name": "Nome Novo"})
+        assert estourou.status_code == 429
+    finally:
+        limiter.enabled = False
+        limiter.reset()
+

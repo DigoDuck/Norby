@@ -7,11 +7,11 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse, Response
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from app.config import get_settings
 from app.dependencies import get_db, get_current_user
 from app.limiter import limiter, user_key, refresh_token_key, reset_email_key
-from app.models.sql_models import User
+from app.models.sql_models import RefreshToken, User
 from app.schemas.user import (
     UserRegister, UserLogin, UserUpdate, Token, TokenPair,
     DeleteAccountRequest, UserResponse, ForgotPassword, ResetPassword,
@@ -25,7 +25,7 @@ from app.services.account_service import delete_account, export_data
 from app.services.photo_service import MAX_BYTES, PhotoInvalid, PhotoTooLarge, processar_foto
 from app.services.billing_service import GatewayCancelFailed
 from app.services.email_service import (
-    EmailFailed, EmailNotConfigured, enviar_email, html_recuperacao,
+    EmailFailed, EmailNotConfigured, enviar_email, html_aviso_troca_email, html_recuperacao,
 )
 from app.services.plan_service import AI_TRIAL
 from app.services.throttle_service import check_throttle, record_failure, record_success
@@ -254,21 +254,48 @@ async def me(current_user: User = Depends(get_current_user)):
     return current_user
 
 @router.put("/me", response_model=UserResponse)
+# Issue #160: sem teto, "400 email já cadastrado" vs "200" é um oráculo de
+# enumeração testável à velocidade do HTTP, movendo o próprio e-mail pra
+# frente e pra trás. Chave por usuário pelo mesmo motivo do upload de foto
+# acima: atrás do proxy do Railway, por IP seria um balde único pra todo
+# mundo (ver "Rate limit atrás do proxy" no AGENTS.md). 10/hora sobra para um
+# formulário de configurações e já encarece bastante o #153 se ele não tivesse
+# entrado junto.
+@limiter.limit("10/hour", key_func=user_key)
 async def update_me(
+    request: Request,
     payload: UserUpdate,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     # exclude_none: `null` explícito no corpo gravaria NULL em coluna NOT NULL.
     data = payload.model_dump(exclude_none=True)
+    # current_password é só para a checagem de step-up abaixo, nunca uma
+    # coluna: fora do loop de setattr mais abaixo.
+    data.pop("current_password", None)
 
-    # Se o email mudar, garante que não está em uso por outro usuário.
-    # func.lower() + exclusão do próprio id: fix round 1 (issue #22) — sem
-    # isso, "Joao@x.com" e "joao@x.com" seriam contas diferentes (mesmo
-    # problema do cadastro), e trocar só a caixa do próprio email bateria
+    # func.lower(): fix round 1 (issue #22) — "Joao@x.com" e "joao@x.com" são
+    # a MESMA conta, senão trocar só a caixa do próprio email bateria
     # falso-positivo contra si mesmo.
     new_email = data.get("email")
-    if new_email and new_email != current_user.email:
+    email_mudando = bool(new_email and new_email != current_user.email)
+
+    if email_mudando:
+        # Step-up de senha (issue #153): sem isto, um access token roubado (15
+        # min de vida, mas XSS ou aba esquecida aberta bastam) troca o e-mail
+        # da conta silenciosamente e sequestra a recuperação de senha, que só
+        # manda pro endereço cadastrado. Mesmo formato do DELETE /auth/me.
+        #
+        # ANTES da consulta de e-mail duplicado (issue #160): se viesse
+        # depois, "senha errada" contra um e-mail já cadastrado ainda
+        # responderia 400 em vez de 401 — um oráculo de enumeração de graça,
+        # sem gastar tentativa nenhuma de senha.
+        password_ok = await asyncio.to_thread(
+            verify_password, payload.current_password or "", current_user.password_hash
+        )
+        if not password_ok:
+            raise HTTPException(status_code=401, detail="Senha incorreta")
+
         normalized_email = new_email.strip().lower()
         existing = await db.execute(
             select(User).where(
@@ -278,6 +305,10 @@ async def update_me(
         )
         if existing.scalar_one_or_none():
             raise HTTPException(status_code=400, detail="Email já cadastrado")
+
+    # Guardado ANTES do setattr: é para onde o aviso de troca vai, e depois
+    # do loop abaixo current_user.email já é o novo endereço.
+    email_antigo = current_user.email
 
     for field, value in data.items():
         setattr(current_user, field, value)
@@ -291,6 +322,33 @@ async def update_me(
         await db.rollback()
         raise HTTPException(status_code=400, detail="Email já cadastrado")
     await db.refresh(current_user)
+
+    if email_mudando:
+        # Ponto único de sucesso da troca de e-mail — Task 3 (bump do
+        # token_epoch, #156) entra aqui também.
+        #
+        # Revoga TODOS os refresh tokens vivos, mesma query do reset_password
+        # (auth_service.py): quem trocou de e-mail pode ter feito isso porque
+        # a conta foi comprometida, e um refresh de 7 dias sobrevivendo à
+        # troca anularia o motivo de tê-la feito.
+        await db.execute(
+            update(RefreshToken)
+            .where(RefreshToken.user_id == current_user.id, RefreshToken.revoked.is_(False))
+            .values(revoked=True)
+        )
+        await db.commit()
+
+        try:
+            await enviar_email(
+                para=email_antigo,
+                assunto="Seu e-mail do Norby foi alterado",
+                html=html_aviso_troca_email(current_user.email),
+            )
+        except (EmailFailed, EmailNotConfigured) as erro:
+            # Best-effort: a troca já está commitada, e Brevo ausente em
+            # dev/teste (ou fora do ar) não pode desfazer uma mudança real.
+            logger.error("falha ao avisar troca de email: %s", erro)
+
     return current_user
 
 

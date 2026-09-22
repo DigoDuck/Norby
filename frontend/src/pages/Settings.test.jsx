@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 import { accountApi } from "@/api/account";
+import { authApi } from "@/api/auth";
 import { useAuthStore } from "@/store/authStore";
 import Settings from "./Settings";
 
@@ -96,6 +97,77 @@ describe("Settings", () => {
       screen.getByLabelText("Digite EXCLUIR para confirmar"),
     ).toBeInTheDocument();
     expect(screen.getByLabelText("Sua senha atual")).toBeInTheDocument();
+  });
+});
+
+describe("Settings, step-up de senha na troca de e-mail (#153)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useAuthStore.getState().login("access", {
+      name: "Alice",
+      email: "alice@test.com",
+    });
+  });
+
+  it("só nome não pede senha", async () => {
+    authApi.updateProfile.mockResolvedValue({ data: { name: "Nome Novo", email: "alice@test.com" } });
+    renderSettings();
+
+    expect(
+      screen.queryByLabelText("Senha atual (necessária para trocar o e-mail)"),
+    ).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Nome completo"), {
+      target: { value: "Nome Novo" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Salvar alterações/ }));
+
+    await waitFor(() =>
+      expect(authApi.updateProfile).toHaveBeenCalledWith({
+        name: "Nome Novo",
+        email: "alice@test.com",
+      }),
+    );
+  });
+
+  it("e-mail alterado pede a senha atual e a envia como current_password", async () => {
+    authApi.updateProfile.mockResolvedValue({
+      data: { name: "Alice", email: "novo@test.com" },
+    });
+    renderSettings();
+
+    fireEvent.change(screen.getByLabelText("E-mail"), {
+      target: { value: "novo@test.com" },
+    });
+
+    const senha = screen.getByLabelText("Senha atual (necessária para trocar o e-mail)");
+    fireEvent.change(senha, { target: { value: "secret123" } });
+
+    fireEvent.click(screen.getByRole("button", { name: /Salvar alterações/ }));
+
+    await waitFor(() =>
+      expect(authApi.updateProfile).toHaveBeenCalledWith({
+        name: "Alice",
+        email: "novo@test.com",
+        current_password: "secret123",
+      }),
+    );
+  });
+
+  it("mostra 'Senha incorreta' quando o backend recusa a senha do step-up", async () => {
+    authApi.updateProfile.mockRejectedValue({ response: { status: 401 } });
+    renderSettings();
+
+    fireEvent.change(screen.getByLabelText("E-mail"), {
+      target: { value: "novo@test.com" },
+    });
+    fireEvent.change(
+      screen.getByLabelText("Senha atual (necessária para trocar o e-mail)"),
+      { target: { value: "errada" } },
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Salvar alterações/ }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Senha incorreta");
   });
 });
 
