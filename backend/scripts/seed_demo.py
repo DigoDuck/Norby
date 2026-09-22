@@ -46,21 +46,30 @@ def _is_local_host(url: str) -> bool:
     return urlparse(url).hostname in ("localhost", "127.0.0.1")
 
 
-def _password() -> str:
+def _password() -> tuple[str, bool]:
+    """Retorna (senha, gerada_localmente). `gerada_localmente` decide se o
+    `main()` pode ecoar a senha no print final: uma senha dada via
+    SEED_PASSWORD já é conhecida por quem a definiu, não precisa voltar pro
+    terminal/log.
+
+    Fica dentro de `main()` (não mais em nível de módulo) de propósito:
+    `--check` roda `_selfcheck()` sem servidor, e antes disso o só *importar*
+    o script já gerava e imprimia uma senha descartada, ou abortava com
+    sys.exit se SEED_API_URL apontasse pra um host remoto sem SEED_PASSWORD
+    — em ambos os casos, efeito colateral que `--check` não deveria ter.
+    """
     given = os.getenv("SEED_PASSWORD")
     if given:
-        return given
+        return given, False
     if _is_local_host(API):
         gerada = secrets.token_urlsafe(12)
         print(f"SEED_PASSWORD não definida — gerando uma para {EMAIL}: {gerada}")
-        return gerada
+        return gerada, True
     sys.exit(
         "SEED_PASSWORD é obrigatória fora de localhost "
         f"(SEED_API_URL={API}) — sem ela a senha ficaria pública neste script."
     )
 
-
-PASSWORD = _password()
 
 MONTHS = 6  # o dashboard plota os 6 últimos meses COM dados (desc + limit 6)
 
@@ -140,29 +149,30 @@ def rows_for(today: date) -> list[tuple]:
     return out
 
 
-def _token(c: httpx.Client) -> str:
+def _token(c: httpx.Client, password: str) -> str:
     r = c.post(
         "/auth/register",
         json={
             "name": NAME,
             "email": EMAIL,
-            "password": PASSWORD,
+            "password": password,
             "accept_privacy": True,
         },
     )
     if r.status_code == 201:
         return r.json()["access_token"]
-    r = c.post("/auth/login", json={"email": EMAIL, "password": PASSWORD})
+    r = c.post("/auth/login", json={"email": EMAIL, "password": password})
     r.raise_for_status()
     return r.json()["access_token"]
 
 
 def main() -> None:
+    password, gerada_localmente = _password()
     today = date.today()
     # As rotas são declaradas com barra final; sem ela o FastAPI responde 301 e
     # o POST vira GET (405). Manter a barra em todo path de coleção.
     with httpx.Client(base_url=API, timeout=30) as c:
-        c.headers["Authorization"] = f"Bearer {_token(c)}"
+        c.headers["Authorization"] = f"Bearer {_token(c, password)}"
 
         existing = c.get("/wallets/").json()
         if existing:
@@ -215,7 +225,10 @@ def main() -> None:
         ):
             c.post("/recurring/", json=rec).raise_for_status()
 
-        print(f"ok — {EMAIL} / {PASSWORD}: {len(rows)} lançamentos, "
+        # A senha só volta ao terminal quando foi gerada aqui — se veio de
+        # SEED_PASSWORD, quem a definiu já sabe qual é.
+        quem = f"{EMAIL} / {password}" if gerada_localmente else EMAIL
+        print(f"ok — {quem}: {len(rows)} lançamentos, "
               f"2 carteiras, 3 metas, 2 recorrências em {API}")
 
 

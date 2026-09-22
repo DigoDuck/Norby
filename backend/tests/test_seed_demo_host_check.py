@@ -3,11 +3,12 @@ precisa comparar o hostname exato, não fazer substring match na URL crua
 ("http://localhost.evil.com" continha "://localhost" e escapava do gate de
 SEED_PASSWORD obrigatória fora de localhost).
 
-`scripts/` não é um pacote (sem `__init__.py`), e o módulo roda código de
-nível de topo ao importar (`PASSWORD = _password()`), então carregamos o
-arquivo isolado via `importlib` em vez de `import scripts.seed_demo` —
-evita depender de sys.path e garante SEED_PASSWORD setada antes do import
-pra nunca disparar o `sys.exit` do módulo durante a carga do teste.
+`scripts/` não é um pacote (sem `__init__.py`), então carregamos o arquivo
+isolado via `importlib` em vez de `import scripts.seed_demo` — evita
+depender de sys.path. `SEED_PASSWORD` é setada por precaução (não é mais
+lida no import desde que `_password()` passou a rodar só dentro de
+`main()`, no fix wave final), mas não custa manter o teste robusto a uma
+regressão nisso.
 
 `async def` sem tocar em I/O, mesmo motivo do `test_docs_exposure.py`: o
 `conftest` tem uma fixture `autouse` assíncrona que cria/derruba o schema a
