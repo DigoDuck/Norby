@@ -53,7 +53,10 @@ export function ConfirmDialog({
     setLoading(true);
     try {
       await onConfirm(requirePassword ? password : undefined);
-      setOpen(false);
+      // Fecha pelo mesmo caminho do cancelar: o Base UI só chama onOpenChange
+      // em fechamento feito pelo usuário, então setOpen(false) direto deixava a
+      // senha no estado e ela voltava preenchida ao reabrir (F1 do scan).
+      handleOpenChange(false);
     } catch (err) {
       setError(apiErrorMessage(err, errorFallback));
     } finally {
