@@ -43,4 +43,33 @@ describe("ConfirmDialog", () => {
     // Continua aberto (o título segue visível).
     expect(screen.getByText("Remover?")).toBeInTheDocument();
   });
+
+  it("forgets the password after a successful confirm, so reopening starts empty", async () => {
+    // Achado F1 do scan do frontend: o fechamento pelo sucesso não passava pelo
+    // caminho que limpa a senha, e o diálogo reaberto já vinha preenchido.
+    const onConfirm = vi.fn().mockResolvedValue(undefined);
+    render(
+      <ConfirmDialog
+        trigger={<button>abrir</button>}
+        title="Enviar recuperação?"
+        confirmLabel="Enviar"
+        requirePassword
+        onConfirm={onConfirm}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "abrir" }));
+    fireEvent.change(await screen.findByLabelText("Sua senha atual"), {
+      target: { value: "senha-do-admin" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Enviar" }));
+    await waitFor(() => expect(onConfirm).toHaveBeenCalledWith("senha-do-admin"));
+    await waitFor(() =>
+      expect(screen.queryByText("Enviar recuperação?")).not.toBeInTheDocument(),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "abrir" }));
+    expect(await screen.findByLabelText("Sua senha atual")).toHaveValue("");
+    expect(screen.getByRole("button", { name: "Enviar" })).toBeDisabled();
+  });
 });
