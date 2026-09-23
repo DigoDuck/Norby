@@ -182,7 +182,13 @@ async def test_update_me_rejects_an_email_already_taken_in_another_case(client):
     })
     auth = {"Authorization": f"Bearer {maria.json()['access_token']}"}
 
-    res = await client.put("/auth/me", json={"email": "joao@test.com"}, headers=auth)
+    # current_password: issue #153, o step-up de senha vem ANTES desta
+    # checagem de duplicado — sem ele, a rota nem chegaria aqui.
+    res = await client.put(
+        "/auth/me",
+        json={"email": "joao@test.com", "current_password": "secret123"},
+        headers=auth,
+    )
     assert res.status_code == 400
 
     # E a recusa não pode deixar rastro: o email de Maria continua o dela.

@@ -30,7 +30,12 @@ class UserUpdate(BaseModel):
     # para um nome que o cadastro recusaria.
     name: PersonName | None = None
     email: EmailStr | None = None
-    
+    # Step-up auth (issue #153): só exigido quando `email` muda de fato — a
+    # rota valida isso, não este schema, porque comparar com o e-mail atual
+    # exige o `current_user` carregado. Nunca é gravado via setattr (o router
+    # exclui este campo do loop).
+    current_password: str | None = None
+
 class PlanResponse(BaseModel):
     """O plano como o frontend precisa vê-lo (ADR 0002).
 

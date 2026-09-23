@@ -50,6 +50,15 @@ async def get_current_user( # Autenticação
     if user is None:
         raise credentials_exception
 
+    # Epoch de credencial (#156). `payload.get("ep", 0)`: tokens emitidos
+    # antes desta feature não carregam o claim, e o usuário ainda não sofreu
+    # nenhum bump conta como epoch 0 — os dois lados batem e o token antigo
+    # continua valendo. Depois de um reset de senha ou troca de e-mail, a
+    # coluna sobe e o claim do token antigo fica para trás: mesma
+    # credentials_exception de sempre, sem vazar o motivo.
+    if payload.get("ep", 0) != user.token_epoch:
+        raise credentials_exception
+
     # Reconciliação preguiçosa (issue #48): pega carona na requisição, como o
     # `materialize_due_recurring` — este projeto não tem agendador e este
     # ticket não adiciona um. Aqui, e não nos leitores de plano, porque este é

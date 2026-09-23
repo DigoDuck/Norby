@@ -142,6 +142,81 @@ async def test_the_password_actually_changes(client, enviados):
 
 
 @pytest.mark.asyncio
+async def test_reset_invalidates_an_access_token_issued_before_it(client, enviados):
+    # #156: o refresh token já cai (teste abaixo), mas o access token de 15min
+    # emitido ANTES do reset continuava valendo até expirar por conta própria —
+    # ele não passa pelo Postgres, só pela assinatura. O epoch por usuário
+    # fecha essa janela: reset_password incrementa `token_epoch`, e o claim
+    # `ep` do token antigo (gravado no momento da emissão) nunca mais bate.
+    email, body = await registrar(client)
+    token_antigo = body["access_token"]
+
+    await client.post("/auth/forgot-password", json={"email": email})
+    await client.post(
+        "/auth/reset-password",
+        json={"token": link_do(enviados), "new_password": "novasenha1"},
+    )
+
+    res = await client.get("/auth/me", headers={"Authorization": f"Bearer {token_antigo}"})
+    assert res.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_reset_cascades_over_a_predecessor_still_inside_the_rotation_grace(client, enviados):
+    # Revisão do #156: a query antiga da cascata (`revoked IS false`) não
+    # tocava um sucessor rotacionado há menos de ROTATION_REUSE_GRACE — ele
+    # já está com revoked=True, e seu revoked_at recente sobrevivia ao reset.
+    # Reapresentar esse token depois ainda caía no ramo "dentro da janela" de
+    # rotate_refresh_token, que relê o epoch ATUAL do usuário e devolve um
+    # par novo — ressuscitando a sessão que o reset dizia ter encerrado, com
+    # o próprio epoch novo de brinde. Determinístico, não uma corrida: só
+    # precisa rotacionar uma vez antes do reset.
+    email, _ = await registrar(client)
+    r0 = client.cookies.get(COOKIE)
+    await client.post("/auth/refresh")  # rotaciona r0 -> r1; r0.revoked_at fica recente
+
+    await client.post("/auth/forgot-password", json={"email": email})
+    await client.post(
+        "/auth/reset-password",
+        json={"token": link_do(enviados), "new_password": "novasenha1"},
+    )
+
+    client.cookies.clear()
+    client.cookies.set(COOKIE, r0)
+    ressuscitado = await client.post("/auth/refresh")
+    assert ressuscitado.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_reset_login_refresh_then_me_works(client, enviados):
+    # Guarda rotate_refresh_token passando o epoch ATUAL do usuário (lido do
+    # banco na rotação), não um epoch zero ou em cache: sem isto, o access
+    # token emitido pelo /auth/refresh logo após o reset carregaria um `ep`
+    # desatualizado e cairia num 401 tão bobo quanto o buraco que o próprio
+    # reset deveria fechar.
+    email, _ = await registrar(client)
+    await client.post("/auth/forgot-password", json={"email": email})
+    await client.post(
+        "/auth/reset-password",
+        json={"token": link_do(enviados), "new_password": "novasenha1"},
+    )
+
+    login = await client.post(
+        "/auth/login", json={"email": email, "password": "novasenha1"}
+    )
+    assert login.status_code == 200
+
+    refreshed = await client.post("/auth/refresh")
+    assert refreshed.status_code == 200
+
+    me = await client.get(
+        "/auth/me",
+        headers={"Authorization": f"Bearer {refreshed.json()['access_token']}"},
+    )
+    assert me.status_code == 200
+
+
+@pytest.mark.asyncio
 async def test_reset_revokes_every_session(client, enviados, db_session):
     email, _ = await registrar(client)
     refresh = client.cookies.get(COOKIE)

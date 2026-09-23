@@ -129,6 +129,29 @@ async def test_me_with_valid_token(client):
 
 
 @pytest.mark.asyncio
+async def test_token_without_an_epoch_claim_is_accepted_for_a_fresh_user(client, db_session):
+    # #156: compat com token antigo. Um token assinado sem o claim `ep` (como
+    # todos antes desta feature) precisa continuar valendo para quem nunca
+    # sofreu bump — get_current_user trata claim ausente como epoch 0, que é
+    # também o default da coluna para conta nova.
+    from sqlalchemy import select
+    from app.models.sql_models import User
+
+    reg = await client.post("/auth/register", json=REG)
+    user = await db_session.scalar(select(User).where(User.email == REG["email"]))
+    assert user.token_epoch == 0
+
+    s = get_settings()
+    token_sem_ep = jwt.encode(
+        {"sub": str(user.id), "exp": datetime.now(timezone.utc) + timedelta(minutes=5)},
+        s.secret_key,
+        algorithm=s.algorithm,
+    )
+    res = await client.get("/auth/me", headers={"Authorization": f"Bearer {token_sem_ep}"})
+    assert res.status_code == 200
+
+
+@pytest.mark.asyncio
 async def test_login_runs_bcrypt_even_for_unknown_email(client, monkeypatch):
     # Sem o hash dummy, e-mail inexistente retorna sem passar por bcrypt: a
     # diferença de tempo (~200ms) revela quais e-mails estão cadastrados.
@@ -391,4 +414,273 @@ async def test_update_me_enforces_the_same_floor_as_register(make_auth_client):
 
     ok = await ac.put("/auth/me", json={"name": "Al"})
     assert ok.status_code == 200
+
+
+# --- Step-up de senha na troca de e-mail (issue #153) -----------------------
+
+
+@pytest.mark.asyncio
+async def test_update_me_email_change_without_password_401(make_auth_client):
+    ac = await make_auth_client("Alice")
+    antes = (await ac.get("/auth/me")).json()
+
+    res = await ac.put("/auth/me", json={"email": "novo@test.com"})
+    assert res.status_code == 401
+    assert res.json()["detail"] == "Senha incorreta"
+
+    # Linha intacta: sem senha, o e-mail não pode ter mudado no banco.
+    depois = (await ac.get("/auth/me")).json()
+    assert depois["email"] == antes["email"]
+
+
+@pytest.mark.asyncio
+async def test_update_me_email_change_wrong_password_401(make_auth_client):
+    ac = await make_auth_client("Alice")
+    antes = (await ac.get("/auth/me")).json()
+
+    res = await ac.put(
+        "/auth/me",
+        json={"email": "novo@test.com", "current_password": "senha-errada"},
+    )
+    assert res.status_code == 401
+    assert res.json()["detail"] == "Senha incorreta"
+
+    depois = (await ac.get("/auth/me")).json()
+    assert depois["email"] == antes["email"]
+
+
+@pytest.mark.asyncio
+async def test_update_me_email_change_wrong_password_does_not_leak_duplicate_email(
+    make_auth_client,
+):
+    # Issue #160: a checagem de senha vem ANTES da consulta de e-mail
+    # duplicado. Se viesse depois, "senha errada" em cima de um e-mail já
+    # cadastrado ainda responderia 400 (e não 401), um oráculo de enumeração
+    # de graça, sem gastar tentativa nenhuma de senha.
+    dona = await make_auth_client("Dona")
+    email_ja_usado = (await dona.get("/auth/me")).json()["email"]
+
+    atacante = await make_auth_client("Mal")
+    res = await atacante.put(
+        "/auth/me",
+        json={"email": email_ja_usado, "current_password": "senha-errada"},
+    )
+    assert res.status_code == 401
+    assert res.json()["detail"] == "Senha incorreta"
+
+
+@pytest.mark.asyncio
+async def test_update_me_email_change_ok_revokes_refresh_tokens_and_notifies_old_address(
+    make_auth_client, db_session, monkeypatch,
+):
+    import app.routers.auth as auth_router
+    from sqlalchemy import select
+    from app.models.sql_models import RefreshToken
+
+    caixa = []
+
+    async def _fake_enviar(*, para, assunto, html):
+        caixa.append({"para": para, "assunto": assunto, "html": html})
+        return "msg-1"
+
+    monkeypatch.setattr(auth_router, "enviar_email", _fake_enviar)
+
+    ac = await make_auth_client("Alice")
+    antes = (await ac.get("/auth/me")).json()
+    old_email = antes["email"]
+
+    res = await ac.put(
+        "/auth/me",
+        json={"email": "novo@test.com", "current_password": "secret123"},
+    )
+    assert res.status_code == 200
+    assert res.json()["email"] == "novo@test.com"
+
+    tokens = (
+        await db_session.execute(
+            select(RefreshToken).where(RefreshToken.user_id == antes["id"])
+        )
+    ).scalars().all()
+    assert tokens  # o cadastro em make_auth_client já emite um refresh token
+    assert all(t.revoked for t in tokens)
+
+    assert caixa and caixa[-1]["para"] == old_email
+
+
+@pytest.mark.asyncio
+async def test_update_me_email_change_ok_even_if_notice_email_fails(
+    make_auth_client, monkeypatch,
+):
+    # Brevo ausente em dev/teste não pode desfazer uma troca já commitada.
+    import app.routers.auth as auth_router
+    from app.services.email_service import EmailNotConfigured
+
+    async def _fake_enviar(*, para, assunto, html):
+        raise EmailNotConfigured()
+
+    monkeypatch.setattr(auth_router, "enviar_email", _fake_enviar)
+
+    ac = await make_auth_client("Alice")
+    res = await ac.put(
+        "/auth/me",
+        json={"email": "novo2@test.com", "current_password": "secret123"},
+    )
+    assert res.status_code == 200
+    assert res.json()["email"] == "novo2@test.com"
+
+
+@pytest.mark.asyncio
+async def test_update_me_email_change_invalidates_the_old_access_token(make_auth_client):
+    # #156: a revogação de refresh (teste acima) não derruba o access token
+    # da aba atual, que segue assinado e válido até expirar sozinho. O bump
+    # de token_epoch fecha essa janela — a MESMA aba que trocou o e-mail
+    # perde acesso na próxima chamada, e só um login novo (que emite um token
+    # com o epoch atual) volta a funcionar.
+    ac = await make_auth_client("Alice")
+
+    res = await ac.put(
+        "/auth/me",
+        json={"email": "novo4@test.com", "current_password": "secret123"},
+    )
+    assert res.status_code == 200
+
+    # `ac` ainda carrega o token ANTIGO: update_me não devolve um novo.
+    ainda_com_token_velho = await ac.get("/auth/me")
+    assert ainda_com_token_velho.status_code == 401
+
+    login_novo = await ac.post(
+        "/auth/login", json={"email": "novo4@test.com", "password": "secret123"}
+    )
+    assert login_novo.status_code == 200
+    ac.headers["Authorization"] = f"Bearer {login_novo.json()['access_token']}"
+    funciona = await ac.get("/auth/me")
+    assert funciona.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_email_change_cascades_over_a_predecessor_still_inside_the_rotation_grace(
+    make_auth_client,
+):
+    # Revisão do #156: mesmo buraco do teste equivalente em
+    # test_password_reset.py, mas pelo lado da troca de e-mail. A query
+    # antiga da cascata (`revoked IS false`) não tocava um sucessor
+    # rotacionado há menos de ROTATION_REUSE_GRACE — ele já está com
+    # revoked=True, e seu revoked_at recente sobrevivia à troca. Determinístico:
+    # só precisa rotacionar uma vez antes do PUT.
+    cookie = get_settings().refresh_cookie_name
+    ac = await make_auth_client("Alice")
+    r0 = ac.cookies.get(cookie)
+    await ac.post("/auth/refresh")  # rotaciona r0 -> r1; r0.revoked_at fica recente
+
+    res = await ac.put(
+        "/auth/me",
+        json={"email": "novo6@test.com", "current_password": "secret123"},
+    )
+    assert res.status_code == 200
+
+    ac.cookies.clear()
+    ac.cookies.set(cookie, r0)
+    ressuscitado = await ac.post("/auth/refresh")
+    assert ressuscitado.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_update_me_name_only_needs_no_password(make_auth_client):
+    ac = await make_auth_client("Alice")
+    res = await ac.put("/auth/me", json={"name": "Nome Novo"})
+    assert res.status_code == 200
+    assert res.json()["name"] == "Nome Novo"
+
+
+@pytest.mark.asyncio
+async def test_update_me_case_only_email_change_needs_no_password(make_auth_client):
+    # Fix round 1: "mudou" tem que ser comparado NORMALIZADO, o mesmo
+    # critério que a checagem de duplicado já usa (func.lower()). Sem isso,
+    # só corrigir a CAIXA do próprio e-mail (Alice@x.com -> alice@x.com)
+    # exigia senha, revogava toda sessão e mandava um aviso de segurança à
+    # toa — nada mudou de fato.
+    ac = await make_auth_client("Alice")
+    antes = (await ac.get("/auth/me")).json()
+    # Só a PARTE LOCAL em caixa alta: o `EmailStr` do Pydantic sempre grava o
+    # domínio em minúsculas (case-insensitive por definição de DNS), então
+    # forçar caixa alta ali não sobreviveria à validação e quebraria a
+    # asserção de "armazenamento mantido" abaixo por um motivo alheio a
+    # este teste.
+    local, dominio = antes["email"].split("@")
+    so_caixa = f"{local.upper()}@{dominio}"
+
+    res = await ac.put("/auth/me", json={"email": so_caixa})
+    assert res.status_code == 200
+    # Comportamento de armazenamento mantido: a caixa nova digitada é a que
+    # fica gravada — só o critério de "precisa de senha" ignora caixa.
+    assert res.json()["email"] == so_caixa
+
+
+@pytest.mark.asyncio
+async def test_update_me_email_change_failure_rolls_back_email_and_revocation_together(
+    make_auth_client, db_session, monkeypatch,
+):
+    # Fix round 1: a troca de e-mail e a revogação de refresh tokens têm que
+    # estar na MESMA transação. Com dois commits separados, o primeiro
+    # (troca de e-mail) podia ter sucesso e o segundo (revogação) falhar,
+    # deixando o e-mail já trocado com os refresh tokens ainda vivos — o
+    # estado exato que o #153 existe para evitar. Forçamos o ÚNICO commit da
+    # rota a falhar e provamos que as duas escritas desaparecem JUNTAS.
+    from sqlalchemy import select
+    from sqlalchemy.exc import IntegrityError
+    from sqlalchemy.ext.asyncio import AsyncSession
+    from app.models.sql_models import RefreshToken
+
+    ac = await make_auth_client("Alice")
+    antes = (await ac.get("/auth/me")).json()
+
+    async def _boom(self):
+        raise IntegrityError("UPDATE users SET email=... (simulado)", {}, Exception("simulado"))
+
+    monkeypatch.setattr(AsyncSession, "commit", _boom)
+
+    res = await ac.put(
+        "/auth/me",
+        json={"email": "novo@test.com", "current_password": "secret123"},
+    )
+    assert res.status_code == 400
+    assert res.json()["detail"] == "Email já cadastrado"
+
+    # Restaura o commit real ANTES de consultar: as chamadas abaixo (via `ac`
+    # e via `db_session`) precisam de um commit/select funcionando de verdade.
+    monkeypatch.undo()
+
+    depois = await ac.get("/auth/me")
+    assert depois.json()["email"] == antes["email"]
+
+    tokens = (
+        await db_session.execute(
+            select(RefreshToken).where(RefreshToken.user_id == antes["id"])
+        )
+    ).scalars().all()
+    assert tokens and not any(t.revoked for t in tokens)
+
+
+@pytest.mark.asyncio
+async def test_update_me_rate_limit_is_per_user(make_auth_client):
+    # Issue #160: sem teto, uma conta testava uma wordlist inteira de e-mails
+    # movendo o próprio e-mail pra frente e pra trás, à velocidade do HTTP.
+    from app.limiter import limiter
+
+    ac = await make_auth_client("Alice")
+
+    # A fixture global desliga o limiter. Religamos só depois do cadastro para
+    # medir exclusivamente o balde do PUT /auth/me.
+    limiter.reset()
+    limiter.enabled = True
+    try:
+        for _ in range(10):
+            res = await ac.put("/auth/me", json={"name": "Nome Novo"})
+            assert res.status_code == 200
+
+        estourou = await ac.put("/auth/me", json={"name": "Nome Novo"})
+        assert estourou.status_code == 429
+    finally:
+        limiter.enabled = False
+        limiter.reset()
 

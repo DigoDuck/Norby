@@ -66,6 +66,19 @@ class User(Base):
         Boolean, nullable=False, default=False, server_default=text("false")
     )
 
+    # Epoch de credencial (issue #156). Incrementado SÓ em reset_password e na
+    # troca de e-mail (auth.py, dentro de `if email_mudando:`) — não em
+    # logout nem em ação de admin, que não são evento de credencial. Todo
+    # access token carrega o epoch vigente no momento em que foi emitido
+    # (claim `ep`); get_current_user compara com esta coluna e rejeita quem
+    # ficou para trás. Cobre o buraco que o refresh token revogado não cobre:
+    # o access token não passa pelo Postgres, só pela assinatura, então
+    # continuava válido até expirar sozinho (até 15min) mesmo depois da senha
+    # trocada.
+    token_epoch: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+
     # --- Plano e assinatura (ADR 0001, issue #19) ----------------------------
     # premium_until é O PORTÃO: o current_period_end do Stripe, e a única coluna
     # que a autorização lê. O Stripe não move essa data quando o cartão falha —

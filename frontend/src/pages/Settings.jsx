@@ -52,13 +52,28 @@ export default function Settings() {
   // árvore sem duplicar id, que quebraria a associação label/campo.
   const nomeId = useId();
   const emailId = useId();
+  const senhaEmailId = useId();
+  const senhaEmailErrorId = useId();
   const fotoId = useId();
   const [form, setForm] = useState({
     name: user?.name || "",
     email: user?.email || "",
   });
+  // Issue #153: trocar o e-mail exige a senha atual (step-up), o mesmo
+  // contrato do DELETE /auth/me. Nome sozinho continua sem fricção.
+  // Fix round 1: comparação NORMALIZADA (o backend também compara por
+  // caixa), senão só corrigir a CAIXA do próprio e-mail (Alice@x.com ->
+  // alice@x.com) pedia senha à toa aqui, mesmo o servidor não indo exigi-la.
+  const emailChanged =
+    form.email.trim().toLowerCase() !== (user?.email || "").trim().toLowerCase();
+  const [currentPassword, setCurrentPassword] = useState("");
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState(null);
+  // Só true quando `error` é especificamente a recusa de senha do step-up
+  // (#153): é o que decide se o campo de senha ganha aria-invalid/describedby,
+  // e não qualquer erro de salvar (429, e-mail duplicado etc. não são sobre
+  // este campo).
+  const [senhaInvalida, setSenhaInvalida] = useState(false);
 
   const [photoError, setPhotoError] = useState("");
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -124,8 +139,14 @@ export default function Settings() {
       a.download = "norby-meus-dados.json";
       a.click();
       URL.revokeObjectURL(url);
-    } catch {
-      setDangerError("Não foi possível exportar seus dados. Tente novamente.");
+    } catch (err) {
+      // O corpo do 429 do slowapi é {"error": ...}, não {"detail": ...}, então
+      // apiErrorMessage cairia no fallback genérico — mapeado à mão aqui.
+      setDangerError(
+        err.response?.status === 429
+          ? "Muitas tentativas. Tente de novo mais tarde."
+          : "Não foi possível exportar seus dados. Tente novamente.",
+      );
     } finally {
       setExporting(false);
     }
@@ -151,13 +172,42 @@ export default function Settings() {
 
   async function handleSave() {
     setError(null);
+    setSenhaInvalida(false);
     try {
-      const res = await authApi.updateProfile(form);
+      const payload = emailChanged
+        ? { ...form, current_password: currentPassword }
+        : form;
+      const res = await authApi.updateProfile(payload);
+
+      if (emailChanged) {
+        // #156: a troca sobe o token_epoch no servidor, que mata o access
+        // token desta aba na hora — a próxima chamada qualquer bateria num
+        // 401 mudo. Não chama updateUser: o logout abaixo já limpa o store
+        // inteiro. Mesmo padrão de RedefinirSenha.jsx -> Auth.jsx: desloga e
+        // manda o state que o Auth.jsx lê para mostrar o aviso, já que esta
+        // tela não fica no ar tempo nenhum para mostrar nada.
+        await authApi.logout();
+        navigate("/", { replace: true, state: { emailAlterado: true } });
+        return;
+      }
+
       updateUser(res.data); // só atualiza o store após sucesso no backend
+      setCurrentPassword("");
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (err) {
-      setError(apiErrorMessage(err, "Não foi possível salvar."));
+      if (err.response?.status === 429) {
+        // O corpo do 429 do slowapi é {"error": ...}, não {"detail": ...},
+        // então apiErrorMessage cairia no fallback genérico.
+        setError("Muitas tentativas. Tente de novo mais tarde.");
+      } else if (emailChanged && err.response?.status === 401) {
+        // 401 só é "senha incorreta" quando a senha era de fato exigida — o
+        // mesmo status por outro motivo não pode confundir a pessoa.
+        setError("Senha incorreta.");
+        setSenhaInvalida(true);
+      } else {
+        setError(apiErrorMessage(err, "Não foi possível salvar."));
+      }
     }
   }
 
@@ -263,9 +313,33 @@ export default function Settings() {
               className={shadcnInputCls}
             />
           </div>
+
+          {/* Step-up (#153): só aparece quando o e-mail digitado difere do
+              atual, mesmo padrão visual do campo de senha da exclusão de
+              conta abaixo. */}
+          {emailChanged && (
+            <div className="sm:col-span-2">
+              <label htmlFor={senhaEmailId} className="block text-xs font-medium text-content-2 mb-2">
+                Senha atual (necessária para trocar o e-mail)
+              </label>
+              <Input
+                id={senhaEmailId}
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                aria-invalid={senhaInvalida ? "true" : undefined}
+                aria-describedby={senhaInvalida ? senhaEmailErrorId : undefined}
+                className={shadcnInputCls}
+              />
+            </div>
+          )}
         </div>
 
-        {error && <p className="text-danger text-xs mt-3">{error}</p>}
+        {error && (
+          <p id={senhaEmailErrorId} role="alert" className="text-danger text-xs mt-3">
+            {error}
+          </p>
+        )}
 
         <Button
           onClick={handleSave}

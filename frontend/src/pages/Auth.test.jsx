@@ -117,4 +117,19 @@ describe("Auth", () => {
       screen.getByText("Senha redefinida. Entre com a nova senha."),
     ).toBeInTheDocument();
   });
+
+  it("avisa que o e-mail foi alterado ao voltar do fluxo de troca (#156)", () => {
+    // Settings.jsx navega pra cá com esse state pelo mesmo motivo do
+    // RedefinirSenha.jsx: o token_epoch já matou a sessão daquela aba, então
+    // não há tela própria para mostrar o aviso.
+    render(
+      <MemoryRouter initialEntries={[{ pathname: "/", state: { emailAlterado: true } }]}>
+        <Auth />
+      </MemoryRouter>,
+    );
+
+    expect(
+      screen.getByText("E-mail alterado. Entre com o novo endereço."),
+    ).toBeInTheDocument();
+  });
 });

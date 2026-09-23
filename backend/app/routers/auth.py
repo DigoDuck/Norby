@@ -19,13 +19,14 @@ from app.schemas.user import (
 from app.services.auth_service import (
     hash_password, verify_password, verify_and_upgrade, create_access_token,
     create_refresh_token, rotate_refresh_token, revoke_refresh_token,
-    create_password_reset, find_user_by_email, reset_password, _DUMMY_HASH,
+    create_password_reset, find_user_by_email, reset_password,
+    revoke_all_refresh_tokens, _DUMMY_HASH,
 )
 from app.services.account_service import delete_account, export_data
 from app.services.photo_service import MAX_BYTES, PhotoInvalid, PhotoTooLarge, processar_foto
 from app.services.billing_service import GatewayCancelFailed
 from app.services.email_service import (
-    EmailFailed, EmailNotConfigured, enviar_email, html_recuperacao,
+    EmailFailed, EmailNotConfigured, enviar_email, html_aviso_troca_email, html_recuperacao,
 )
 from app.services.plan_service import AI_TRIAL
 from app.services.throttle_service import check_throttle, record_failure, record_success
@@ -160,7 +161,7 @@ async def register(
     await db.refresh(user)
     await record_success(payload.email, db)
 
-    access = create_access_token(str(user.id))
+    access = create_access_token(str(user.id), user.token_epoch)
     refresh = await create_refresh_token(str(user.id), db)
     _set_refresh_cookie(response, refresh)
     return Token(access_token=access, user=UserResponse.model_validate(user))
@@ -206,7 +207,7 @@ async def login(
         await db.commit()
     await record_success(payload.email, db)
 
-    access = create_access_token(str(user.id))
+    access = create_access_token(str(user.id), user.token_epoch)
     refresh = await create_refresh_token(str(user.id), db)
     _set_refresh_cookie(response, refresh)
     return Token(access_token=access, user=UserResponse.model_validate(user))
@@ -260,44 +261,136 @@ async def logout(
 async def me(current_user: User = Depends(get_current_user)):
     return current_user
 
+
+async def mandar_aviso_de_troca_de_email(email_antigo: str, novo_email: str) -> None:
+    """Roda DEPOIS da resposta, via BackgroundTasks — mesmo motivo do envio de
+    recuperação (mandar_link_de_recuperacao, mais abaixo): a troca já está
+    commitada, então nada aqui pode atrasar nem desfazer a resposta do PUT.
+
+    Sem log de falha próprio: `enviar_email` já loga (email_service.py); uma
+    segunda linha aqui só duplicaria a mesma falha com o motivo cortado
+    (`EmailFailed`/`EmailNotConfigured` não guardam o `assunto`).
+    """
+    try:
+        await enviar_email(
+            para=email_antigo,
+            assunto="Seu e-mail do Norby foi alterado",
+            html=html_aviso_troca_email(novo_email),
+        )
+    except (EmailFailed, EmailNotConfigured):
+        pass
+
+
 @router.put("/me", response_model=UserResponse)
+# Issue #160: sem teto, "400 email já cadastrado" vs "200" é um oráculo de
+# enumeração testável à velocidade do HTTP, movendo o próprio e-mail pra
+# frente e pra trás. Chave por usuário pelo mesmo motivo do upload de foto
+# acima: atrás do proxy do Railway, por IP seria um balde único pra todo
+# mundo (ver "Rate limit atrás do proxy" no AGENTS.md). 10/hora sobra para um
+# formulário de configurações e já encarece bastante o #153 se ele não tivesse
+# entrado junto.
+@limiter.limit("10/hour", key_func=user_key)
 async def update_me(
+    request: Request,
     payload: UserUpdate,
+    background: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     # exclude_none: `null` explícito no corpo gravaria NULL em coluna NOT NULL.
     data = payload.model_dump(exclude_none=True)
+    # current_password é só para a checagem de step-up abaixo, nunca uma
+    # coluna: fora do loop de setattr mais abaixo.
+    data.pop("current_password", None)
 
-    # Se o email mudar, garante que não está em uso por outro usuário.
-    # func.lower() + exclusão do próprio id: fix round 1 (issue #22) — sem
-    # isso, "Joao@x.com" e "joao@x.com" seriam contas diferentes (mesmo
-    # problema do cadastro), e trocar só a caixa do próprio email bateria
-    # falso-positivo contra si mesmo.
+    # func.lower(): fix round 1 (issue #22) — "Joao@x.com" e "joao@x.com" são
+    # a MESMA conta, o mesmo critério usado em toda comparação de e-mail do
+    # app. Fix round 1 do #153: "mudou" também precisa comparar NORMALIZADO
+    # pelo mesmo motivo — sem isto, só trocar a CAIXA do próprio e-mail
+    # (Alice@x.com -> alice@x.com) já contava como mudança, exigia senha,
+    # revogava toda sessão e mandava aviso de segurança à toa. A CAIXA nova
+    # continua sendo gravada (setattr abaixo usa `new_email` cru, não o
+    # normalizado): só o critério de "mudou" é que ignora caixa.
+    #
+    # (O falso-positivo "e-mail já cadastrado" contra a PRÓPRIA conta, na
+    # consulta de duplicado logo abaixo, não vem do func.lower() — vem de
+    # `User.id != current_user.id`, que exclui a própria linha do match.
+    # func.lower() só resolve a comparação insensível a caixa.)
     new_email = data.get("email")
-    if new_email and new_email != current_user.email:
-        normalized_email = new_email.strip().lower()
+    normalized_new_email = new_email.strip().lower() if new_email else None
+    email_mudando = bool(
+        normalized_new_email and normalized_new_email != current_user.email.strip().lower()
+    )
+
+    if email_mudando:
+        # Step-up de senha (issue #153): sem isto, um access token roubado (15
+        # min de vida, mas XSS ou aba esquecida aberta bastam) troca o e-mail
+        # da conta silenciosamente e sequestra a recuperação de senha, que só
+        # manda pro endereço cadastrado. Mesmo formato do DELETE /auth/me.
+        #
+        # ANTES da consulta de e-mail duplicado (issue #160): se viesse
+        # depois, "senha errada" contra um e-mail já cadastrado ainda
+        # responderia 400 em vez de 401 — um oráculo de enumeração de graça,
+        # sem gastar tentativa nenhuma de senha.
+        password_ok = await asyncio.to_thread(
+            verify_password, payload.current_password or "", current_user.password_hash
+        )
+        if not password_ok:
+            raise HTTPException(status_code=401, detail="Senha incorreta")
+
         existing = await db.execute(
             select(User).where(
-                func.lower(User.email) == normalized_email,
+                func.lower(User.email) == normalized_new_email,
                 User.id != current_user.id,
             )
         )
         if existing.scalar_one_or_none():
             raise HTTPException(status_code=400, detail="Email já cadastrado")
 
+    # Guardado ANTES do setattr: é para onde o aviso de troca vai, e depois
+    # do loop abaixo current_user.email já é o novo endereço.
+    email_antigo = current_user.email
+
     for field, value in data.items():
         setattr(current_user, field, value)
+
+    if email_mudando:
+        # Fix round 1: revoga na MESMA transação da troca de e-mail, dentro
+        # do ÚNICO commit logo abaixo. Dois commits separados (um para a
+        # troca, outro para a revogação) deixavam o e-mail já trocado com os
+        # refresh tokens ainda vivos se o segundo falhasse — exatamente o
+        # estado que o #153 existe para evitar. Mesmo helper do
+        # reset_password (auth_service.py): quem trocou de e-mail pode ter
+        # feito isso porque a conta foi comprometida, e um refresh de 7 dias
+        # sobrevivendo à troca anularia o motivo de tê-la feito.
+        await revoke_all_refresh_tokens(current_user.id, db)
+        # #156: o refresh revogado acima não derruba o access token da aba
+        # atual, que não passa pelo Postgres. Subir o epoch na MESMA
+        # transação fecha essa janela — a próxima checagem de get_current_user
+        # já rejeita o token emitido com o epoch antigo. Expressão SQL, não
+        # `+= 1` em Python: mesmo motivo do reset_password.
+        current_user.token_epoch = User.token_epoch + 1
 
     try:
         await db.commit()
     except IntegrityError:
         # Corrida equivalente à do cadastro: duas trocas de email pro mesmo
         # endereço (caixas diferentes) em paralelo. Índice único no banco
-        # barra a segunda; sem o catch, viraria 500.
+        # barra a segunda; sem o catch, viraria 500. O rollback desfaz a
+        # troca de e-mail E a revogação de refresh tokens juntas, porque as
+        # duas estão na mesma transação.
         await db.rollback()
         raise HTTPException(status_code=400, detail="Email já cadastrado")
     await db.refresh(current_user)
+
+    if email_mudando:
+        # Ponto único de sucesso da troca de e-mail. A revogação de refresh e
+        # o bump do token_epoch (#156) já estão commitados, dentro do bloco
+        # `if email_mudando:` lá em cima; só falta o aviso, que é best-effort.
+        # Via BackgroundTasks, mesmo padrão de mandar_link_de_recuperacao
+        # abaixo: o envio não pode segurar a resposta do PUT.
+        background.add_task(mandar_aviso_de_troca_de_email, email_antigo, current_user.email)
+
     return current_user
 
 
