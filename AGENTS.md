@@ -287,9 +287,14 @@ incluído):** o uvicorn só honra `X-Forwarded-For` quando o peer é
 `127.0.0.1` (default de `forwarded_allow_ips`), e o proxy do Railway não é
 loopback; `FORWARDED_ALLOW_IPS` não existe naquele ambiente, então
 `request.client.host` devolve o IP do proxy para todo mundo. **Não** ligar
-`--forwarded-allow-ips="*"`: nessa versão do uvicorn o `always_trust` faz o
-middleware usar o *primeiro* item do `X-Forwarded-For`, que é o que o
-cliente controla — o rate limit viraria spoofável. Railway também não
+`--forwarded-allow-ips="*"`: o `always_trust` faz o middleware usar o
+*primeiro* item do `X-Forwarded-For`, que é o que o cliente controla — o rate
+limit viraria spoofável. Conferido de novo no uvicorn 0.52 (lendo
+`proxy_headers.py`): o `"*"` continua pegando o primeiro item, mas confiar numa
+faixa CIDR específica percorre o header de trás para frente e devolve o
+primeiro IP não confiável, que o cliente não forja. É o caminho se um dia o
+throttle precisar do IP real (#157, opção c), desde que se saiba a faixa dos
+proxies do Railway. Railway também não
 documenta onde fica o IP real nesse header (o próprio suporte deles se
 contradiz), então `app/routers/auth.py` loga o header cru (`_log_xff`) nas 4
 rotas de auth pra decidir com dado — temporário, remover depois de ler os
