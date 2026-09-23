@@ -29,7 +29,9 @@ from app.services.email_service import (
     EmailFailed, EmailNotConfigured, enviar_email, html_aviso_troca_email, html_recuperacao,
 )
 from app.services.plan_service import AI_TRIAL
-from app.services.throttle_service import check_throttle, record_failure, record_success
+from app.services.throttle_service import (
+    check_throttle, record_failure, record_success, reserve_attempt, stamp_failure,
+)
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 logger = logging.getLogger("norby.auth")
@@ -168,8 +170,8 @@ async def register(
 
 @router.post("/login", response_model=Token)
 # Teto global 200/min: só flood. A defesa contra força bruta é o atraso
-# progressivo por conta (HMAC do email) em check_throttle/record_failure —
-# ver app/services/throttle_service.py e a issue #22.
+# progressivo por conta (HMAC do email) em reserve_attempt — ver
+# app/services/throttle_service.py e as issues #22 e #157.
 @limiter.limit("200/minute")
 async def login(
     request: Request,
@@ -178,7 +180,10 @@ async def login(
     db: AsyncSession = Depends(get_db),
     _xff: None = Depends(_log_xff),
 ):
-    retry_after = await check_throttle(payload.email, db)
+    # Reserva ANTES do bcrypt, não check + record depois (issue #157): a
+    # tentativa admitida já sai contada, então uma rajada simultânea não passa
+    # inteira pelas tentativas livres.
+    retry_after = await reserve_attempt(payload.email, db)
     if retry_after is not None:
         raise _throttled(retry_after)
 
@@ -197,9 +202,9 @@ async def login(
         user.password_hash if user else _DUMMY_HASH,
     )
     if not user or not password_ok:
-        # Incrementa IDÊNTICO exista ou não o email — preserva o tempo
-        # constante acima e impede que o throttle vire oráculo de enumeração.
-        await record_failure(payload.email, db)
+        # A falha já foi contada na reserva; aqui só recomeça a espera do fim
+        # da tentativa. Igual exista ou não o email (sem oráculo).
+        await stamp_failure(payload.email, db)
         raise HTTPException(status_code=401, detail="Credenciais inválidas")
 
     if upgraded_hash:

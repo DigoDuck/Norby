@@ -295,6 +295,21 @@ contradiz), então `app/routers/auth.py` loga o header cru (`_log_xff`) nas 4
 rotas de auth pra decidir com dado — temporário, remover depois de ler os
 logs de produção por algumas semanas.
 
+**Throttle do login: reserva atômica e lockout aceito (#157, 2026-09-23).**
+`reserve_attempt` checa e conta a tentativa num único `INSERT ... ON CONFLICT
+DO UPDATE ... WHERE <curva admite>` antes do bcrypt: uma rajada simultânea
+não passa mais inteira pelas 3 tentativas livres (F6 do scan). Tentativa
+recusada com 429 não grava nada, e `stamp_failure` recomeça a espera do fim
+da tentativa que falhou, preservando a curva da #22. O cadastro continua no
+`check_throttle` + `record_failure`. **Risco aceito (F3):** quem sabe o e-mail
+de alguém mantém a conta travada em 60s com uma tentativa errada por minuto,
+porque a chave é só o e-mail (atrás do proxy não há IP confiável). Mitigações:
+sessão ativa não passa pelo login (o refresh renova) e o reset de senha zera o
+balde. **Gatilho:** abuso observado ou reclamação de usuário travado. Aí entra
+o cookie de dispositivo conhecido (padrão "device cookies" da OWASP): cookie
+assinado de longa duração, gravado no login bem-sucedido e mantido após o
+logout, que tira aquele navegador do balde da conta.
+
 Rotas **autenticadas** usam `user_key` em `app/limiter.py`, chaveando pelo id
 do usuário: `/ai/*` e, desde 2026-08-15, `DELETE /auth/me`.
 

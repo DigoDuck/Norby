@@ -3,7 +3,7 @@ import hmac
 import math
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -66,6 +66,62 @@ async def check_throttle(email: str, db: AsyncSession) -> int | None:
     # mas basta o relógio do host andar pra trás entre a gravação e a leitura
     # para `elapsed` ficar negativo e o Retry-After estourar o teto anunciado.
     return min(math.ceil(remaining), _MAX_WAIT_SECONDS)
+
+
+async def reserve_attempt(email: str, db: AsyncSession) -> int | None:
+    """Reserva a tentativa de login ANTES do bcrypt. None = admitida (e já
+    contada); caso contrário, segundos restantes de espera.
+
+    Issue #157 (F6 do scan): check_throttle só lia o contador e a falha era
+    gravada depois dos ~200ms do bcrypt, então N tentativas simultâneas liam
+    todas o mesmo contador e eram todas admitidas. Aqui checar e contar é UM
+    statement: o ON CONFLICT trava a linha da chave e só incrementa se a curva
+    admite a tentativa. Recusada, o statement não devolve linha e NADA é
+    gravado — o 429 não estende a espera de ninguém, nem a do próprio dono.
+
+    Toda tentativa admitida conta, inclusive a da senha certa: o login bem
+    sucedido chama record_success, que apaga a linha. Roda idêntico exista ou
+    não o email, pelo mesmo motivo de record_failure (sem oráculo).
+    """
+    await _purge_expired(db)
+    key = email_key_hash(email)
+    now = datetime.now(timezone.utc)
+    decorrido = func.extract("epoch", now - LoginThrottle.last_failure_at)
+    espera = func.least(func.power(2, LoginThrottle.failure_count - _FREE_FAILURES), _MAX_WAIT_SECONDS)
+    stmt = (
+        pg_insert(LoginThrottle)
+        .values(key_hash=key, failure_count=1, last_failure_at=now)
+        .on_conflict_do_update(
+            index_elements=[LoginThrottle.key_hash],
+            set_={"failure_count": LoginThrottle.failure_count + 1, "last_failure_at": now},
+            where=or_(LoginThrottle.failure_count < _FREE_FAILURES, decorrido >= espera),
+        )
+        .returning(LoginThrottle.failure_count)
+    )
+    admitida = (await db.execute(stmt)).first() is not None
+    await db.commit()
+    if admitida:
+        return None
+    # Recusada: a linha existe e está dentro da espera. check_throttle só
+    # calcula o Retry-After; se a janela venceu nesse meio-tempo, devolve None
+    # e o teto de 1s abaixo evita um 429 sem espera anunciada.
+    return await check_throttle(email, db) or 1
+
+
+async def stamp_failure(email: str, db: AsyncSession) -> None:
+    """Após a falha do login, recomeça a espera do FIM da tentativa.
+
+    reserve_attempt grava last_failure_at antes do bcrypt; sem este carimbo a
+    espera contaria do início da tentativa e cada degrau da curva encolheria
+    pelo tempo do bcrypt (a janela de 1s some inteira). Só atualiza o horário:
+    a tentativa já foi contada na reserva.
+    """
+    await db.execute(
+        update(LoginThrottle)
+        .where(LoginThrottle.key_hash == email_key_hash(email))
+        .values(last_failure_at=datetime.now(timezone.utc))
+    )
+    await db.commit()
 
 
 async def record_failure(email: str, db: AsyncSession) -> None:
