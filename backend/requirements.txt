@@ -1,10 +1,10 @@
 fastapi==0.141.1
 uvicorn[standard]==0.52.4
 sqlalchemy[asyncio]==2.0.52
-asyncpg==0.30.0
-alembic==1.19.1
+asyncpg==0.31.0
+alembic==1.20.0
 motor==3.7.1
-PyJWT==2.13.0  # JWT HS256 do access token. Substituiu o python-jose (issue #29): sem ecdsa, sem cryptography.
+PyJWT==2.14.0  # JWT HS256 do access token. Substituiu o python-jose (issue #29): sem ecdsa, sem cryptography.
 python-dotenv==1.2.3
 pydantic-settings==2.15.0
 google-genai==2.22.0
@@ -18,7 +18,7 @@ httpx==0.28.1  # email_service (Brevo)
 # Billing (ADR 0001). O SDK entra por causa da verificação de assinatura do
 # webhook: ela precisa ser timing-safe e checar a tolerância de timestamp
 # contra replay, e isso não é lugar para HMAC feito à mão.
-stripe==15.5.1
+stripe==15.6.1
 
 # Foto de perfil (issue #35): redimensiona no servidor para 128x128 WebP.
 # python-multipart é o que o FastAPI usa para ler multipart/form-data.
