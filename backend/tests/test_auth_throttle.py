@@ -361,3 +361,19 @@ async def test_concurrent_first_failures_do_not_500_or_lose_count(db_session):
         await db_session.execute(select(LoginThrottle).where(LoginThrottle.key_hash == email_key_hash(email)))
     ).scalar_one()
     assert row.failure_count == 5
+
+
+@pytest.mark.asyncio
+async def test_concurrent_logins_do_not_bypass_the_free_attempts(client):
+    # Issue #157 (F6 do scan): check_throttle só lia o contador e a falha era
+    # gravada depois do bcrypt (~200ms). N tentativas simultâneas liam todas o
+    # mesmo contador zerado e eram todas admitidas, então o atraso progressivo
+    # virava "N palpites por janela". Aqui a janela é o próprio bcrypt, larga o
+    # bastante para reproduzir pela rota, ao contrário da corrida do upsert acima.
+    import asyncio
+
+    email = "rajada@test.com"
+    respostas = await asyncio.gather(*[_fail_login(client, email) for _ in range(8)])
+    codigos = sorted(r.status_code for r in respostas)
+
+    assert codigos == [401] * 3 + [429] * 5
