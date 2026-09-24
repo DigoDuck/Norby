@@ -272,9 +272,10 @@ async def mandar_aviso_de_troca_de_email(email_antigo: str, novo_email: str) -> 
     recuperação (mandar_link_de_recuperacao, mais abaixo): a troca já está
     commitada, então nada aqui pode atrasar nem desfazer a resposta do PUT.
 
-    Sem log de falha próprio: `enviar_email` já loga (email_service.py); uma
-    segunda linha aqui só duplicaria a mesma falha com o motivo cortado
-    (`EmailFailed`/`EmailNotConfigured` não guardam o `assunto`).
+    Sem log de falha próprio: `enviar_email` já loga as duas falhas, inclusive
+    a chave ausente (#165); uma segunda linha aqui só duplicaria a mesma falha
+    com o motivo cortado (`EmailFailed`/`EmailNotConfigured` não guardam o
+    `assunto`).
     """
     try:
         await enviar_email(

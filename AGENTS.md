@@ -343,6 +343,35 @@ Primeiro admin, depois da migration: no console do banco,
 `docker exec norby_postgres psql -U $POSTGRES_USER -d $POSTGRES_DB -c "..."`
 (os nomes vêm do `.env`).
 
+**Runbook "não fui eu" — reverter uma troca de e-mail (#165).** Não existe
+endpoint para isso; o aviso de troca vai para o endereço ANTIGO, e é dali que
+a reclamação chega. A resposta vinda desse endereço é a prova de identidade:
+não reverter por pedido que chegue de outro lugar. Ponto que muda o
+procedimento: trocar e-mail **exige a senha atual** (#153), então quem trocou
+já sabe a senha — reverter só o e-mail devolve a conta com o invasor ainda
+sabendo entrar. Os três passos, nesta ordem:
+
+1. Conferir que o endereço antigo não foi tomado por outra conta nesse meio
+   tempo (o índice único em `lower(email)` recusaria o UPDATE):
+   `SELECT id FROM users WHERE lower(email) = lower('<antigo>');`
+2. Numa transação só, devolver o e-mail, derrubar os access tokens (epoch) e
+   os refresh tokens (forma TERMINAL da cascata, com `revoked_at` nulo — ver
+   `revoke_all_refresh_tokens`):
+   ```sql
+   BEGIN;
+   UPDATE users SET email = '<antigo>', token_epoch = token_epoch + 1
+    WHERE id = '<user_id>';
+   UPDATE refresh_tokens SET revoked = true, revoked_at = NULL
+    WHERE user_id = '<user_id>';
+   COMMIT;
+   ```
+3. Pela área de admin, disparar a recuperação de senha para a conta (vai para
+   o endereço já restaurado). Até a pessoa redefinir, a senha que o invasor
+   conhece continua valendo.
+
+A reversão por SQL não grava linha em `admin_actions` (só o passo 3 grava).
+Anotar data, `user_id` e motivo fora do banco até isso virar endpoint.
+
 Login e cadastro (anônimos) **não seguem mais por IP.** Desde 2026-08-16 usam
 atraso progressivo **por conta**: a chave é o HMAC-SHA256 do email
 normalizado (lower + trim) com o `secret_key` do servidor — o email cru nunca
