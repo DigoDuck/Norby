@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status, Request
@@ -41,8 +42,19 @@ settings = get_settings()
 # CONCORRÊNCIA entre usuários diferentes. Cada decode ainda custa dezenas de
 # MB (teto de pixels em photo_service.py), então N uploads simultâneos de N
 # usuários diferentes podiam empilhar no mesmo worker e estourar memória
-# (#155). O semáforo é de módulo, não por request, para valer entre usuários.
-_SEMAFORO_DECODE_FOTO = asyncio.Semaphore(2)
+# (#155). Pool de módulo, não por request, para valer entre usuários.
+#
+# Pool dedicado, não semáforo + asyncio.to_thread (#165): a thread do
+# to_thread não é cancelável, então um request cancelado (cliente caiu,
+# timeout do proxy) devolvia a vaga do semáforo com o decode ainda rodando, e
+# o teto de 2 virava 3, 4... Aqui a vaga É a thread: só volta quando o decode
+# termina, cancelado ou não.
+_POOL_DECODE_FOTO = ThreadPoolExecutor(max_workers=2, thread_name_prefix="decode-foto")
+# Teto da fila + decode. Quem espera segura o corpo (até 2 MB) na memória;
+# sem teto, uma fila de uploads crescia sem limite de tempo. Estourar vira 503
+# e o pedido some da fila se ainda não tinha começado. Um decode real leva
+# bem menos de 1s, então 15s só estoura sob carga anormal.
+_ESPERA_MAXIMA_DECODE_FOTO = 15.0
 
 
 def _throttled(retry_after: int) -> HTTPException:
@@ -437,18 +449,22 @@ async def upload_my_photo(
             raise HTTPException(status_code=413, detail="A imagem deve ter no máximo 2 MB")
 
     try:
-        # Bloqueante (decodifica e reescala): vai para thread, como o bcrypt.
-        # O semáforo limita quantos decodes rodam ao mesmo tempo no processo
-        # inteiro — o rate limit acima é por usuário e não segura isso (#155).
-        # ponytail: asyncio.to_thread não é cancelável — se o request for
-        # cancelado (cliente cai, timeout do proxy), o `async with` libera a
-        # vaga do semáforo mas a thread do decode continua rodando até o fim,
-        # então o nº real de decodes simultâneos pode passar de 2; e quem
-        # está esperando a vaga segura o corpo (até 2 MB) na memória sem
-        # limite de tempo de fila. Upgrade: ThreadPoolExecutor(max_workers=2)
-        # dedicado, que dá cancelamento/timeout de fila de verdade.
-        async with _SEMAFORO_DECODE_FOTO:
-            current_user.photo = await asyncio.to_thread(processar_foto, corpo)
+        # Bloqueante (decodifica e reescala): vai para o pool dedicado, que
+        # limita quantos decodes rodam ao mesmo tempo no processo inteiro — o
+        # rate limit acima é por usuário e não segura isso (#155, #165).
+        # Cancelar o await (timeout abaixo ou request cancelado) tira o pedido
+        # da fila se ele ainda não começou; se já começou, o decode termina e
+        # só então a thread volta ao pool.
+        current_user.photo = await asyncio.wait_for(
+            asyncio.get_running_loop().run_in_executor(
+                _POOL_DECODE_FOTO, processar_foto, corpo
+            ),
+            timeout=_ESPERA_MAXIMA_DECODE_FOTO,
+        )
+    except TimeoutError:
+        raise HTTPException(
+            status_code=503, detail="Servidor ocupado processando imagens, tente de novo"
+        )
     except PhotoTooLarge as erro:
         raise HTTPException(status_code=413, detail=str(erro))
     except PhotoInvalid as erro:
