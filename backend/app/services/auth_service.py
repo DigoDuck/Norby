@@ -107,19 +107,50 @@ async def revoke_all_refresh_tokens(user_id, db: AsyncSession) -> None:
     )
 
 
+async def _trava_usuario_do_token(raw: str, db: AsyncSession) -> RefreshToken | None:
+    """Trava o USUÁRIO dono do token e só depois o próprio token (#165).
+
+    Ordem única de locks para tudo que pode abrir uma cascata: `users` primeiro,
+    `refresh_tokens` depois. reset_password e a troca de e-mail já seguem essa
+    ordem (o UPDATE em `users` sai no autoflush, antes da cascata). A rotação e
+    o logout travavam o token direto, e duas cascatas do mesmo usuário
+    seguravam cada uma o seu token enquanto o UPDATE da cascata precisava do
+    token da outra — deadlock, e o Postgres matava uma delas com 500. Ordenar
+    as linhas de `refresh_tokens` por id não resolveria: o primeiro lock já foi
+    tomado fora de ordem.
+
+    Travar o usuário serializa por pessoa, não globalmente. De quebra fecha a
+    corrida de READ COMMITTED da mesma issue: um sucessor que a rotação
+    commitasse enquanto a cascata esperava lock ficava fora do snapshot do
+    UPDATE e sobrevivia. Com a fila no usuário, ou a rotação commita antes da
+    cascata começar (e a cascata enxerga o sucessor), ou só roda depois dela
+    (e encontra o próprio token já terminal).
+
+    A primeira leitura, sem lock, só descobre de quem é o token; a segunda,
+    já com o usuário travado, é a que vale.
+    """
+    token_hash = _hash_token(raw)
+    user_id = await db.scalar(
+        select(RefreshToken.user_id).where(RefreshToken.token_hash == token_hash)
+    )
+    if user_id is None:
+        return None
+    await db.execute(select(User.id).where(User.id == user_id).with_for_update())
+    result = await db.execute(
+        select(RefreshToken).where(RefreshToken.token_hash == token_hash).with_for_update()
+    )
+    return result.scalar_one_or_none()
+
+
 async def rotate_refresh_token(raw: str, db: AsyncSession) -> tuple[str, str, User] | None:
     """Valida, revoga o antigo e emite o par novo em uma transação só.
 
     O FOR UPDATE serializa duas rotações do mesmo token: a segunda só lê a linha
     depois do commit da primeira, já com revoked=True. Sem ele, as duas validam
-    o token vivo e emitem sucessores diferentes.
+    o token vivo e emitem sucessores diferentes. O usuário é travado antes do
+    token, ver _trava_usuario_do_token.
     """
-    result = await db.execute(
-        select(RefreshToken)
-        .where(RefreshToken.token_hash == _hash_token(raw))
-        .with_for_update()
-    )
-    record = result.scalar_one_or_none()
+    record = await _trava_usuario_do_token(raw, db)
     if record is None:
         return None
 
@@ -168,14 +199,10 @@ async def revoke_refresh_token(raw: str, db: AsyncSession) -> None:
     roubou R0, rotacionou para R1 e deixou a vítima com R0. Nos dois casos, a
     resposta segura é derrubar todas as sessões do usuário.
 
-    Continua idempotente: token desconhecido não levanta erro.
+    Continua idempotente: token desconhecido não levanta erro. Mesma ordem de
+    locks da rotação (usuário, depois token): ver _trava_usuario_do_token.
     """
-    result = await db.execute(
-        select(RefreshToken)
-        .where(RefreshToken.token_hash == _hash_token(raw))
-        .with_for_update()
-    )
-    record = result.scalar_one_or_none()
+    record = await _trava_usuario_do_token(raw, db)
     if record is None:
         return
 

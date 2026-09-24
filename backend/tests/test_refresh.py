@@ -404,3 +404,152 @@ async def test_the_cookie_alone_does_not_authenticate_a_route(client):
     await _register(client)  # o client agora carrega o cookie
     res = await client.get("/auth/me")  # sem header Authorization
     assert res.status_code == 401
+
+
+async def _espera_alguem_travado(timeout=5.0, obrigatorio=True):
+    """Bloqueia até outra conexão estar parada esperando lock no Postgres.
+
+    É o que torna determinísticos os testes de concorrência abaixo: sem isso,
+    eles dependeriam de `sleep` e do escalonador para acertar a ordem. Conexão
+    NOVA a cada consulta: o Postgres fotografa o pg_stat_activity uma vez por
+    transação, e reler dentro da mesma devolveria sempre a mesma foto.
+    """
+    from sqlalchemy import text
+
+    from tests.conftest import test_engine
+
+    prazo = asyncio.get_running_loop().time() + timeout
+    while asyncio.get_running_loop().time() < prazo:
+        async with test_engine.connect() as conn:
+            travados = await conn.scalar(
+                text("SELECT count(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock'")
+            )
+        if travados:
+            return
+        await asyncio.sleep(0.02)
+    if obrigatorio:
+        raise AssertionError("nenhuma conexão chegou a esperar lock")
+
+
+async def _conclui(tarefa):
+    """Espera a tarefa concorrente; se o teste falhar antes, cancela-a, para
+    a sessão dela não ficar presa num lock e travar o teardown do schema."""
+    try:
+        return await asyncio.wait_for(tarefa, timeout=10)
+    finally:
+        tarefa.cancel()
+
+
+@pytest.mark.asyncio
+async def test_two_concurrent_cascades_for_one_user_do_not_deadlock(client, db_session):
+    # #165: duas cascatas paralelas do mesmo usuário (dois tokens velhos
+    # reapresentados juntos, ou logout velho + refresh velho) travavam em
+    # deadlock. Cada uma segurava o PRÓPRIO token com FOR UPDATE e o UPDATE
+    # da cascata precisava da linha que a outra segurava; o Postgres matava
+    # uma delas e a requisição virava 500.
+    #
+    # Interleaving forçado: `outra` faz o que uma cascata concorrente faz
+    # (trava o usuário, depois o próprio token s0) e fica parada; só então a
+    # rotação de r0 entra. A cascata de `outra` roda depois que a rotação já
+    # está esperando lock, que é o instante do deadlock no código antigo.
+    from sqlalchemy import select
+
+    from app.models.sql_models import User
+    from app.services.auth_service import (
+        _hash_token, revoke_all_refresh_tokens, rotate_refresh_token,
+    )
+    from tests.conftest import TestSessionLocal
+
+    await _register(client)
+    r0 = client.cookies.get(COOKIE)
+    await client.post("/auth/refresh")
+    s0 = (await client.post("/auth/login", json={"email": REG["email"], "password": REG["password"]})).cookies.get(COOKIE)
+    assert s0
+    client.cookies.clear()
+    client.cookies.set(COOKIE, s0)
+    await client.post("/auth/refresh")  # s0 também rotacionado
+
+    # Os dois tokens velhos saem da janela de graça: reapresentar = cascata.
+    await db_session.execute(
+        update(RefreshToken)
+        .where(RefreshToken.revoked.is_(True))
+        .values(revoked_at=datetime.now(timezone.utc) - ROTATION_REUSE_GRACE - timedelta(seconds=1))
+    )
+    await db_session.commit()
+    user_id = await db_session.scalar(
+        select(RefreshToken.user_id).where(RefreshToken.token_hash == _hash_token(s0))
+    )
+
+    async with TestSessionLocal() as outra, TestSessionLocal() as sess_rotacao:
+        await outra.execute(select(User.id).where(User.id == user_id).with_for_update())
+        await outra.execute(
+            select(RefreshToken).where(RefreshToken.token_hash == _hash_token(s0)).with_for_update()
+        )
+
+        rotacao = asyncio.create_task(rotate_refresh_token(r0, sess_rotacao))
+        try:
+            await _espera_alguem_travado()
+            await revoke_all_refresh_tokens(user_id, outra)
+            await outra.commit()
+        finally:
+            resultado = await _conclui(rotacao)
+        assert resultado is None
+
+    db_session.expire_all()
+    vivos = (
+        await db_session.execute(
+            select(RefreshToken).where(
+                RefreshToken.revoked.is_(False) | RefreshToken.revoked_at.is_not(None)
+            )
+        )
+    ).scalars().all()
+    assert vivos == []
+
+
+@pytest.mark.asyncio
+async def test_a_cascade_catches_a_successor_committed_while_it_waited(client, db_session):
+    # #165, corrida de READ COMMITTED: um sucessor que outra transação
+    # commitava enquanto a cascata estava em andamento ficava fora do
+    # snapshot do UPDATE e sobrevivia a ela. `outra` faz o papel de uma
+    # rotação legítima em voo: trava o usuário e insere o sucessor, ainda sem
+    # commit. A cascata (logout com token velho) precisa esperar por ela e
+    # então enxergar o sucessor.
+    from sqlalchemy import select
+
+    from app.models.sql_models import User
+    from app.services.auth_service import _hash_token, _new_refresh, revoke_refresh_token
+    from tests.conftest import TestSessionLocal
+
+    await _register(client)
+    r0 = client.cookies.get(COOKIE)
+    await client.post("/auth/refresh")
+    await db_session.execute(
+        update(RefreshToken)
+        .where(RefreshToken.revoked.is_(True))
+        .values(revoked_at=datetime.now(timezone.utc) - ROTATION_REUSE_GRACE - timedelta(seconds=1))
+    )
+    await db_session.commit()
+    user_id = await db_session.scalar(
+        select(RefreshToken.user_id).where(RefreshToken.token_hash == _hash_token(r0))
+    )
+
+    async with TestSessionLocal() as outra, TestSessionLocal() as sess_logout:
+        await outra.execute(select(User.id).where(User.id == user_id).with_for_update())
+        sucessor = _new_refresh(str(user_id), outra)
+        await outra.flush()
+
+        cascata = asyncio.create_task(revoke_refresh_token(r0, sess_logout))
+        try:
+            # Não obrigatório: no código sem a fila no usuário a cascata nem
+            # espera — termina sem enxergar o sucessor, e quem reprova é a
+            # asserção final, que é o defeito de verdade.
+            await _espera_alguem_travado(timeout=1.0, obrigatorio=False)
+            await outra.commit()
+        finally:
+            await _conclui(cascata)
+
+    db_session.expire_all()
+    registro = await db_session.scalar(
+        select(RefreshToken).where(RefreshToken.token_hash == _hash_token(sucessor))
+    )
+    assert registro.revoked is True and registro.revoked_at is None
