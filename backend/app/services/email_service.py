@@ -31,11 +31,12 @@ TIMEOUT = 10.0
 class EmailNotConfigured(Exception):
     """Sem `BREVO_API_KEY` no momento do envio.
 
-    O router já barra isso alto, ANTES de agendar o envio (checagem em
-    `auth.py`, resposta 503) — na prática esta exceção é a última linha de
-    defesa, só alcançável se a chave sumir entre o pre-check e a BackgroundTask
-    rodar. `mandar_link_de_recuperacao` a engole em silêncio, sem logar: a
-    resposta já foi entregue e não há para quem reportar o erro.
+    Na recuperação de senha o router barra isso alto, ANTES de agendar o envio
+    (checagem em `auth.py`, resposta 503). O aviso de troca de e-mail não tem
+    esse pre-check — a troca conclui de qualquer jeito —, então lá esta
+    exceção é o caminho normal quando a chave falta. Por isso `enviar_email`
+    loga antes de levantar (#165): os dois chamadores a engolem, e sem o log o
+    aviso de segurança ao endereço antigo sumiria sem rastro.
     """
 
 
@@ -52,6 +53,9 @@ async def enviar_email(*, para: str, assunto: str, html: str) -> str:
     """
     settings = get_settings()
     if not settings.brevo_api_key:
+        # Mesmo nível e mesma forma do log de EmailFailed abaixo: só o assunto,
+        # nunca o destinatário.
+        logger.error("brevo: BREVO_API_KEY ausente, '%s' não foi enviado", assunto)
         raise EmailNotConfigured()
 
     corpo = {

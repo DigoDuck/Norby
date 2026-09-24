@@ -530,6 +530,36 @@ async def test_update_me_email_change_ok_even_if_notice_email_fails(
 
 
 @pytest.mark.asyncio
+async def test_a_notice_skipped_for_a_missing_brevo_key_is_logged(
+    make_auth_client, monkeypatch, caplog,
+):
+    # #165: a troca de e-mail não tem o pre-check de chave que a recuperação
+    # de senha tem (503 antes de agendar), então sem BREVO_API_KEY o aviso ao
+    # endereço antigo sumia sem deixar rastro — a troca concluía e ninguém
+    # sabia que o aviso de segurança nunca saiu. Sem mock do enviar_email: é
+    # o caminho real que precisa logar.
+    import logging
+
+    from app.config import get_settings
+
+    monkeypatch.setattr(get_settings(), "brevo_api_key", "")
+    ac = await make_auth_client("Alice")
+    antigo = (await ac.get("/auth/me")).json()["email"]
+
+    with caplog.at_level(logging.ERROR, logger="norby.email"):
+        res = await ac.put(
+            "/auth/me",
+            json={"email": "novo3@test.com", "current_password": "secret123"},
+        )
+
+    assert res.status_code == 200
+    registros = [r for r in caplog.records if r.name == "norby.email"]
+    assert any("BREVO_API_KEY" in r.getMessage() for r in registros)
+    # Endereço nunca vai para o log, nem o antigo nem o novo.
+    assert not any(antigo in r.getMessage() or "novo3@" in r.getMessage() for r in registros)
+
+
+@pytest.mark.asyncio
 async def test_update_me_email_change_invalidates_the_old_access_token(make_auth_client):
     # #156: a revogação de refresh (teste acima) não derruba o access token
     # da aba atual, que segue assinado e válido até expirar sozinho. O bump
