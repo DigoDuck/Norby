@@ -21,7 +21,7 @@ from app.services.auth_service import (
     hash_password, verify_password, verify_and_upgrade, create_access_token,
     create_refresh_token, rotate_refresh_token, revoke_refresh_token,
     create_password_reset, find_user_by_email, reset_password,
-    revoke_all_refresh_tokens, _DUMMY_HASH,
+    revoke_all_refresh_tokens, emitir_sessao_do_login, _DUMMY_HASH,
 )
 from app.services.account_service import delete_account, export_data
 from app.services.photo_service import MAX_BYTES, PhotoInvalid, PhotoTooLarge, processar_foto
@@ -208,10 +208,9 @@ async def login(
     # e-mail inexistente retorna ~200ms mais rápido e vira oráculo de enumeração.
     # verify_and_upgrade é bloqueante e também produz o hash novo quando o
     # usuário ainda está no bcrypt legado.
+    hash_verificado = user.password_hash if user else _DUMMY_HASH
     password_ok, upgraded_hash = await asyncio.to_thread(
-        verify_and_upgrade,
-        payload.password,
-        user.password_hash if user else _DUMMY_HASH,
+        verify_and_upgrade, payload.password, hash_verificado
     )
     if not user or not password_ok:
         # A falha já foi contada na reserva; aqui só recomeça a espera do fim
@@ -219,13 +218,14 @@ async def login(
         await stamp_failure(payload.email, db)
         raise HTTPException(status_code=401, detail="Credenciais inválidas")
 
-    if upgraded_hash:
-        user.password_hash = upgraded_hash
-        await db.commit()
+    # A senha trocou durante o bcrypt (reset commitado no meio, #165): a que
+    # foi digitada já não é a da conta. Sem stamp_failure — não é tentativa de
+    # força bruta, é uma corrida perdida para a própria dona da conta.
+    sessao = await emitir_sessao_do_login(user, hash_verificado, upgraded_hash, db)
+    if sessao is None:
+        raise HTTPException(status_code=401, detail="Credenciais inválidas")
+    access, refresh = sessao
     await record_success(payload.email, db)
-
-    access = create_access_token(str(user.id), user.token_epoch)
-    refresh = await create_refresh_token(str(user.id), db)
     _set_refresh_cookie(response, refresh)
     return Token(access_token=access, user=UserResponse.model_validate(user))
 

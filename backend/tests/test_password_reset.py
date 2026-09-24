@@ -395,3 +395,55 @@ async def test_the_email_does_not_look_like_marketing(client, enviados):
     assert "background:" not in html, "botao colorido e o sinal mais forte de promocao"
     assert "<img" not in html
 
+
+
+@pytest.mark.asyncio
+async def test_a_login_verified_just_before_a_reset_does_not_survive_it(client, db_session, monkeypatch):
+    # #165: o login confere a senha, e só depois grava o refresh token. Uma
+    # redefinição de senha que commitasse no meio derrubava toda sessão
+    # existente — mas o refresh do login, gravado DEPOIS da cascata,
+    # sobrevivia. A pessoa que redefiniu a senha porque desconfiava de
+    # alguém ficava com esse alguém logado por 7 dias.
+    #
+    # A redefinição roda dentro do próprio verify_and_upgrade (na thread do
+    # to_thread, devolvendo ao loop por run_coroutine_threadsafe): cai
+    # exatamente depois de a senha antiga ser aceita e antes dos tokens.
+    import asyncio
+
+    from app.services.auth_service import create_password_reset, reset_password
+    from tests.conftest import TestSessionLocal
+
+    email = "vitima@test.com"
+    res = await client.post(
+        "/auth/register",
+        json={"name": "Vera", "email": email, "password": "antiga12345", "accept_privacy": True},
+    )
+    assert res.status_code == 201
+    user_id = res.json()["user"]["id"]
+    client.cookies.clear()
+
+    loop = asyncio.get_running_loop()
+    verificar_de_verdade = auth_router.verify_and_upgrade
+
+    async def _redefine():
+        async with TestSessionLocal() as outra:
+            token = await create_password_reset(user_id, outra)
+            assert await reset_password(token, "novinha12345", outra)
+
+    def _verifica_e_redefine_no_meio(senha, hash_):
+        resultado = verificar_de_verdade(senha, hash_)
+        asyncio.run_coroutine_threadsafe(_redefine(), loop).result(timeout=10)
+        return resultado
+
+    monkeypatch.setattr(auth_router, "verify_and_upgrade", _verifica_e_redefine_no_meio)
+    login = await client.post("/auth/login", json={"email": email, "password": "antiga12345"})
+
+    assert login.status_code == 401
+    vivos = (
+        await db_session.execute(
+            select(RefreshToken).where(
+                RefreshToken.user_id == uuid.UUID(user_id), RefreshToken.revoked.is_(False)
+            )
+        )
+    ).scalars().all()
+    assert vivos == []
