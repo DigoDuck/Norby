@@ -115,6 +115,13 @@ Roteamento geral em `~/.claude/SKILLS.md`. Aqui só o que é específico do Norb
   ticket acionável e a decisão de arquitetura.
 - **`pytest` e `alembic` rodam dentro do container** `norby_backend`; o host não
   conecta no Postgres do Docker.
+  **Exceção: sessão na nuvem (Claude Code na web).** Lá não há compose: o
+  `.claude/hooks/session-start.sh` sobe o Postgres do próprio container e o
+  Mongo via Docker, cria o venv 3.12 em `backend/.venv` e roda `npm install`.
+  `pytest` e `alembic` rodam direto no host. O hook não roda na máquina local.
+  Sem `design-references/`, `graphify-out/` e as skills locais, **UI na nuvem
+  não cumpre a regra das referências visuais**: trabalho de UI fica para a
+  máquina local.
 
 ## Agent skills
 
