@@ -289,6 +289,21 @@ janela (SEC-01 continua valendo). A coluna `refresh_tokens.revoked_at`
 (migration desta task) fica NULL em toda revogação em cascata — de propósito,
 para que um cascateamento nunca vire elegível para a própria graça.
 
+**Risco aceito: logout comum não fecha a graça do antecessor (#165,
+2026-09-24).** O logout com o token VIVO (R1) revoga só R1. Se R1 nasceu de
+uma rotação há menos de 30s, o antecessor R0 ainda está dentro da janela e
+`rotate_refresh_token` o troca por um sucessor novo: a sessão que acabou de
+sair volta a existir. Explorar exige ter roubado R0 **e** apresentá-lo nos
+30s seguintes à rotação, com a vítima deslogando nesse intervalo. Quem rouba
+um refresh já tem caminhos melhores, e o reuso fora da janela continua
+cascateando. Alternativas descartadas: usar a cascata no logout transforma
+"sair" em "sair de todos os dispositivos"; revogar só o antecessor imediato
+exige gravar de qual token cada um nasceu (coluna + migration), custo que o
+risco não paga hoje. **Gatilho:** `ROTATION_REUSE_GRACE` crescer além de 30s,
+roubo de refresh observado, ou a entrada do cookie de dispositivo conhecido
+(ver throttle do login abaixo), por ser a próxima mudança no fluxo de sessão
+e dar para levar a migration junto. Aí a saída é a coluna de linhagem.
+
 **Rate limit atrás do proxy — reescrito em 2026-08-16 (issue #22, fix round 1
 incluído):** o uvicorn só honra `X-Forwarded-For` quando o peer é
 `127.0.0.1` (default de `forwarded_allow_ips`), e o proxy do Railway não é
