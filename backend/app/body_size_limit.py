@@ -24,7 +24,12 @@ BODY_SIZE_LIMIT = 1_048_576
 # que o que já existe. "Decida pelo menor": isentar mantém o teto efetivo
 # nos 2 MB da rota, que é menor que 2 MB + folga — por isso a isenção, não a
 # duplicação.
+#
+# Isenção por MÉTODO + caminho (#165): só o PUT tem o teto próprio. GET e
+# DELETE na mesma rota não leem corpo hoje, mas um handler novo ali herdaria
+# a isenção em silêncio e leria corpo sem teto nenhum.
 PHOTO_UPLOAD_PATH = "/auth/me/photo"
+PHOTO_UPLOAD_METHOD = "PUT"
 
 # Mesmo texto do 413 que o webhook do Stripe já usa (billing.py) — um único
 # contrato de erro de "corpo grande demais" na API inteira.
@@ -76,7 +81,9 @@ class BodySizeLimitMiddleware:
         self.app = app
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http" or scope["path"] == PHOTO_UPLOAD_PATH:
+        if scope["type"] != "http" or (
+            scope["path"] == PHOTO_UPLOAD_PATH and scope["method"] == PHOTO_UPLOAD_METHOD
+        ):
             await self.app(scope, receive, send)
             return
 

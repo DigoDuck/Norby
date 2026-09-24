@@ -124,3 +124,23 @@ async def test_the_photo_upload_still_accepts_one_point_five_mb(make_auth_client
         "/auth/me/photo", content=dados, headers={"Content-Type": "image/bmp"}
     )
     assert resposta.status_code == 200, resposta.text
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("metodo", ["POST", "PATCH", "DELETE"])
+async def test_only_the_photo_put_is_exempt_from_the_cap(make_auth_client, metodo):
+    # #165: a isenção olhava só o caminho. Hoje GET e DELETE nessa rota nunca
+    # leem corpo, então era inofensivo — mas qualquer handler novo em
+    # /auth/me/photo (um POST, um PATCH) herdaria a isenção sem ninguém ver, e
+    # leria corpo sem teto nenhum. A isenção vale só para o PUT, o único
+    # método que tem o teto próprio de 2 MB.
+    #
+    # Content-Length DECLARADO, não corpo em pedaços: sem header, o teto só
+    # conta o que o app lê, e estes métodos nunca leem — o teste passaria
+    # a depender de um handler que ainda não existe. O declarado é recusado
+    # antes de qualquer leitura, então mede exatamente a isenção.
+    alice = await make_auth_client("Alice")
+    resposta = await alice.request(
+        metodo, "/auth/me/photo", content=b"x" * (BODY_SIZE_LIMIT + 1)
+    )
+    assert resposta.status_code == 413
