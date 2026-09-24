@@ -69,7 +69,11 @@ dist/
 *.DS_Store
 
 # Claude Code
-.claude/
+# Só o hook da nuvem é versionado (setup de sessão na web). Skills locais,
+# settings.local.json e o resto de .claude/ continuam fora do git.
+.claude/*
+!.claude/settings.json
+!.claude/hooks/
 .agents/
 .codex/
 graphify-out/
