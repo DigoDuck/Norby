@@ -463,7 +463,11 @@ export default function Goals() {
 
               <p className="relative text-xs text-content-2 mt-3">
                 {done
-                  ? "Meta alcançada 🎉"
+                  ? (
+                    <span className="inline-flex items-center gap-1 text-income font-medium">
+                      <Check size={12} aria-hidden="true" /> Meta alcançada
+                    </span>
+                  )
                   : over
                     ? `Ultrapassou em ${formatBRL(parseFloat(g.current_amount) - parseFloat(g.target_amount))}`
                     : `Faltam ${formatBRL(g.remaining)}`}

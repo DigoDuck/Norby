@@ -18,7 +18,7 @@ export const mainItems = [
   { to: "/transactions", icon: FileText, label: "Relatórios" },
   { to: "/recurring", icon: Repeat, label: "Recorrências" },
   { to: "/goals", icon: Target, label: "Metas" },
-  { to: "/ai", icon: BrainCircuit, label: "IA Analista" },
+  { to: "/ai", icon: BrainCircuit, label: "Norby IA" },
 ];
 
 export const prefItems = [

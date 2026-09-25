@@ -12,7 +12,7 @@ import { usePlano } from "@/lib/plan";
 const WELCOME = {
   role: "assistant",
   content:
-    "Oi 👋 Sou a Norby, sua analista financeira. Posso analisar seus gastos, sugerir economias e responder dúvidas sobre suas finanças. No que posso ajudar hoje?",
+    "Oi! Sou a Norby, sua analista financeira. Posso analisar seus gastos, sugerir economias e responder dúvidas sobre suas finanças. No que posso ajudar hoje?",
 };
 
 // Agrupa sessões por recência (Hoje / 7 dias / Anteriores) usando updated_at.
@@ -168,7 +168,7 @@ export default function AIAnalyst() {
     return (
       <div className="panel p-10 flex items-center justify-center min-h-[420px]">
         <PremiumLock
-          title="A analista da Norby é do Norby+"
+          title="A Norby IA faz parte do Norby+"
           text="Converse sobre seus gastos, peça sugestões de economia e receba a leitura do seu mês."
         />
       </div>
@@ -199,18 +199,10 @@ export default function AIAnalyst() {
       <div className="panel flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         {/* Header */}
         <div className="flex items-center gap-3 border-b border-line/[0.08] px-4 py-4 sm:px-6">
-          <div className="relative shrink-0">
-            <AiOrb size={32} pulse={false} />
-            <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-surface bg-income" />
-          </div>
+          <AiOrb size={32} />
           <div>
-            <p className="text-[15px] font-semibold text-content">Norby AI</p>
-            <div className="flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-income" />
-              <span className="text-xs text-income">
-                online · pronta pra ajudar
-              </span>
-            </div>
+            <p className="text-[15px] font-semibold text-content">Norby IA</p>
+            <p className="text-xs text-content-2">Sua analista financeira</p>
           </div>
         </div>
 
@@ -232,11 +224,11 @@ export default function AIAnalyst() {
               </div>
             )}
 
-            {/* Insight do dia (só em conversa nova) */}
+            {/* Leitura de hoje (só em conversa nova) */}
             {sessionId === null && insightLine && (
               <div className="inset-panel rounded-tl-md border-accent/25 p-5">
                 <span className="chip-neutral mb-3 text-accent">
-                  <NorthStar size={10} /> INSIGHT DO DIA
+                  <NorthStar size={10} /> Leitura de hoje
                 </span>
                 <p className="text-pretty text-[15px] leading-relaxed text-content">
                   {insightLine}
@@ -252,8 +244,8 @@ export default function AIAnalyst() {
                 <div
                   className={`inset-panel max-w-[86%] px-4 py-3 text-[14px] leading-relaxed sm:max-w-[78%] ${
                     msg.role === "user"
-                      ? "rounded-tr-md text-content"
-                      : "rounded-tl-md border-l-2 border-l-accent/40 text-content"
+                      ? "rounded-tr-md border-accent/20 bg-accent/10 text-content"
+                      : "rounded-tl-md text-content"
                   }`}
                 >
                   {msg.content}

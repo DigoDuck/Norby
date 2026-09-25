@@ -7,7 +7,8 @@ import { LoadError } from "@/components/shared/LoadState";
 
 import { transactionsApi } from "@/api/transactions";
 import { walletsApi } from "@/api/wallets";
-import { categoriesFor, emojiForCategory, reconcileCategory, TRANSACTION_TYPE_OPTIONS } from "@/lib/categories";
+import { categoriesFor, reconcileCategory, TRANSACTION_TYPE_OPTIONS } from "@/lib/categories";
+import CategoryIcon from "@/components/shared/CategoryIcon";
 import { transactionSchema } from "@/lib/schemas";
 import { apiErrorMessage, formatDateBR, inputCls, toDateInput, todayInput, formatSinal } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
@@ -635,7 +636,7 @@ export default function Transactions() {
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="flex items-center gap-2 text-sm font-medium text-content">
-                    <span aria-hidden="true">{emojiForCategory(t.category, t.type)}</span>
+                    <CategoryIcon category={t.category} type={t.type} size={15} className="shrink-0 text-content-3" />
                     <span className="truncate">{t.category}</span>
                   </p>
                   <p className="mt-1 truncate text-xs text-content-2">

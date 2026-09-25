@@ -10,6 +10,7 @@ import {
   PiggyBank,
   Sparkles,
   Lock,
+  Target,
 } from "lucide-react";
 import {
   AreaChart,
@@ -38,7 +39,16 @@ import { LoadError } from "@/components/shared/LoadState";
 import { usePlano } from "@/lib/plan";
 import { useAuthStore } from "@/store/authStore";
 import { formatDateBR, formatBRL, parseDateOnly, formatSinal, formatPct } from "@/lib/utils";
-import { emojiForCategory } from "@/lib/categories";
+import CategoryIcon from "@/components/shared/CategoryIcon";
+
+// "Boa noite, Diogo": a saudação acompanha o horário, sem emoji no título
+// (o leitor de tela lia "Olá, Diogo, mão acenando").
+function saudacao(agora = new Date()) {
+  const h = agora.getHours();
+  if (h >= 5 && h < 12) return "Bom dia";
+  if (h >= 12 && h < 18) return "Boa tarde";
+  return "Boa noite";
+}
 
 // Rótulo curto pt-BR de uma chave ano-mês ("2026-07" → "jul"), em horário local.
 const monthLabel = (ym) => {
@@ -252,7 +262,7 @@ export default function Dashboard() {
   if (falhas.core) {
     return (
       <div className="space-y-4">
-        <h1 className="text-3xl font-bold text-content tracking-tight">Olá, {firstName}</h1>
+        <h1 className="text-3xl font-bold text-content tracking-tight">{saudacao()}, {firstName}</h1>
         <LoadError what="seu saldo e o resumo do mês" onRetry={tentarDeNovo} />
       </div>
     );
@@ -274,7 +284,7 @@ export default function Dashboard() {
         <div className="min-w-0">
           <p className="text-xs text-content-3 first-letter:uppercase">{todayLabel}</p>
           <h1 className="text-3xl font-bold text-content tracking-tight mt-1">
-            Olá, {firstName} 👋
+            {saudacao()}, {firstName}
           </h1>
           <p className="text-sm text-content-2 mt-1">
             Seu saldo, seus gastos e seu ritmo neste mês.
@@ -392,7 +402,7 @@ export default function Dashboard() {
             upIsGood={false}
           />
           <StatTile
-            label="Score IA"
+            label="Score financeiro"
             value={insight?.score != null ? `${insight.score}/100` : "—"}
             icon={Sparkles}
             note={iaLiberada ? "este mês" : "disponível no Norby+"}
@@ -406,8 +416,8 @@ export default function Dashboard() {
           ) : featuredGoal ? (
             <>
               <div className="relative flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-income/15 flex items-center justify-center shrink-0 text-base">
-                  🎯
+                <div className="w-9 h-9 rounded-xl bg-income/15 flex items-center justify-center shrink-0 text-income">
+                  <Target size={17} aria-hidden="true" />
                 </div>
                 <div className="min-w-0">
                   <h2 className="font-semibold text-content truncate">
@@ -458,8 +468,8 @@ export default function Dashboard() {
           ) : (
             <>
               <div className="relative flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-income/15 flex items-center justify-center shrink-0 text-base">
-                  🎯
+                <div className="w-9 h-9 rounded-xl bg-income/15 flex items-center justify-center shrink-0 text-income">
+                  <Target size={17} aria-hidden="true" />
                 </div>
                 <h2 className="font-semibold text-content">Metas</h2>
               </div>
@@ -611,8 +621,8 @@ export default function Dashboard() {
                     className="flex items-center justify-between py-2.5 border-b border-line/5 last:border-0"
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-9 h-9 rounded-[10px] bg-surface-inset flex items-center justify-center shrink-0 text-base">
-                        {emojiForCategory(t.category, t.type)}
+                      <div className="w-9 h-9 rounded-[10px] bg-surface-inset flex items-center justify-center shrink-0 text-content-2">
+                        <CategoryIcon category={t.category} type={t.type} />
                       </div>
                       <div className="min-w-0">
                         <p className="text-[13px] font-medium text-content truncate">

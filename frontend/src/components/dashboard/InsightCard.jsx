@@ -15,7 +15,7 @@ function insightIcon(text) {
 }
 
 /**
- * Painel "Leitura da IA" do dashboard.
+ * Painel "Leitura da Norby" do dashboard.
  *
  * @param {{ summary_text?: string, suggested_action?: string|null } | null} insight
  * @param {boolean} [bloqueada]  plano sem IA: mostra o convite, não um vazio falso
@@ -29,16 +29,14 @@ export default function InsightCard({ insight, bloqueada = false }) {
       <div className="relative flex items-center gap-3">
         <AiOrb size={34} />
         <div>
-          <h2 className="font-semibold text-content">Leitura da IA</h2>
-          <p className="text-[11px] text-accent tracking-wide">
-            resumo do seu comportamento
-          </p>
+          <h2 className="font-semibold text-content">Leitura da Norby</h2>
+          <p className="text-xs text-content-2">Seu mês, em poucas linhas</p>
         </div>
       </div>
       {bloqueada ? (
         <PremiumLock
           className="flex-1 justify-center"
-          title="A leitura da IA é do Norby+"
+          title="A leitura da Norby faz parte do Norby+"
           text="Assine para receber a análise do seu mês e sugestões práticas."
         />
       ) : insightItems.length === 0 ? (

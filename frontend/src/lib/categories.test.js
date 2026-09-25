@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   categoriesFor,
-  emojiForCategory,
+  iconForCategory,
   reconcileCategory,
   EXPENSE_CATEGORIES,
   INCOME_CATEGORIES,
@@ -26,16 +26,17 @@ describe("reconcileCategory", () => {
   });
 });
 
-describe("emojiForCategory", () => {
-  it("dá um emoji para toda categoria conhecida", () => {
+describe("iconForCategory", () => {
+  it("dá um ícone próprio para toda categoria conhecida", () => {
     for (const c of [...EXPENSE_CATEGORIES, ...INCOME_CATEGORIES]) {
-      expect(emojiForCategory(c, "EXPENSE")).toBeTruthy();
+      expect(iconForCategory(c, "EXPENSE")).not.toBe(iconForCategory("Categoria Histórica", "EXPENSE"));
     }
   });
 
   it("cai no genérico por tipo em categoria desconhecida", () => {
     // Categorias históricas, de antes da lista atual, continuam renderizando.
-    expect(emojiForCategory("Categoria Histórica", "INCOME")).toBe("🪙");
-    expect(emojiForCategory("Categoria Histórica", "EXPENSE")).toBe("💸");
+    expect(iconForCategory("Categoria Histórica", "INCOME")).not.toBe(
+      iconForCategory("Categoria Histórica", "EXPENSE"),
+    );
   });
 });

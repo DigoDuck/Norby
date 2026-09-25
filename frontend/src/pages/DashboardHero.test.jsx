@@ -51,7 +51,7 @@ describe("Dashboard hero", () => {
   it("greets the user with a primary CTA to the AI", async () => {
     renderDashboard();
 
-    await screen.findByRole("heading", { name: "Olá, Alice 👋" });
+    await screen.findByRole("heading", { name: /^(Bom dia|Boa tarde|Boa noite), Alice$/ });
 
     expect(screen.getByRole("button", { name: "Falar com a Norby" })).toHaveClass("bg-content");
   });

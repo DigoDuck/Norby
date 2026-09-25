@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Flame } from "lucide-react";
 import { formatBRL, formatDateBR } from "@/lib/utils";
 import { computeRitmo, heatGrid, heatLevel, weeksThatFit, windowDays } from "@/lib/ritmo";
 
@@ -63,7 +64,9 @@ export default function RitmoCard({ transactions, erro = false }) {
         </div>
         {/* Só a partir de 3 dias: sequência curta vira cobrança, não prêmio */}
         {ritmo.hasPace && ritmo.streak >= 3 && (
-          <span className="chip bg-accent/15 text-accent">🔥 {ritmo.streak}</span>
+          <span className="chip bg-accent/15 text-accent">
+            <Flame size={12} aria-hidden="true" /> {ritmo.streak} dias seguidos
+          </span>
         )}
       </div>
 

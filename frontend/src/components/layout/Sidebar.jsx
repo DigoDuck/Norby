@@ -83,14 +83,14 @@ export default function Sidebar() {
           adminItems.map((item) => <NavItem key={item.to} {...item} />)}
       </nav>
 
-      {/* IA do Mês — atalho para o analista */}
+      {/* Norby IA: atalho para a analista */}
       <NavLink
         to="/ai"
         className="group flex items-center gap-3 p-3.5 mb-4 bg-accent/[0.08] border border-accent/20 rounded-2xl transition-colors hover:bg-accent/[0.14] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-focus-offset"
       >
-        <AiOrb size={34} pulse={false} />
+        <AiOrb size={34} />
         <div className="min-w-0">
-          <p className="text-xs font-semibold text-accent">IA do Mês</p>
+          <p className="text-xs font-semibold text-accent">Norby IA</p>
           <p className="text-[11px] text-content-2 leading-snug mt-0.5">
             {iaLiberada
               ? "Análises personalizadas do seu perfil financeiro"
