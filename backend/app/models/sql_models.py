@@ -148,6 +148,12 @@ class RefreshToken(Base):
     # #130: instante da revogação. Dentro de ROTATION_REUSE_GRACE a partir
     # daqui, reapresentar o token vale como resposta perdida, não como roubo.
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # #175: "manter conectado". False = cookie de sessão e teto curto; True =
+    # 7 dias que renovam a cada uso. A rotação herda os dois campos abaixo.
+    remember: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
+    # #175: teto ABSOLUTO da sessão, fixado no login e copiado a cada rotação.
+    # `expires_at` de qualquer sucessor nunca passa dele.
+    session_expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     user: Mapped["User"] = relationship("User", back_populates="refresh_tokens")

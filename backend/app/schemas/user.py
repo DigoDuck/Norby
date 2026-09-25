@@ -23,6 +23,9 @@ class UserRegister(BaseModel):
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
+    # #175: "manter conectado". Default False: quem não marcou (ou um cliente
+    # antigo que não manda o campo) ganha a sessão curta, o lado seguro.
+    remember: bool = False
 
 class UserUpdate(BaseModel):
     # Mesmo tipo do cadastro: sem limite, um nome de 300 chars estourava o
