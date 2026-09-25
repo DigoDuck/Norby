@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Plus,
@@ -29,14 +29,13 @@ import NorthStar from "@/components/shared/NorthStar";
 import InsightCard from "@/components/dashboard/InsightCard";
 import CategoryPie from "@/components/dashboard/CategoryPie";
 import ChartTooltip from "@/components/dashboard/ChartTooltip";
-import RitmoCard from "@/components/dashboard/RitmoCard";
+import RitmoCard, { RITMO_MAX_WEEKS } from "@/components/dashboard/RitmoCard";
 import StatTile from "@/components/dashboard/StatTile";
 import Money from "@/components/shared/Money";
 import WalletMark from "@/components/shared/WalletMark";
 import { useAuthStore } from "@/store/authStore";
 import { formatDateBR, formatBRL, parseDateOnly } from "@/lib/utils";
 import { emojiForCategory } from "@/lib/categories";
-import { computeRitmo } from "@/lib/ritmo";
 
 // Rótulo curto pt-BR de uma chave ano-mês ("2026-07" → "jul"), em horário local.
 const monthLabel = (ym) => {
@@ -69,8 +68,6 @@ function relativeDay(value) {
   return formatDateBR(value);
 }
 
-// Janela do heatmap "Ritmo financeiro" (dias, terminando hoje)
-const STREAK_DAYS = 42;
 
 // Meses (1-12/ano) que a janela de N dias terminando hoje atravessa.
 function monthsForWindow(days) {
@@ -101,7 +98,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     async function loadData() {
-      const streakMonths = monthsForWindow(STREAK_DAYS);
+      const streakMonths = monthsForWindow(RITMO_MAX_WEEKS * 7);
       // allSettled: falha de um painel (ex.: IA) não derruba os demais
       const [wRes, tRes, sRes, iRes, gRes, ...streakRes] =
         await Promise.allSettled([
@@ -195,14 +192,6 @@ export default function Dashboard() {
       );
     };
 
-  // ── Ritmo financeiro: 42 dias, "no ritmo" = gasto do dia abaixo da cota ──
-  // Regra e testes em lib/ritmo.js.
-  const ritmo = useMemo(
-    () => computeRitmo(streakTx, STREAK_DAYS, new Date()),
-    [streakTx],
-  );
-
-
   // ── Meta em destaque: a SAVINGS mais próxima de concluir ──
   const featuredGoal = goals
     .filter((g) => g.type === "SAVINGS")
@@ -259,7 +248,7 @@ export default function Dashboard() {
         </Button>
       </header>
 
-      {/* ── Linha 1: saldo (4) + KPIs do mês (5) + ritmo (3) ──────────── */}
+      {/* ── Linha 1: saldo (4) + KPIs do mês (5) + meta (3) ───────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         <section className="lg:col-span-4 panel p-6 flex flex-col gap-5">
           <div className="flex items-center justify-between gap-3">
@@ -365,13 +354,6 @@ export default function Dashboard() {
           />
         </section>
 
-        <RitmoCard ritmo={ritmo} dias={STREAK_DAYS} />
-      </div>
-
-      {/* ── Linha 2: categorias + meta + leitura da IA ──────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        <CategoryPie data={categoryData} total={categoryTotal} />
-
         {/* Meta em destaque */}
         <div className="lg:col-span-3 panel p-6 flex flex-col">
           {featuredGoal ? (
@@ -448,13 +430,17 @@ export default function Dashboard() {
             </>
           )}
         </div>
-
-        <InsightCard insight={insight} />
       </div>
 
-      {/* ── Linha 3: fluxo de caixa ──────────────────────────────────── */}
+      {/* ── Linha 2: ritmo (7, largo para caber semanas) + categorias (5) ── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        <div className="lg:col-span-12 panel p-6">
+        <RitmoCard transactions={streakTx} />
+        <CategoryPie data={categoryData} total={categoryTotal} />
+      </div>
+
+      {/* ── Linha 3: fluxo de caixa + leitura da IA ─────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        <div className="lg:col-span-8 panel p-6">
           <div className="flex items-start justify-between mb-4">
             <div>
               <h2 className="font-semibold text-content">Fluxo de caixa</h2>
@@ -537,6 +523,8 @@ export default function Dashboard() {
             </ResponsiveContainer>
           )}
         </div>
+
+        <InsightCard insight={insight} />
       </div>
 
       {/* ── Linha 4: gastos por categoria + movimentações recentes ──── */}

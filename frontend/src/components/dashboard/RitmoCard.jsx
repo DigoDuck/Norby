@@ -1,5 +1,6 @@
+import { useEffect, useMemo, useRef, useState } from "react";
 import { formatBRL, formatDateBR } from "@/lib/utils";
-import { heatGrid, heatLevel } from "@/lib/ritmo";
+import { computeRitmo, heatGrid, heatLevel, weeksThatFit, windowDays } from "@/lib/ritmo";
 
 // Intensidade do heatmap: escala sequencial própria (--heat-*), nunca a paleta
 // categórica da pizza — reusá-la aqui faria o painel parecer que codifica
@@ -10,18 +11,45 @@ const heatColor = (level) =>
 // Rótulo só em seg/qua/sex, como no GitHub: sete rótulos empilhados viram ruído.
 const DIAS = ["", "Seg", "", "Qua", "", "Sex", ""];
 
+// Quantos lançamentos o dashboard busca para o painel: meio ano.
+export const RITMO_MAX_WEEKS = 26;
+
+// Quadrado de ~30px, o tamanho dos 14x3 de antes. A grade cresce em semanas até
+// preencher a largura; a célula nunca estica.
+const FIT = { cell: 30, gap: 4, label: 30, min: 4, max: RITMO_MAX_WEEKS };
+
 /**
  * Painel "Ritmo financeiro": dias dentro da cota diária, com streak como bônus.
  *
- * @param {ReturnType<import("@/lib/ritmo").computeRitmo>} ritmo
- * @param {number} dias  tamanho da janela (só para os rótulos)
+ * O tamanho da janela vem da largura: cabem N semanas de quadrados de ~30px,
+ * então são N semanas (de um domingo até hoje) que entram no cálculo e na frase.
+ *
+ * @param {Array} transactions  lançamentos das últimas RITMO_MAX_WEEKS semanas
  */
-export default function RitmoCard({ ritmo, dias }) {
+export default function RitmoCard({ transactions }) {
+  const gridRef = useRef(null);
+  const [semanas, setSemanas] = useState(6);
+
+  useEffect(() => {
+    const el = gridRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return undefined;
+    const ro = new ResizeObserver(([entry]) =>
+      setSemanas(weeksThatFit(entry.contentRect.width, FIT)),
+    );
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const dias = windowDays(semanas);
+  const ritmo = useMemo(
+    () => computeRitmo(transactions, dias, new Date()),
+    [transactions, dias],
+  );
   const { weeks, months } = heatGrid(ritmo.cells);
   const hoje = ritmo.cells.at(-1)?.key;
 
   return (
-    <div className="lg:col-span-3 panel p-6 flex flex-col">
+    <div className="lg:col-span-7 panel p-6 flex flex-col">
       <div className="flex items-start justify-between gap-2">
         <div>
           <h2 className="font-semibold text-content">Ritmo financeiro</h2>
@@ -43,6 +71,7 @@ export default function RitmoCard({ ritmo, dias }) {
           ignorado por boa parte dos leitores de tela, então o painel inteiro só
           existia para quem usa mouse e enxerga. */}
       <div
+        ref={gridRef}
         role="img"
         aria-label={
           ritmo.hasPace
@@ -50,9 +79,8 @@ export default function RitmoCard({ ritmo, dias }) {
             : `Sem ritmo calculado nos últimos ${dias} dias`
         }
         // Uma grade só, coluna a coluna: rótulo dos dias + uma coluna por
-        // semana, cada uma com 1fr da largura. As células são quadradas e
-        // preenchem o card; o teto de 40px de altura evita quadrados enormes
-        // em card largo (celular deitado, tablet), onde a célula alarga.
+        // semana. Como o número de semanas vem da largura, o 1fr de cada
+        // coluna fica perto dos 30px e a célula sai quadrada.
         className="grid grid-flow-col gap-1 mt-4"
         style={{
           gridTemplateRows: "auto repeat(7, auto)",
@@ -89,7 +117,7 @@ export default function RitmoCard({ ritmo, dias }) {
                     : "sem lançamentos"
                 }`}
                 style={{ backgroundColor: heatColor(heatLevel(cell, ritmo.dailyPace)) }}
-                className={`heat-cell w-full aspect-square max-h-10 ${
+                className={`heat-cell w-full aspect-square ${
                   cell.key === hoje
                     ? "ring-1 ring-accent ring-offset-1 ring-offset-surface"
                     : ""

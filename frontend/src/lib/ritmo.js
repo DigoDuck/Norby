@@ -121,3 +121,21 @@ export function heatGrid(cells) {
   });
   return { weeks, months };
 }
+
+/**
+ * Dias de uma janela de `weeks` semanas que começa num domingo e termina hoje:
+ * as semanas anteriores inteiras mais domingo..hoje. Assim a primeira coluna
+ * da grade nunca começa com casas vazias.
+ */
+export function windowDays(weeks, today = new Date()) {
+  return (weeks - 1) * 7 + today.getDay() + 1;
+}
+
+/**
+ * Quantas semanas cabem numa largura com células de `cell` px: é a grade que
+ * se ajusta à largura, como no GitHub, e não a célula que estica.
+ */
+export function weeksThatFit(width, { cell, gap, label, min, max }) {
+  const cabem = Math.floor((width - label + gap) / (cell + gap));
+  return Math.min(max, Math.max(min, cabem));
+}

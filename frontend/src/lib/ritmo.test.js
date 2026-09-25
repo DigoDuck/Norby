@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeRitmo, headroom, heatLevel, heatGrid } from "./ritmo";
+import { computeRitmo, headroom, heatLevel, heatGrid, windowDays, weeksThatFit } from "./ritmo";
 
 // Janela curta e data fixa: o cálculo depende de "hoje", então nada de new Date().
 const TODAY = new Date(2026, 6, 16); // 16/07/2026
@@ -148,5 +148,37 @@ describe("heatGrid", () => {
 
   it("rotula o mês na primeira coluna e onde um mês começa", () => {
     expect(grid.months).toEqual(["Ago", "", "", "Set", "", "", ""]);
+  });
+});
+
+describe("windowDays", () => {
+  it("começa num domingo e termina hoje, então toda coluna fica cheia", () => {
+    const sexta = new Date(2026, 8, 25);
+    const dias = windowDays(6, sexta);
+    expect(dias).toBe(41); // 5 semanas cheias + domingo a sexta
+    const r = computeRitmo([], dias, sexta);
+    expect(r.cells[0].weekday).toBe(0);
+    expect(heatGrid(r.cells).weeks[0][0]).not.toBeNull();
+  });
+
+  it("num domingo a última coluna tem um dia só", () => {
+    expect(windowDays(3, new Date(2026, 8, 27))).toBe(15);
+  });
+});
+
+describe("weeksThatFit", () => {
+  const opts = { cell: 30, gap: 4, label: 30, min: 4, max: 26 };
+
+  it("cabe o que a largura permite, com quadrados de ~30px", () => {
+    // 30 do rótulo + 16 colunas de 34 = 574
+    expect(weeksThatFit(574, opts)).toBe(16);
+  });
+
+  it("nunca passa do máximo que o painel busca", () => {
+    expect(weeksThatFit(5000, opts)).toBe(26);
+  });
+
+  it("card estreito ainda mostra o mínimo", () => {
+    expect(weeksThatFit(80, opts)).toBe(4);
   });
 });
