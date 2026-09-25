@@ -126,7 +126,7 @@ export default function Wallets() {
         </div>
         <Button
           onClick={openNew}
-          className="bg-accent-fill text-accent-contrast hover:bg-accent-fill/90 font-medium"
+          className="font-medium"
         >
           <Plus size={16} /> Nova carteira
         </Button>
@@ -211,7 +211,7 @@ export default function Wallets() {
               <Button
                 onClick={handleSave}
                 disabled={saving}
-                className="flex-[1.4] bg-accent-fill text-accent-contrast hover:bg-accent-fill/90 font-medium"
+                className="flex-[1.4] font-medium"
               >
                 {saving
                   ? "Salvando…"

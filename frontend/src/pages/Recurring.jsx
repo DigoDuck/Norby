@@ -163,7 +163,7 @@ export default function Recurring() {
         <Dialog open={open} onOpenChange={handleOpenChange}>
           <DialogTrigger
             render={
-              <Button className="bg-accent-fill text-accent-contrast hover:bg-accent-fill/90 font-medium" />
+              <Button className="font-medium" />
             }
           >
             <Plus size={16} className="mr-1" /> Nova Recorrência
@@ -339,7 +339,7 @@ export default function Recurring() {
               <Button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full bg-accent-fill text-accent-contrast hover:bg-accent-fill/90 font-medium"
+                className="w-full font-medium"
               >
                 {isSubmitting ? "Salvando…" : "Criar recorrência"}
               </Button>

@@ -221,7 +221,7 @@ export default function PlanCard() {
           <Button
             onClick={() => abrir("checkout")}
             disabled={carregando !== ""}
-            className="bg-accent-fill text-accent-contrast hover:bg-accent-fill/90 font-medium"
+            className="font-medium"
           >
             {carregando === "checkout" ? "Abrindo…" : "Assinar"}
           </Button>

@@ -343,7 +343,7 @@ export default function Settings() {
 
         <Button
           onClick={handleSave}
-          className="mt-5 bg-accent-fill text-accent-contrast hover:bg-accent-fill/90 font-medium"
+          className="mt-5 font-medium"
         >
           <Save size={15} /> {saved ? "Salvo!" : "Salvar alterações"}
         </Button>

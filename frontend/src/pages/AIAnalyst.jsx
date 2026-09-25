@@ -113,7 +113,7 @@ export default function AIAnalyst() {
       <button
         type="button"
         onClick={newConversation}
-        className="flex w-full items-center justify-center gap-2 rounded-full bg-accent-fill py-2.5 text-sm font-semibold text-accent-contrast transition-colors hover:bg-accent-fill/90 active:scale-[0.98]"
+        className="flex w-full items-center justify-center gap-2 rounded-full bg-content py-2.5 text-sm font-semibold text-bg-base transition-colors hover:bg-content/85 active:scale-[0.98]"
       >
         <Plus size={16} /> Nova conversa
       </button>
@@ -273,7 +273,7 @@ export default function AIAnalyst() {
                 onClick={sendMessage}
                 disabled={loading || !input.trim()}
                 size="icon-lg"
-                className="shrink-0 rounded-xl bg-accent-fill text-accent-contrast hover:bg-accent-fill/90 disabled:opacity-40"
+                className="shrink-0 rounded-xl disabled:opacity-40"
               >
                 <Send size={17} />
                 <span className="sr-only">Enviar</span>

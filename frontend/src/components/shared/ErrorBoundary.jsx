@@ -42,7 +42,7 @@ export default class ErrorBoundary extends Component {
           </p>
           <Button
             onClick={() => window.location.reload()}
-            className="mt-6 bg-accent-fill text-accent-contrast hover:bg-accent-fill/90"
+            className="mt-6"
           >
             Recarregar
           </Button>

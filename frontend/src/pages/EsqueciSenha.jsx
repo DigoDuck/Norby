@@ -89,7 +89,7 @@ export default function EsqueciSenha() {
         <Button
           type="submit"
           disabled={isSubmitting}
-          className="w-full bg-accent-fill font-medium text-accent-contrast hover:bg-accent-fill/90"
+          className="w-full font-medium"
         >
           {isSubmitting ? "Enviando…" : "Enviar link"}
         </Button>

@@ -196,7 +196,7 @@ export default function Goals() {
               ultimoGatilho.current = e.currentTarget;
             }}
             render={
-              <Button className="bg-accent-fill text-accent-contrast hover:bg-accent-fill/90 font-medium" />
+              <Button className="font-medium" />
             }
           >
             <Plus size={16} /> Nova meta
@@ -327,7 +327,7 @@ export default function Goals() {
                 <Button
                   type="submit"
                   disabled={isSubmitting}
-                  className="flex-[1.4] bg-accent-fill text-accent-contrast hover:bg-accent-fill/90 font-medium"
+                  className="flex-[1.4] font-medium"
                 >
                   {isSubmitting ? "Salvando…" : editing ? "Salvar" : "Criar meta"}
                 </Button>
@@ -354,7 +354,7 @@ export default function Goals() {
             </div>
             <Button
               onClick={() => navigate("/ai")}
-              className="bg-accent-fill text-accent-contrast hover:bg-accent-fill/90 font-medium shrink-0"
+              className="font-medium shrink-0"
             >
               Conversar com a Norby <ArrowRight size={15} />
             </Button>

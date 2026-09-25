@@ -324,7 +324,7 @@ export default function Transactions() {
             render={
               <Button
                 onClick={openNew}
-                className="bg-accent-fill text-accent-contrast hover:bg-accent-fill/90 font-medium"
+                className="font-medium"
               />
             }
           >
@@ -459,7 +459,7 @@ export default function Transactions() {
               <Button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full bg-accent-fill text-accent-contrast hover:bg-accent-fill/90 font-medium"
+                className="w-full font-medium"
               >
                 {isSubmitting
                   ? "Salvando..."
