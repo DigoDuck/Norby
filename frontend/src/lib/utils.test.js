@@ -1,5 +1,22 @@
 import { describe, it, expect } from "vitest";
-import { apiErrorMessage, formatDateBR, toDateInput, parseDateOnly } from "./utils";
+import { apiErrorMessage, formatBRL, formatDateBR, formatPct, formatSinal, toDateInput, parseDateOnly } from "./utils";
+
+describe("formato de dinheiro e percentual", () => {
+  it("negativo leva o sinal de menos antes do R$, não depois", () => {
+    expect(formatBRL(-200)).toBe("−R$ 200,00");
+    expect(formatBRL(1234.5)).toBe("R$ 1.234,50");
+  });
+
+  it("lançamento tem um formato só: +R$ para entrada, −R$ para saída", () => {
+    expect(formatSinal("45.9", false)).toBe("−R$ 45,90");
+    expect(formatSinal(6200, true)).toBe("+R$ 6.200,00");
+  });
+
+  it("percentual com vírgula decimal, sem sinal (a seta diz a direção)", () => {
+    expect(formatPct(13.84)).toBe("13,8%");
+    expect(formatPct(-191.2, 0)).toBe("191%");
+  });
+});
 
 describe("apiErrorMessage", () => {
   it("never shows the raw detail of a server error", () => {

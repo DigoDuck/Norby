@@ -146,21 +146,12 @@ export default function Wallets() {
           className="bg-surface border-line/10 text-content"
         >
           <DialogHeader>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-accent-fill flex items-center justify-center shrink-0">
-                <Wallet size={20} className="text-accent-contrast" />
-              </div>
-              <div>
-                <DialogTitle>
-                  {editing ? "Editar carteira" : "Nova carteira"}
-                </DialogTitle>
-                <p className="text-xs text-content-2 mt-0.5">
-                  {editing
-                    ? "Atualize o nome desta carteira"
-                    : "Adicione uma conta para acompanhar"}
-                </p>
-              </div>
-            </div>
+            <DialogTitle>{editing ? "Editar carteira" : "Nova carteira"}</DialogTitle>
+            <p className="text-xs text-content-2 mt-0.5">
+              {editing
+                ? "Atualize o nome desta carteira"
+                : "Adicione uma conta para acompanhar"}
+            </p>
           </DialogHeader>
 
           <div className="space-y-4 mt-1">
@@ -209,9 +200,9 @@ export default function Wallets() {
             {error && <p className="text-danger text-xs">{error}</p>}
             <div className="flex gap-2.5 pt-1">
               <Button
-                variant="outline"
+                variant="secondary"
                 onClick={() => handleOpenChange(false)}
-                className="flex-1 border-line/10 bg-transparent text-content-2 hover:bg-state/5"
+                className="flex-1"
               >
                 Cancelar
               </Button>
@@ -287,7 +278,7 @@ export default function Wallets() {
                   </button>
                   <ConfirmDialog
                     title="Remover esta carteira?"
-                    description="A carteira e todas as suas transações serão removidas."
+                    description={`"${w.name}" e todas as transações dela serão removidas.`}
                     confirmLabel="Remover"
                     errorFallback="Não foi possível remover a carteira."
                     onConfirm={() => deleteWallet(w.id)}

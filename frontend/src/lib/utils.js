@@ -51,8 +51,24 @@ export function todayInput() {
 }
 
 /** Formata um valor (número ou string decimal) como moeda pt-BR: "R$ 1.234,56". */
-export const formatBRL = (v) =>
-  `R$ ${Number(v).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+const brl = (v) =>
+  Math.abs(Number(v)).toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
+// Sinal de menos tipográfico (U+2212), antes do R$: "−R$ 200,00". O hífen
+// depois do símbolo ("R$ -200,00") era o que o toLocaleString dava sozinho.
+const MENOS = "−";
+
+export const formatBRL = (v) => `${Number(v) < 0 ? MENOS : ""}R$ ${brl(v)}`;
+
+/** Lançamento com sinal explícito, igual em todas as telas: +R$ / −R$. */
+export const formatSinal = (v, entrada) => `${entrada ? "+" : MENOS}R$ ${brl(v)}`;
+
+/** Percentual em pt-BR ("13,8%"), sem sinal: a seta ao lado diz a direção. */
+export const formatPct = (v, casas = 1) =>
+  `${Math.abs(v).toLocaleString("pt-BR", { maximumFractionDigits: casas })}%`;
 
 /**
  * Mensagem de erro da API, segura para renderizar.

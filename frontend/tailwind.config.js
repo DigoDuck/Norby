@@ -30,6 +30,7 @@ export default {
           income: c("--income"),
           expense: c("--expense"),
           danger: c("--danger"),
+          "danger-fill": c("--danger-fill"),
           warning: c("--warning"),
 
           "chart-1": c("--chart-1"),

@@ -1,4 +1,5 @@
 import { ArrowDownRight, ArrowUpRight } from "lucide-react";
+import { formatPct } from "@/lib/utils";
 
 /**
  * Tile de KPI: rótulo + ícone num círculo, número grande e a variação contra o
@@ -59,7 +60,7 @@ export default function StatTile({
         {delta !== undefined && (
           <span className={chip}>
             {delta >= 0 ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
-            {Math.abs(delta).toFixed(0)}%
+            {formatPct(delta, 0)}
           </span>
         )}
         <span className={highlight ? "" : "text-content-3"}>

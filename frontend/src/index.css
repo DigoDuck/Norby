@@ -46,6 +46,9 @@
   --income: 13 217 134;          /* #0DD986 */
   --expense: 255 82 96;          /* #FF5260 */
   --danger: 255 82 96;
+  /* Preenchimento de botão destrutivo: o #FF5260 com texto branco dá 3,2:1.
+     Um passo mais escuro passa 4,8:1; --danger segue sendo o de texto. */
+  --danger-fill: 220 38 38;
   --warning: 251 146 60;
 
   /* Paleta categórica: hoje só dá cor ao chip de carteira sem banco
@@ -111,6 +114,7 @@
   --income: 3 102 60;            /* #03663C — 7,0:1 no branco, 5,3:1 na pílula a 20% */
   --expense: 187 6 30;           /* #BB061E — 6,7:1 */
   --danger: 187 6 30;
+  --danger-fill: 187 6 30;
   --warning: 194 65 12;          /* #C2410C */
 
   --chart-1: 235 104 52;         /* #EB6834 */
@@ -174,6 +178,14 @@
   body {
     @apply bg-bg-base text-content antialiased;
     font-family: theme('fontFamily.sans');
+  }
+  /* Foco visível em TODO elemento interativo. Os primitivos já desenham um
+     anel próprio (e o `focus-visible:outline-none` deles vence esta regra);
+     botões crus, como filtros, ícones da tabela e sessões da IA, caíam no
+     outline padrão, quase preto sobre o tema escuro. */
+  :where(button, a, [role="button"], summary, [tabindex]):focus-visible {
+    outline: 2px solid rgb(var(--focus));
+    outline-offset: 2px;
   }
   /* Números monetários/tabela: figuras tabulares (precisão, sem layout shift) */
   .tnum { font-variant-numeric: tabular-nums; }

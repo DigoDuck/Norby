@@ -9,7 +9,7 @@ import { transactionsApi } from "@/api/transactions";
 import { walletsApi } from "@/api/wallets";
 import { categoriesFor, emojiForCategory, reconcileCategory, TRANSACTION_TYPE_OPTIONS } from "@/lib/categories";
 import { transactionSchema } from "@/lib/schemas";
-import { apiErrorMessage, formatDateBR, formatBRL, inputCls, toDateInput, todayInput } from "@/lib/utils";
+import { apiErrorMessage, formatDateBR, inputCls, toDateInput, todayInput, formatSinal } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 
 import { Button } from "@/components/ui/button";
@@ -330,13 +330,16 @@ export default function Transactions() {
               />
             }
           >
-            <Plus size={16} className="mr-1" /> Nova Transação
+            <Plus size={16} className="mr-1" /> Nova transação
           </DialogTrigger>
           <DialogContent className="bg-surface border-line/10 text-content">
             <DialogHeader>
               <DialogTitle>
-                {editing ? "Editar Transação" : "Nova Transação"}
+                {editing ? "Editar transação" : "Nova transação"}
               </DialogTitle>
+              <p className="text-xs text-content-2 mt-0.5">
+                Uma entrada ou saída de uma das suas carteiras
+              </p>
             </DialogHeader>
 
             {/* eslint-disable-next-line react-hooks/refs -- falso positivo
@@ -458,17 +461,27 @@ export default function Transactions() {
                 <p className="text-danger text-xs">{serverError}</p>
               )}
 
-              <Button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full font-medium"
-              >
-                {isSubmitting
-                  ? "Salvando..."
-                  : editing
-                    ? "Salvar alterações"
-                    : "Registrar Transação"}
-              </Button>
+              <div className="flex gap-2.5 pt-1">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => handleOpenChange(false)}
+                  className="flex-1"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="flex-[1.4] font-medium"
+                >
+                  {isSubmitting
+                    ? "Salvando…"
+                    : editing
+                      ? "Salvar alterações"
+                      : "Registrar transação"}
+                </Button>
+              </div>
             </form>
           </DialogContent>
         </Dialog>
@@ -578,8 +591,7 @@ export default function Transactions() {
                     t.type === "INCOME" ? "text-income" : "text-expense"
                   }`}
                 >
-                  {t.type === "INCOME" ? "+" : "-"}
-                  {formatBRL(t.amount)}
+                  {formatSinal(t.amount, t.type === "INCOME")}
                 </td>
                 <td className="px-4 py-3 text-sm text-content-2 tnum">
                   {formatDateBR(t.date)}
@@ -589,20 +601,21 @@ export default function Transactions() {
                     <button
                       type="button"
                       onClick={() => openEdit(t)}
-                      className="text-content-3 hover:text-content transition-colors"
+                      className="grid place-items-center size-8 rounded-md text-content-3 hover:text-content hover:bg-state/[0.06] transition-colors"
                     >
                       <Pencil size={16} />
                       <span className="sr-only">Editar transação</span>
                     </button>
                     <ConfirmDialog
                       title="Remover esta transação?"
+                      description={`${t.description || t.category} · ${formatSinal(t.amount, t.type === "INCOME")} · ${formatDateBR(t.date)}`}
                       confirmLabel="Remover"
                       errorFallback="Não foi possível remover a transação."
                       onConfirm={() => deleteTransaction(t.id)}
                       trigger={
                         <button
                           type="button"
-                          className="text-content-3 hover:text-danger transition-colors"
+                          className="grid place-items-center size-8 rounded-md text-content-3 hover:text-danger hover:bg-danger/10 transition-colors"
                         >
                           <Trash2 size={16} />
                           <span className="sr-only">Excluir transação</span>
@@ -634,8 +647,7 @@ export default function Transactions() {
                     t.type === "INCOME" ? "text-income" : "text-expense"
                   }`}
                 >
-                  {t.type === "INCOME" ? "+" : "-"}
-                  {formatBRL(t.amount)}
+                  {formatSinal(t.amount, t.type === "INCOME")}
                 </p>
               </div>
 
@@ -652,20 +664,21 @@ export default function Transactions() {
                   <button
                     type="button"
                     onClick={() => openEdit(t)}
-                    className="text-content-3 hover:text-content transition-colors"
+                    className="grid place-items-center size-8 rounded-md text-content-3 hover:text-content hover:bg-state/[0.06] transition-colors"
                   >
                     <Pencil size={16} />
                     <span className="sr-only">Editar transação</span>
                   </button>
                   <ConfirmDialog
                     title="Remover esta transação?"
+                      description={`${t.description || t.category} · ${formatSinal(t.amount, t.type === "INCOME")} · ${formatDateBR(t.date)}`}
                     confirmLabel="Remover"
                     errorFallback="Não foi possível remover a transação."
                     onConfirm={() => deleteTransaction(t.id)}
                     trigger={
                       <button
                         type="button"
-                        className="text-content-3 hover:text-danger transition-colors"
+                        className="grid place-items-center size-8 rounded-md text-content-3 hover:text-danger hover:bg-danger/10 transition-colors"
                       >
                         <Trash2 size={16} />
                         <span className="sr-only">Excluir transação</span>

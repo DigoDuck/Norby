@@ -210,17 +210,10 @@ export default function Goals() {
             className="bg-surface border-line/10 text-content"
           >
             <DialogHeader>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-accent-fill flex items-center justify-center shrink-0">
-                  <Target size={20} className="text-accent-contrast" />
-                </div>
-                <div>
-                  <DialogTitle>{editing ? "Editar meta" : "Nova meta"}</DialogTitle>
-                  <p className="text-xs text-content-2 mt-0.5">
-                    Poupança para um objetivo ou orçamento de uma categoria
-                  </p>
-                </div>
-              </div>
+              <DialogTitle>{editing ? "Editar meta" : "Nova meta"}</DialogTitle>
+              <p className="text-xs text-content-2 mt-0.5">
+                Poupança para um objetivo ou orçamento de uma categoria
+              </p>
             </DialogHeader>
 
             <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="space-y-3 mt-1">
@@ -322,9 +315,9 @@ export default function Goals() {
               <div className="flex gap-2.5 pt-1">
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="secondary"
                   onClick={() => handleOpenChange(false)}
-                  className="flex-1 border-line/10 bg-transparent text-content-2 hover:bg-state/5"
+                  className="flex-1"
                 >
                   Cancelar
                 </Button>
@@ -510,6 +503,7 @@ export default function Goals() {
                 </button>
                 <ConfirmDialog
                   title="Remover esta meta?"
+                  description={`"${g.name}" sai da sua lista de metas.`}
                   confirmLabel="Remover"
                   errorFallback="Não foi possível remover a meta."
                   onConfirm={() => deleteGoal(g.id)}

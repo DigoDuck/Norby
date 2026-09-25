@@ -9,7 +9,7 @@ import { recurringApi } from "@/api/recurring";
 import { walletsApi } from "@/api/wallets";
 import { categoriesFor, reconcileCategory, TRANSACTION_TYPE_OPTIONS } from "@/lib/categories";
 import { recurringSchema } from "@/lib/schemas";
-import { apiErrorMessage, formatDateBR, formatBRL, inputCls } from "@/lib/utils";
+import { apiErrorMessage, formatDateBR, inputCls, formatSinal } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 
 import { Button } from "@/components/ui/button";
@@ -165,11 +165,14 @@ export default function Recurring() {
               <Button className="font-medium" />
             }
           >
-            <Plus size={16} className="mr-1" /> Nova Recorrência
+            <Plus size={16} className="mr-1" /> Nova recorrência
           </DialogTrigger>
           <DialogContent className="bg-surface border-line/10 text-content">
             <DialogHeader>
               <DialogTitle>Nova recorrência</DialogTitle>
+              <p className="text-xs text-content-2 mt-0.5">
+                Uma conta ou receita que o Norby lança sozinho na data
+              </p>
             </DialogHeader>
 
             <form
@@ -335,13 +338,23 @@ export default function Recurring() {
                 <p className="text-danger text-xs">{serverError}</p>
               )}
 
-              <Button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full font-medium"
-              >
-                {isSubmitting ? "Salvando…" : "Criar recorrência"}
-              </Button>
+              <div className="flex gap-2.5 pt-1">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => handleOpenChange(false)}
+                  className="flex-1"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="flex-[1.4] font-medium"
+                >
+                  {isSubmitting ? "Salvando…" : "Criar recorrência"}
+                </Button>
+              </div>
             </form>
           </DialogContent>
         </Dialog>
@@ -386,8 +399,7 @@ export default function Recurring() {
                   it.type === "INCOME" ? "text-income" : "text-expense"
                 }`}
               >
-                <span aria-hidden="true">{it.type === "INCOME" ? "↑" : "↓"}</span>{" "}
-                {it.type === "INCOME" ? "+" : "−"} {formatBRL(it.amount)}
+                {formatSinal(it.amount, it.type === "INCOME")}
               </span>
               <span className="text-xs text-content-3 tnum lg:min-w-40">
                 Próx. {formatDateBR(it.next_run_date)}
@@ -409,6 +421,7 @@ export default function Recurring() {
               </button>
               <ConfirmDialog
                 title="Remover esta recorrência?"
+                description={`${it.description || it.category} · ${formatSinal(it.amount, it.type === "INCOME")}. Os lançamentos já feitos continuam.`}
                 confirmLabel="Remover"
                 errorFallback="Não foi possível remover a recorrência."
                 onConfirm={() => deleteRecurring(it.id)}

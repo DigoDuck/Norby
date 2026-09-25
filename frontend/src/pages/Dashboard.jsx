@@ -37,7 +37,7 @@ import WalletMark from "@/components/shared/WalletMark";
 import { LoadError } from "@/components/shared/LoadState";
 import { usePlano } from "@/lib/plan";
 import { useAuthStore } from "@/store/authStore";
-import { formatDateBR, formatBRL, parseDateOnly } from "@/lib/utils";
+import { formatDateBR, formatBRL, parseDateOnly, formatSinal, formatPct } from "@/lib/utils";
 import { emojiForCategory } from "@/lib/categories";
 
 // Rótulo curto pt-BR de uma chave ano-mês ("2026-07" → "jul"), em horário local.
@@ -325,7 +325,7 @@ export default function Dashboard() {
                   ) : (
                     <ArrowDownRight size={12} />
                   )}
-                  {Math.abs(balanceChange).toFixed(1)}%
+                  {formatPct(balanceChange)}
                 </span>
                 <span className="text-xs text-content-3">vs. mês passado</span>
               </div>
@@ -631,7 +631,7 @@ export default function Dashboard() {
                           : "font-medium text-content-2"
                       }`}
                     >
-                      {isIncome ? "+" : "−"} {formatBRL(parseFloat(t.amount))}
+                      {formatSinal(t.amount, isIncome)}
                     </p>
                   </div>
                 );
