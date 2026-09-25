@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 import { accountApi } from "@/api/account";
@@ -33,9 +33,9 @@ vi.mock("react-router-dom", async (importOriginal) => {
   return { ...actual, useNavigate: () => navigateMock };
 });
 
-function renderSettings() {
+function renderSettings(aba) {
   render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[aba ? `/settings?aba=${aba}` : "/settings"]}>
       <Settings />
     </MemoryRouter>,
   );
@@ -61,7 +61,7 @@ describe("Settings", () => {
 
   it("exige e envia a senha atual ao excluir a conta", async () => {
     accountApi.deleteAccount.mockResolvedValue({ status: 204 });
-    renderSettings();
+    renderSettings("conta");
 
     const button = screen.getByRole("button", {
       name: "Excluir minha conta permanentemente",
@@ -86,7 +86,7 @@ describe("Settings", () => {
 
   it("mostra uma mensagem específica quando a senha está incorreta", async () => {
     accountApi.deleteAccount.mockRejectedValue({ response: { status: 401 } });
-    renderSettings();
+    renderSettings("conta");
     fillDeleteConfirmation("senhaerrada1");
 
     fireEvent.click(
@@ -102,7 +102,7 @@ describe("Settings", () => {
     accountApi.exportData.mockRejectedValue({
       response: { status: 429, data: { error: "rate limited" } },
     });
-    renderSettings();
+    renderSettings("privacidade");
 
     fireEvent.click(screen.getByRole("button", { name: /Exportar/ }));
 
@@ -115,13 +115,38 @@ describe("Settings", () => {
     // Clicar no rótulo tem que focar o campo, e o leitor de tela precisa
     // anunciar o nome — placeholder some ao digitar e não serve como rótulo.
     renderSettings();
-
     expect(screen.getByLabelText("Nome completo")).toBeInTheDocument();
     expect(screen.getByLabelText("E-mail")).toBeInTheDocument();
+    cleanup();
+
+    renderSettings("conta");
     expect(
       screen.getByLabelText("Digite EXCLUIR para confirmar"),
     ).toBeInTheDocument();
     expect(screen.getByLabelText("Sua senha atual")).toBeInTheDocument();
+  });
+});
+
+describe("Settings, subabas", () => {
+  beforeEach(() => {
+    useAuthStore.getState().login("access", { name: "Alice", email: "alice@test.com" });
+  });
+
+  it("abre em Perfil por padrão e na aba que a URL pede", () => {
+    renderSettings();
+    expect(screen.getByRole("link", { name: /Perfil/ })).toHaveAttribute("aria-current", "page");
+    cleanup();
+
+    renderSettings("seguranca");
+    expect(screen.getByRole("link", { name: /Segurança/ })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("button", { name: /Sair/ })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Nome completo")).not.toBeInTheDocument();
+  });
+
+  it("sem nada de plano a mostrar, a aba Plano nem aparece", () => {
+    renderSettings("plano");
+    expect(screen.queryByRole("link", { name: /Plano/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Perfil/ })).toHaveAttribute("aria-current", "page");
   });
 });
 
