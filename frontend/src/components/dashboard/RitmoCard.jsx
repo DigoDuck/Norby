@@ -10,9 +10,9 @@ const heatColor = (level) =>
 // Rótulo só em seg/qua/sex, como no GitHub: sete rótulos empilhados viram ruído.
 const DIAS = ["", "Seg", "", "Qua", "", "Sex", ""];
 
-// Linha do mês + 7 dias de 24px: rótulos e semanas usam a mesma grade, senão
-// "Seg" deixa de alinhar com a linha da segunda-feira.
-const ROWS = "grid grid-rows-[1rem_repeat(7,1.5rem)] gap-1";
+// Linha do mês + 7 dias de 12px, como no GitHub: rótulos e semanas usam a
+// mesma grade, senão "Seg" deixa de alinhar com a linha da segunda-feira.
+const ROWS = "grid grid-rows-[1rem_repeat(7,0.75rem)] gap-[3px]";
 
 /**
  * Painel "Ritmo financeiro": dias dentro da cota diária, com streak como bônus.
@@ -53,9 +53,9 @@ export default function RitmoCard({ ritmo, dias }) {
             ? `${ritmo.onPaceCount} dos últimos ${dias} dias dentro do seu ritmo de gasto diário`
             : `Sem ritmo calculado nos últimos ${dias} dias`
         }
-        className="flex gap-1 mt-4 self-start"
+        className="flex gap-[3px] mt-4 self-start"
       >
-        <div className={`${ROWS} pr-1 text-[11px] leading-6 text-content-3`}>
+        <div className={`${ROWS} pr-1.5 text-[11px] leading-3 text-content-3`}>
           <span />
           {DIAS.map((dia, i) => (
             <span key={i}>{dia}</span>
@@ -77,7 +77,7 @@ export default function RitmoCard({ ritmo, dias }) {
                       : "sem lançamentos"
                   }`}
                   style={{ backgroundColor: heatColor(heatLevel(cell, ritmo.dailyPace)) }}
-                  className={`heat-cell size-6 ${
+                  className={`heat-cell size-3 ${
                     cell.key === hoje
                       ? "ring-1 ring-accent ring-offset-1 ring-offset-surface"
                       : ""

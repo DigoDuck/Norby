@@ -1,14 +1,13 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
-import { colorForCategory } from "@/lib/palette";
 import { formatBRL } from "@/lib/utils";
 import ChartTooltip from "./ChartTooltip";
 
+// Cor pela posição da fatia (maior primeiro), num matiz só: a cor mostra o
+// peso, e quem diz a categoria é a legenda, sempre visível ao lado.
+const pieColor = (i) => `rgb(var(--pie-${Math.min(i, 4) + 1}))`;
+
 /**
  * Painel "Onde vai seu dinheiro": pizza do top-5 de despesas do mês + legenda.
- *
- * A legenda não é enfeite: com 9 categorias, algumas cores vizinhas se
- * confundem para daltônicos (ver --chart-* no index.css), então nome, % e
- * valor ficam sempre visíveis ao lado da cor.
  *
  * @param {{ name: string, value: number }[]} data  maior fatia primeiro
  * @param {number} total  soma das fatias (para os percentuais)
@@ -50,8 +49,8 @@ export default function CategoryPie({ data, total }) {
                   strokeWidth={data.length > 1 ? 2 : 0}
                   isAnimationActive={false}
                 >
-                  {data.map((c) => (
-                    <Cell key={c.name} fill={colorForCategory(c.name)} />
+                  {data.map((c, i) => (
+                    <Cell key={c.name} fill={pieColor(i)} />
                   ))}
                 </Pie>
                 <Tooltip content={<ChartTooltip />} cursor={false} />
@@ -62,13 +61,13 @@ export default function CategoryPie({ data, total }) {
           {/* Duas linhas por item: em uma só, nome + valor + % não cabem ao
               lado da pizza e "Contas & Serviços" truncava. */}
           <ul className="flex-1 flex flex-col gap-2 min-w-0">
-            {data.map((c) => {
+            {data.map((c, i) => {
               const pct = total ? Math.round((c.value / total) * 100) : 0;
               return (
                 <li key={c.name} className="flex items-center gap-2.5">
                   <span
                     className="w-2.5 h-2.5 rounded-sm shrink-0"
-                    style={{ background: colorForCategory(c.name) }}
+                    style={{ background: pieColor(i) }}
                   />
                   <span className="flex-1 min-w-0">
                     <span className="block text-xs text-content-2 truncate">{c.name}</span>

@@ -48,14 +48,8 @@
   --danger: 239 68 68;
   --warning: 251 146 60;
 
-  /* Uma cor por categoria de despesa, na ordem de lib/categories.js
-     (Alimentação, Moradia, Transporte, Saúde, Educação, Lazer, Compras,
-     Contas & Serviços, Outros). Degraus da paleta validada da skill dataviz,
-     sem o vermelho (se confundia com o laranja até em visão normal) e com uma
-     ameixa no lugar. Com 9 categorias, qualquer par pode ficar vizinho na
-     pizza, e nenhum conjunto de 8 matizes passa em todos os pares para
-     daltonismo: a legenda com nome, % e valor é a codificação secundária
-     obrigatória, nunca opcional. "Outros" é cinza, a categoria-resto. */
+  /* Paleta categórica: hoje só dá cor ao chip de carteira sem banco
+     (lib/palette.js). Degraus validados da skill dataviz. */
   --chart-1: 217 89 38;          /* #D95926 laranja */
   --chart-2: 57 135 229;         /* #3987E5 azul */
   --chart-3: 25 158 112;         /* #199E70 água */
@@ -68,14 +62,22 @@
   --grid-line: 255 255 255;
   --axis: 161 161 170;
 
-  /* Rampa verde monotônica, como a do GitHub, com mínimo de 3:1 contra o card
-     já no nível 1 (3,8 / 5,7 / 8,3 / 10,8). O 0 é neutro: fora de ritmo ou
-     sem cota, não é dado. */
-  --heat-0: 39 39 42;
-  --heat-1: 21 128 61;           /* dia sem lançamento: no ritmo por omissão */
-  --heat-2: 22 163 74;
-  --heat-3: 34 197 94;
-  --heat-4: 74 222 128;
+  /* Pizza por posição, um matiz só: a maior fatia é a mais clara, porque no
+     escuro claro é o que salta. Quem diz a categoria é a legenda. */
+  --pie-1: 147 197 253;
+  --pie-2: 59 130 246;
+  --pie-3: 37 99 235;
+  --pie-4: 29 78 216;
+  --pie-5: 30 58 138;
+
+  /* Rampa em tinta: cinzas do discreto ao claro, e só o estouro tem cor. O
+     nível 1 (dia sem lançamento) fica quase no fundo de propósito, como a
+     casa vazia do GitHub; o valor de cada dia está no title. */
+  --heat-0: 31 31 34;
+  --heat-1: 50 50 56;
+  --heat-2: 100 100 110;
+  --heat-3: 161 161 170;
+  --heat-4: 228 228 231;
   --heat-over: 248 113 113;      /* estourou a cota diária */
 }
 
@@ -110,8 +112,6 @@
   --danger: 185 28 28;
   --warning: 194 65 12;          /* #C2410C */
 
-  /* Mesmos matizes, degraus do claro. Água, amarelo e magenta ficam abaixo de
-     3:1 sobre branco: a legenda sempre visível é o alívio que isso exige. */
   --chart-1: 235 104 52;         /* #EB6834 */
   --chart-2: 42 120 214;         /* #2A78D6 */
   --chart-3: 27 175 122;         /* #1BAF7A */
@@ -124,13 +124,19 @@
   --grid-line: 9 9 11;
   --axis: 82 82 91;
 
-  /* No claro a intensidade cresce escurecendo (3,3 / 5,0 / 7,0 / 9,1 contra
-     branco). Não é o escuro invertido: os passos são próprios. */
-  --heat-0: 228 228 231;
-  --heat-1: 22 163 74;
-  --heat-2: 21 128 61;
-  --heat-3: 22 101 52;
-  --heat-4: 20 83 45;
+  /* No claro a ênfase inverte: a maior fatia é a mais escura. */
+  --pie-1: 30 58 138;
+  --pie-2: 29 78 216;
+  --pie-3: 37 99 235;
+  --pie-4: 59 130 246;
+  --pie-5: 147 197 253;
+
+  /* No claro a intensidade cresce escurecendo. */
+  --heat-0: 240 240 242;
+  --heat-1: 228 228 231;
+  --heat-2: 161 161 170;
+  --heat-3: 100 100 110;
+  --heat-4: 39 39 42;
   --heat-over: 220 38 38;
 }
 
@@ -234,7 +240,7 @@
 /* Célula do heatmap: azulejo de canto quase reto, como no GitHub. O tamanho
    vem de quem usa (célula ou amostra da legenda); a cor, inline. */
 .heat-cell {
-  @apply rounded-[3px] border border-line/[0.06];
+  @apply rounded-[2px] border border-line/[0.06];
 }
 
 /* Estrela-norte pulsando: substituto de spinner genérico (assinatura da marca) */
