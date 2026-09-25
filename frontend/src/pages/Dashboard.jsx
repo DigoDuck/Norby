@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Plus,
@@ -33,6 +33,7 @@ import RitmoCard, { RITMO_MAX_WEEKS } from "@/components/dashboard/RitmoCard";
 import StatTile from "@/components/dashboard/StatTile";
 import Money from "@/components/shared/Money";
 import WalletMark from "@/components/shared/WalletMark";
+import { LoadError } from "@/components/shared/LoadState";
 import { useAuthStore } from "@/store/authStore";
 import { formatDateBR, formatBRL, parseDateOnly } from "@/lib/utils";
 import { emojiForCategory } from "@/lib/categories";
@@ -96,8 +97,11 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
 
-  useEffect(() => {
-    async function loadData() {
+  // Falha nunca vira zero. Saldo e resumo são o coração da tela: sem eles, a
+  // tela troca os números por um aviso. Os outros painéis falham sozinhos.
+  const [falhas, setFalhas] = useState({});
+
+  const loadData = useCallback(async () => {
       const streakMonths = monthsForWindow(RITMO_MAX_WEEKS * 7);
       // allSettled: falha de um painel (ex.: IA) não derruba os demais
       const [wRes, tRes, sRes, iRes, gRes, ...streakRes] =
@@ -121,10 +125,27 @@ export default function Dashboard() {
           .filter((r) => r.status === "fulfilled")
           .flatMap((r) => r.value.data),
       );
+      const falhou = (r) => r.status === "rejected";
+      setFalhas({
+        core: falhou(wRes) || falhou(sRes),
+        tx: falhou(tRes),
+        goals: falhou(gRes),
+        // Um mês faltando pintaria dias com gasto como dias sem lançamento.
+        ritmo: streakRes.some(falhou),
+      });
       setLoading(false);
-    }
-    loadData();
   }, []);
+
+  useEffect(() => {
+    // Falso positivo: loadData só chama setState depois do await.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadData();
+  }, [loadData]);
+
+  function tentarDeNovo() {
+    setLoading(true);
+    loadData();
+  }
 
   const pctChange = (curr, prev) =>
     prev > 0 ? ((curr - prev) / prev) * 100 : undefined;
@@ -216,6 +237,15 @@ export default function Dashboard() {
     return (
       <div className="flex items-center justify-center h-full">
         <NorthStar size={32} className="text-accent star-loading" />
+      </div>
+    );
+  }
+
+  if (falhas.core) {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-3xl font-bold text-content tracking-tight">Olá, {firstName}</h1>
+        <LoadError what="seu saldo e o resumo do mês" onRetry={tentarDeNovo} />
       </div>
     );
   }
@@ -356,7 +386,9 @@ export default function Dashboard() {
 
         {/* Meta em destaque */}
         <div className="lg:col-span-3 panel p-6 flex flex-col">
-          {featuredGoal ? (
+          {falhas.goals ? (
+            <p className="m-auto py-6 text-xs text-content-3 text-center">Não conseguimos carregar suas metas agora.</p>
+          ) : featuredGoal ? (
             <>
               <div className="relative flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl bg-income/15 flex items-center justify-center shrink-0 text-base">
@@ -434,7 +466,7 @@ export default function Dashboard() {
 
       {/* ── Linha 2: ritmo (7, largo para caber semanas) + categorias (5) ── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        <RitmoCard transactions={streakTx} />
+        <RitmoCard transactions={streakTx} erro={falhas.ritmo} />
         <CategoryPie data={categoryData} total={categoryTotal} />
       </div>
 
@@ -598,7 +630,11 @@ export default function Dashboard() {
           </div>
 
           <div className="flex flex-col flex-1">
-            {transactions.length === 0 ? (
+            {falhas.tx ? (
+              <p className="m-auto py-6 text-xs text-content-3 text-center">
+                Não conseguimos carregar as movimentações agora.
+              </p>
+            ) : transactions.length === 0 ? (
               <div className="flex-1 flex items-center justify-center text-content-3 text-xs text-center py-8">
                 Nenhuma movimentação ainda — use “+ Receita” ou “− Despesa”
                 para começar

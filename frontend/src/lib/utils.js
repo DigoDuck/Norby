@@ -64,6 +64,9 @@ export const formatBRL = (v) =>
  * pré-checa (teto de valor, tamanho de texto), esse 422 é alcançável de fato.
  */
 export function apiErrorMessage(err, fallback) {
+  // 5xx é falha nossa: o detail, quando vem, é texto interno ("boom", trace),
+  // nunca algo que o usuário deva ler. Só 4xx carrega mensagem de negócio.
+  if (err?.response?.status >= 500) return fallback;
   const detail = err?.response?.data?.detail;
   if (typeof detail === "string" && detail) return detail;
   if (Array.isArray(detail) && detail.length) {

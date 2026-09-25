@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useCallback, useId, useRef, useState } from "react";
 import { Plus, Pencil, Trash2, Wallet } from "lucide-react";
 import { walletsApi } from "@/api/wallets";
 import { apiErrorMessage, formatBRL, shadcnInputCls } from "@/lib/utils";
@@ -6,6 +6,8 @@ import { OPCOES_BANCO } from "@/lib/bancos";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import Money from "@/components/shared/Money";
 import WalletMark from "@/components/shared/WalletMark";
+import { LoadError, LoadingCards } from "@/components/shared/LoadState";
+import { useLoad } from "@/lib/useLoad";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MoneyInput } from "@/components/ui/money-input";
@@ -32,18 +34,10 @@ export default function Wallets() {
   // e o usuário de teclado caía no body.
   const ultimoGatilho = useRef(null);
 
-  async function load() {
-    const res = await walletsApi.list();
-    setWallets(res.data);
-  }
-
-  useEffect(() => {
-    // Falso positivo: `load` só chama setState DEPOIS do await, então nada
-    // é síncrono aqui. Buscar dados no mount é o padrão do React quando não
-    // há biblioteca de data fetching, e este projeto não tem uma.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    load();
+  const load = useCallback(async () => {
+    setWallets((await walletsApi.list()).data);
   }, []);
+  const { status, reload } = useLoad(load);
 
   async function handleSave() {
     if (!form.name.trim()) return setError("Informe um nome.");
@@ -117,11 +111,17 @@ export default function Wallets() {
             Carteiras
           </h1>
           <p className="text-content-2 text-sm mt-1">
-            {wallets.length}{" "}
-            {wallets.length === 1 ? "carteira" : "carteiras"} · saldo total{" "}
-            <span className="text-accent font-medium tnum">
-              {formatBRL(totalBalance)}
-            </span>
+            {status === "ok" ? (
+              <>
+                {wallets.length}{" "}
+                {wallets.length === 1 ? "carteira" : "carteiras"} · saldo total{" "}
+                <span className="text-accent font-medium tnum">
+                  {formatBRL(totalBalance)}
+                </span>
+              </>
+            ) : (
+              <span aria-hidden="true" className="inline-block h-3.5 w-48 rounded-full bg-line/[0.07] motion-safe:animate-pulse align-middle" />
+            )}
           </p>
         </div>
         <Button
@@ -226,7 +226,12 @@ export default function Wallets() {
 
       {/* Grid de carteiras */}
       <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-        {wallets.length === 0 && (
+        {status === "loading" && <LoadingCards count={3} className="min-h-[196px]" />}
+        {status === "error" && (
+          <LoadError what="suas carteiras" onRetry={reload} className="col-span-full" />
+        )}
+
+        {status === "ok" && wallets.length === 0 && (
           <div className="col-span-full panel p-10 flex flex-col items-center text-center">
             <div className="w-11 h-11 rounded-xl bg-accent/[0.15] flex items-center justify-center mb-3">
               <Wallet size={20} className="text-accent" />
@@ -297,7 +302,7 @@ export default function Wallets() {
         })}
 
         {/* Card tracejado "adicionar" */}
-        {wallets.length > 0 && (
+        {status === "ok" && wallets.length > 0 && (
           <button
             type="button"
             onClick={openNew}

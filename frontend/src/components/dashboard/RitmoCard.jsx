@@ -26,7 +26,7 @@ const FIT = { cell: 30, gap: 4, label: 30, min: 4, max: RITMO_MAX_WEEKS };
  *
  * @param {Array} transactions  lançamentos das últimas RITMO_MAX_WEEKS semanas
  */
-export default function RitmoCard({ transactions }) {
+export default function RitmoCard({ transactions, erro = false }) {
   const gridRef = useRef(null);
   const [semanas, setSemanas] = useState(6);
 
@@ -67,68 +67,77 @@ export default function RitmoCard({ transactions }) {
         )}
       </div>
 
-      {/* role=img + resumo: o `title` de cada célula é invisível para teclado e
-          ignorado por boa parte dos leitores de tela, então o painel inteiro só
-          existia para quem usa mouse e enxerga. */}
-      <div
-        ref={gridRef}
-        role="img"
-        aria-label={
-          ritmo.hasPace
-            ? `${ritmo.onPaceCount} dos últimos ${dias} dias dentro do seu ritmo de gasto diário`
-            : `Sem ritmo calculado nos últimos ${dias} dias`
-        }
-        // Uma grade só, coluna a coluna: rótulo dos dias + uma coluna por
-        // semana. Como o número de semanas vem da largura, o 1fr de cada
-        // coluna fica perto dos 30px e a célula sai quadrada.
-        className="grid grid-flow-col gap-1 mt-4"
-        style={{
-          gridTemplateRows: "auto repeat(7, auto)",
-          gridTemplateColumns: `auto repeat(${weeks.length}, minmax(0, 1fr))`,
-        }}
-      >
-        <span />
-        {DIAS.map((dia, i) => (
-          <span
-            key={i}
-            className="self-center pr-1.5 text-[11px] leading-none text-content-3"
-          >
-            {dia}
-          </span>
-        ))}
+      {erro ? (
+        <p className="m-auto py-10 text-xs text-content-3 text-center">
+          Não conseguimos carregar todos os seus lançamentos, então o ritmo
+          ficaria errado. Recarregue a página para tentar de novo.
+        </p>
+      ) : (
+        <>
+        {/* role=img + resumo: o `title` de cada célula é invisível para teclado e
+            ignorado por boa parte dos leitores de tela, então o painel inteiro só
+            existia para quem usa mouse e enxerga. */}
+        <div
+          ref={gridRef}
+          role="img"
+          aria-label={
+            ritmo.hasPace
+              ? `${ritmo.onPaceCount} dos últimos ${dias} dias dentro do seu ritmo de gasto diário`
+              : `Sem ritmo calculado nos últimos ${dias} dias`
+          }
+          // Uma grade só, coluna a coluna: rótulo dos dias + uma coluna por
+          // semana. Como o número de semanas vem da largura, o 1fr de cada
+          // coluna fica perto dos 30px e a célula sai quadrada.
+          className="grid grid-flow-col gap-1 mt-4"
+          style={{
+            gridTemplateRows: "auto repeat(7, auto)",
+            gridTemplateColumns: `auto repeat(${weeks.length}, minmax(0, 1fr))`,
+          }}
+        >
+          <span />
+          {DIAS.map((dia, i) => (
+            <span
+              key={i}
+              className="self-center pr-1.5 text-[11px] leading-none text-content-3"
+            >
+              {dia}
+            </span>
+          ))}
 
-        {weeks.map((week, c) => [
-          <span
-            key={`mes-${c}`}
-            className="pb-0.5 text-[11px] leading-4 text-content-3 whitespace-nowrap"
-          >
-            {months[c]}
-          </span>,
-          // Sempre 7 casas por coluna, mesmo na última semana (que termina em
-          // hoje): o fluxo por coluna depende disso para alinhar as linhas.
-          ...Array.from({ length: 7 }, (_, r) => {
-            const cell = week[r];
-            return cell ? (
-              <div
-                key={cell.key}
-                title={`${formatDateBR(cell.key)} · ${
-                  cell.active
-                    ? `${formatBRL(cell.spent)} de ${formatBRL(ritmo.dailyPace)}`
-                    : "sem lançamentos"
-                }`}
-                style={{ backgroundColor: heatColor(heatLevel(cell, ritmo.dailyPace)) }}
-                className={`heat-cell w-full aspect-square ${
-                  cell.key === hoje
-                    ? "ring-1 ring-accent ring-offset-1 ring-offset-surface"
-                    : ""
-                }`}
-              />
-            ) : (
-              <div key={`vazio-${c}-${r}`} />
-            );
-          }),
-        ])}
-      </div>
+          {weeks.map((week, c) => [
+            <span
+              key={`mes-${c}`}
+              className="pb-0.5 text-[11px] leading-4 text-content-3 whitespace-nowrap"
+            >
+              {months[c]}
+            </span>,
+            // Sempre 7 casas por coluna, mesmo na última semana (que termina em
+            // hoje): o fluxo por coluna depende disso para alinhar as linhas.
+            ...Array.from({ length: 7 }, (_, r) => {
+              const cell = week[r];
+              return cell ? (
+                <div
+                  key={cell.key}
+                  title={`${formatDateBR(cell.key)} · ${
+                    cell.active
+                      ? `${formatBRL(cell.spent)} de ${formatBRL(ritmo.dailyPace)}`
+                      : "sem lançamentos"
+                  }`}
+                  style={{ backgroundColor: heatColor(heatLevel(cell, ritmo.dailyPace)) }}
+                  className={`heat-cell w-full aspect-square ${
+                    cell.key === hoje
+                      ? "ring-1 ring-accent ring-offset-1 ring-offset-surface"
+                      : ""
+                  }`}
+                />
+              ) : (
+                <div key={`vazio-${c}-${r}`} />
+              );
+            }),
+          ])}
+        </div>
+        </>
+      )}
 
       <div className="flex flex-wrap items-center justify-between gap-2 mt-auto pt-4 text-[11px] text-content-3">
         <span>Últimos {dias} dias</span>

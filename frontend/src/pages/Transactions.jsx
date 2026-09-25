@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, Search, Trash2, Pencil } from "lucide-react";
+import { LoadError } from "@/components/shared/LoadState";
 
 import { transactionsApi } from "@/api/transactions";
 import { walletsApi } from "@/api/wallets";
@@ -57,7 +58,8 @@ export default function Transactions() {
   const [filterType, setFilterType] = useState("");
   const [offset, setOffset] = useState(0);
   const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(false);
+  // Começa carregando: sem isso o primeiro render já dizia "nenhuma transação".
+  const [loading, setLoading] = useState(true);
   // false quando o header X-Total-Count não chegou (backend antigo, proxy,
   // CORS mal configurado): nesse caso `total` é só o length da página, não o
   // total real, e a UI não pode tratá-lo como se fosse.
@@ -475,7 +477,11 @@ export default function Transactions() {
       {/* Filtros e relatório em uma única superfície */}
       <div className="panel overflow-hidden p-4 sm:p-5">
         {serverError && !open && (
-          <p className="text-danger text-xs pb-3">{serverError}</p>
+          <LoadError
+            what="suas transações"
+            onRetry={() => load(filtroAtivo(), offset)}
+            className="mb-4 border-0 shadow-none"
+          />
         )}
         <div className="inset-panel mb-4 flex flex-col gap-3 p-4 sm:flex-row">
           <div className="relative flex-1 sm:max-w-xs">
@@ -675,7 +681,7 @@ export default function Transactions() {
         {/* Texto genérico de propósito: a frase específica de busca ("...para
             essa busca.") já mora no role="status" logo acima — repeti-la aqui
             faria um leitor de tela ouvir a mesma sentença duas vezes. */}
-        {transactions.length === 0 && (
+        {transactions.length === 0 && !loading && !serverError && (
           <div className="text-center py-12 text-content-3 text-sm">
             Nenhuma transação encontrada.
           </div>

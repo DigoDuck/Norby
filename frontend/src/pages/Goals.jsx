@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -13,6 +13,8 @@ import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { AmountPromptDialog } from "@/components/shared/AmountPromptDialog";
 import Money from "@/components/shared/Money";
 import AiOrb from "@/components/shared/AiOrb";
+import { LoadError, LoadingCards } from "@/components/shared/LoadState";
+import { useLoad } from "@/lib/useLoad";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -75,12 +77,12 @@ export default function Goals() {
   // Observa o type para alternar campos condicionais e o rótulo.
   const type = useWatch({ control, name: "type" });
 
-  async function load() {
+  const load = useCallback(async () => {
     setGoals((await goalsApi.list()).data);
-  }
+  }, []);
+  const { status, reload } = useLoad(load);
 
   useEffect(() => {
-    load(); // eslint-disable-line react-hooks/set-state-in-effect
     aiApi.getInsight().then((r) => setInsight(r.data)).catch(() => {});
   }, []);
 
@@ -176,7 +178,9 @@ export default function Goals() {
             Suas metas
           </h1>
           <p className="text-content-2 text-sm mt-1">
-            {goals.length} {goals.length === 1 ? "meta ativa" : "metas ativas"}
+            {status !== "ok" && <span aria-hidden="true" className="inline-block h-3.5 w-48 rounded-full bg-line/[0.07] motion-safe:animate-pulse align-middle" />}
+            {status === "ok" && goals.length === 0 && "Guarde dinheiro com um objetivo ou limite um tipo de gasto"}
+            {status === "ok" && goals.length > 0 && (goals.length === 1 ? "1 meta ativa" : `${goals.length} metas ativas`)}
             {totalSaved > 0 && (
               <>
                 {" "}· você já guardou{" "}
@@ -364,7 +368,12 @@ export default function Goals() {
 
       {/* Grid de metas */}
       <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-        {goals.length === 0 && (
+        {status === "loading" && <LoadingCards count={3} className="min-h-[220px]" />}
+        {status === "error" && (
+          <LoadError what="suas metas" onRetry={reload} className="col-span-full" />
+        )}
+
+        {status === "ok" && goals.length === 0 && (
           <div className="col-span-full panel p-10 flex flex-col items-center text-center">
             <div className="w-11 h-11 rounded-xl bg-accent/[0.15] flex items-center justify-center mb-3">
               <Target size={20} className="text-accent" />
@@ -521,7 +530,7 @@ export default function Goals() {
         })}
 
         {/* Card tracejado "criar" */}
-        {goals.length > 0 && (
+        {status === "ok" && goals.length > 0 && (
           <button
             type="button"
             onClick={(e) => {

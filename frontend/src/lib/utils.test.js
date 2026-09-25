@@ -2,6 +2,11 @@ import { describe, it, expect } from "vitest";
 import { apiErrorMessage, formatDateBR, toDateInput, parseDateOnly } from "./utils";
 
 describe("apiErrorMessage", () => {
+  it("never shows the raw detail of a server error", () => {
+    const err = { response: { status: 500, data: { detail: "boom" } } };
+    expect(apiErrorMessage(err, "Não foi possível carregar.")).toBe("Não foi possível carregar.");
+  });
+
   it("passes through the string detail of a business error", () => {
     const err = { response: { data: { detail: "Email já cadastrado" } } };
     expect(apiErrorMessage(err, "fallback")).toBe("Email já cadastrado");

@@ -1,7 +1,9 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, Trash2, Repeat, Pause, Play } from "lucide-react";
+import { LoadError, LoadingCards } from "@/components/shared/LoadState";
+import { useLoad } from "@/lib/useLoad";
 
 import { recurringApi } from "@/api/recurring";
 import { walletsApi } from "@/api/wallets";
@@ -73,15 +75,12 @@ export default function Recurring() {
     defaultValues: emptyForm(),
   });
 
-  async function load() {
+  const load = useCallback(async () => {
     const [r, w] = await Promise.all([recurringApi.list(), walletsApi.list()]);
     setItems(r.data);
     setWallets(w.data);
-  }
-
-  useEffect(() => {
-    load(); // eslint-disable-line react-hooks/set-state-in-effect
   }, []);
+  const { status, reload } = useLoad(load);
 
   const walletOptions = wallets.map((w) => ({ value: w.id, label: w.name }));
 
@@ -349,9 +348,18 @@ export default function Recurring() {
       </div>
 
       <div className="space-y-3">
-        {items.length === 0 && (
-          <div className="panel p-8 text-center text-content-3 text-sm">
-            Nenhuma recorrência ainda.
+        {status === "loading" && <LoadingCards count={2} className="min-h-[88px]" />}
+        {status === "error" && <LoadError what="suas recorrências" onRetry={reload} />}
+        {status === "ok" && items.length === 0 && (
+          <div className="panel p-10 flex flex-col items-center text-center">
+            <div className="w-11 h-11 rounded-xl bg-accent/[0.15] flex items-center justify-center mb-3">
+              <Repeat size={20} className="text-accent" aria-hidden="true" />
+            </div>
+            <p className="text-sm font-medium text-content">Nenhuma recorrência ainda</p>
+            <p className="text-xs text-content-2 mt-1 max-w-xs leading-relaxed">
+              Cadastre o que se repete, como aluguel, salário e assinaturas, e o
+              Norby lança para você na data certa.
+            </p>
           </div>
         )}
         {items.map((it) => (
