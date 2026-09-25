@@ -25,7 +25,7 @@ export default function InsightCard({ insight, bloqueada = false }) {
   const insightItems = insight?.summary_text?.split("|") || [];
 
   return (
-    <div className="lg:col-span-4 panel p-6 flex flex-col gap-3">
+    <div className="xl:col-span-4 panel p-6 flex flex-col gap-3">
       <div className="relative flex items-center gap-3">
         <AiOrb size={34} />
         <div>
@@ -36,7 +36,7 @@ export default function InsightCard({ insight, bloqueada = false }) {
       {bloqueada ? (
         <PremiumLock
           className="flex-1 justify-center"
-          title="A leitura da Norby faz parte do Norby+"
+          title="A leitura da Norby faz parte do plano Premium"
           text="Assine para receber a análise do seu mês e sugestões práticas."
         />
       ) : insightItems.length === 0 ? (

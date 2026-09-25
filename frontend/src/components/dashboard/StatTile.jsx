@@ -18,6 +18,8 @@ export default function StatTile({
   hint = "vs. mês passado",
   note = "este mês",
   highlight = false,
+  className = "",
+  style,
 }) {
   const good = delta === undefined || (upIsGood ? delta >= 0 : delta <= 0);
   const chip = highlight
@@ -28,7 +30,8 @@ export default function StatTile({
 
   return (
     <div
-      className={`rounded-2xl p-4 flex flex-col gap-3 min-w-0 ${
+      style={style}
+      className={`rounded-2xl p-4 flex flex-col gap-3 min-w-0 ${className} ${
         highlight
           ? "bg-accent-fill text-accent-contrast"
           : "bg-surface-inset border border-line/[0.06] text-content"

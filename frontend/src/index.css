@@ -256,6 +256,19 @@
   @apply rounded-[4px] border border-line/[0.06];
 }
 
+/* Card da pizza: quem decide "pizza ao lado da legenda" é a largura do CARD,
+   não a da tela. O mesmo card tem 435px em 1440 e ~285px em 1024, e a legenda
+   ao lado de uma pizza num card estreito cortava o nome da categoria. */
+.pie-card {
+  container-type: inline-size;
+}
+@container (min-width: 18rem) {
+  .pie-body {
+    flex-direction: row;
+    align-items: center;
+  }
+}
+
 /* Estrela-norte pulsando: substituto de spinner genérico (assinatura da marca) */
 @keyframes star-pulse {
   0%, 100% { opacity: 0.35; transform: scale(0.92); }

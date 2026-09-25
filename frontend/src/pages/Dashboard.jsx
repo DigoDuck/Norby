@@ -227,6 +227,19 @@ export default function Dashboard() {
       : topCategorias;
   const categoryTotal = monthExpenses;
 
+  // Rodapé da pizza: três números do mês, do que já foi buscado (os
+  // lançamentos do Ritmo cobrem o mês corrente inteiro).
+  const mesAtual = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}`;
+  const maiorGasto = streakTx
+    .filter((t) => t.type === "EXPENSE" && String(t.date).startsWith(mesAtual))
+    .reduce((maior, t) => (!maior || parseFloat(t.amount) > parseFloat(maior.amount) ? t : maior), null);
+  const destaquesPizza = {
+    mediaDiaria: monthExpenses / hoje.getDate(),
+    diasDecorridos: hoje.getDate(),
+    maiorGasto,
+    variacao: expenseChange,
+  };
+
   // Ponto de fim de linha do fluxo de caixa (detalhe do rascunho aprovado)
   const endDot = (color) =>
     function EndDot({ cx, cy, index }) {
@@ -298,18 +311,22 @@ export default function Dashboard() {
         </div>
         {/* Sem IA no plano, o convite não pode ser a ação principal da tela. */}
         <Button
-          onClick={() => navigate(iaLiberada ? "/ai" : "/settings")}
+          onClick={() => navigate(iaLiberada ? "/ai" : "/settings?aba=plano")}
           size="lg"
           variant={iaLiberada ? "default" : "secondary"}
         >
-          {iaLiberada ? "Falar com a Norby" : "IA no Norby+"}
+          {iaLiberada ? "Falar com a Norby" : "IA no plano Premium"}
           {iaLiberada ? <NorthStar size={14} /> : <Lock size={14} aria-hidden="true" />}
         </Button>
       </header>
 
       {/* ── Linha 1: saldo (4) + KPIs do mês (5) + meta (3) ───────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        <section className="lg:col-span-4 panel p-6 flex flex-col gap-5">
+      {/* As linhas só dividem em colunas a partir de xl (1280). Entre 1024 e
+          1279 a área útil tem ~650px: o 4/5/3 quebrava o saldo em duas linhas
+          e cortava o nome das carteiras. Abaixo de xl cada card ocupa a
+          largura toda, como no tablet. */}
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
+        <section className="xl:col-span-4 panel p-6 flex flex-col gap-5 motion-rise" style={{ "--i": 0 }}>
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-sm font-medium text-content-2">Saldo total</h2>
             {wallets.length > 1 && (
@@ -384,24 +401,30 @@ export default function Dashboard() {
         </section>
 
         {/* KPIs do mês: um tile só leva o acento, é o ponto focal da tela */}
-        <section className="lg:col-span-5 panel p-4 grid grid-cols-2 gap-3 content-start">
+        <section className="xl:col-span-5 panel p-4 grid grid-cols-2 gap-3 content-start">
           <h2 className="sr-only">Resumo do mês</h2>
           {/* A Sobra é o foco: responde "como estou este mês?" de relance. */}
           <StatTile
             highlight
             label="Sobra do mês"
+            className="motion-rise"
+            style={{ "--i": 1 }}
             value={<Money value={monthNet} centsClassName={TILE_CENTS_ON_ACCENT} />}
             icon={PiggyBank}
             delta={netChange}
           />
           <StatTile
             label="Receitas"
+            className="motion-rise"
+            style={{ "--i": 2 }}
             value={<Money value={monthIncome} centsClassName={TILE_CENTS} />}
             icon={ArrowDownLeft}
             delta={incomeChange}
           />
           <StatTile
             label="Despesas"
+            className="motion-rise"
+            style={{ "--i": 3 }}
             value={<Money value={monthExpenses} centsClassName={TILE_CENTS} />}
             icon={ArrowUpRight}
             delta={expenseChange}
@@ -409,14 +432,16 @@ export default function Dashboard() {
           />
           <StatTile
             label="Score financeiro"
+            className="motion-rise"
+            style={{ "--i": 4 }}
             value={insight?.score != null ? `${insight.score}/100` : "—"}
             icon={Sparkles}
-            note={iaLiberada ? "este mês" : "disponível no Norby+"}
+            note={iaLiberada ? "este mês" : "disponível no plano Premium"}
           />
         </section>
 
         {/* Meta em destaque */}
-        <div className="lg:col-span-3 panel p-6 flex flex-col">
+        <div className="xl:col-span-3 panel p-6 flex flex-col motion-rise" style={{ "--i": 5 }}>
           {falhas.goals ? (
             <p className="m-auto py-6 text-xs text-content-3 text-center">Não conseguimos carregar suas metas agora.</p>
           ) : featuredGoal ? (
@@ -496,14 +521,14 @@ export default function Dashboard() {
       </div>
 
       {/* ── Linha 2: ritmo (7, largo para caber semanas) + categorias (5) ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
         <RitmoCard transactions={streakTx} erro={falhas.ritmo} />
-        <CategoryPie data={categoryData} total={categoryTotal} />
+        <CategoryPie data={categoryData} total={categoryTotal} destaques={destaquesPizza} />
       </div>
 
       {/* ── Linha 3: fluxo de caixa + leitura da IA ─────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        <div className="lg:col-span-8 panel p-6">
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
+        <div className="xl:col-span-8 panel p-6">
           <div className="flex items-start justify-between mb-4">
             <div>
               <h2 className="font-semibold text-content">Fluxo de caixa</h2>
@@ -598,9 +623,9 @@ export default function Dashboard() {
       </div>
 
       {/* ── Linha 4: movimentações recentes ──────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
         {/* Movimentações recentes */}
-        <div className="lg:col-span-12 panel p-6 flex flex-col">
+        <div className="xl:col-span-12 panel p-6 flex flex-col">
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-semibold text-content">
               Movimentações recentes
