@@ -350,14 +350,14 @@ export default function Recurring() {
 
       <div className="space-y-3">
         {items.length === 0 && (
-          <div className="glass p-8 text-center text-content-3 text-sm">
+          <div className="panel p-8 text-center text-content-3 text-sm">
             Nenhuma recorrência ainda.
           </div>
         )}
         {items.map((it) => (
           <article
             key={it.id}
-            className="glass-hover flex flex-col gap-4 p-4 lg:flex-row lg:items-center"
+            className="panel-hover flex flex-col gap-4 p-4 lg:flex-row lg:items-center"
           >
             <div className="flex min-w-0 items-center gap-3 lg:flex-1">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent/[0.15]">

@@ -238,7 +238,7 @@ export default function Dashboard() {
       {/* ── Linha 1: hero (7 col) + saldo total (5 col) ──────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* Hero: saudação + convite à IA + anel da marca */}
-        <section className="hero-card lg:col-span-7 relative overflow-hidden glass p-6 md:pr-[250px] flex items-center min-h-[228px] animate-fade-up">
+        <section className="hero-card lg:col-span-7 relative overflow-hidden panel p-6 md:pr-[250px] flex items-center min-h-[228px] animate-fade-up">
           <div className="hero-card__content min-w-0">
             <h1 className="text-3xl font-bold text-content tracking-tight">
               Olá, {firstName} 👋
@@ -261,7 +261,7 @@ export default function Dashboard() {
         </section>
 
         {/* Saldo total */}
-        <section className="lg:col-span-5 glass p-6 flex flex-col gap-4 animate-fade-up">
+        <section className="lg:col-span-5 panel p-6 flex flex-col gap-4 animate-fade-up">
           <div className="relative flex items-center justify-between gap-3">
             <span className="microlabel">Saldo total</span>
             {wallets.length > 1 && (
@@ -350,7 +350,7 @@ export default function Dashboard() {
         <RitmoCard ritmo={ritmo} dias={STREAK_DAYS} />
 
         {/* Meta em destaque */}
-        <div className="lg:col-span-3 relative overflow-hidden glass border-income/25 p-6 flex flex-col">
+        <div className="lg:col-span-3 relative overflow-hidden panel border-income/25 p-6 flex flex-col">
           <div
             className="absolute inset-0 pointer-events-none"
             style={{
@@ -436,7 +436,7 @@ export default function Dashboard() {
 
       {/* ── Linha 3: fluxo de caixa + leitura da IA ─────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        <div className="lg:col-span-8 glass p-6">
+        <div className="lg:col-span-8 panel p-6">
           <div className="flex items-start justify-between mb-4">
             <div>
               <h2 className="font-semibold text-content">Fluxo de caixa</h2>
@@ -526,7 +526,7 @@ export default function Dashboard() {
       {/* ── Linha 4: gastos por categoria + movimentações recentes ──── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* Gastos por categoria (barras) */}
-        <div className="lg:col-span-6 glass p-6">
+        <div className="lg:col-span-6 panel p-6">
           <div className="flex items-center justify-between mb-5">
             <h2 className="font-semibold text-content">
               Gastos por categoria
@@ -578,7 +578,7 @@ export default function Dashboard() {
         </div>
 
         {/* Movimentações recentes */}
-        <div className="lg:col-span-6 glass p-6 flex flex-col">
+        <div className="lg:col-span-6 panel p-6 flex flex-col">
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-semibold text-content">
               Movimentações recentes

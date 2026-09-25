@@ -473,7 +473,7 @@ export default function Transactions() {
       </div>
 
       {/* Filtros e relatório em uma única superfície */}
-      <div className="glass overflow-hidden p-4 sm:p-5">
+      <div className="panel overflow-hidden p-4 sm:p-5">
         {serverError && !open && (
           <p className="text-danger text-xs pb-3">{serverError}</p>
         )}

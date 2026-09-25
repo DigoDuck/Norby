@@ -23,7 +23,7 @@ export default function InsightCard({ insight }) {
   const insightItems = insight?.summary_text?.split("|") || [];
 
   return (
-    <div className="lg:col-span-4 relative overflow-hidden glass border-accent/20 p-6 flex flex-col gap-3">
+    <div className="lg:col-span-4 relative overflow-hidden panel border-accent/20 p-6 flex flex-col gap-3">
       {/* Segundo e último glow do dashboard: presença da IA (ver DESIGN.md) */}
       <div
         className="absolute inset-0 pointer-events-none"

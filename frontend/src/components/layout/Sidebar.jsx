@@ -48,7 +48,7 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="hidden lg:flex w-64 h-full glass flex-col px-4 py-6 shrink-0 mr-[18px]">
+    <aside className="hidden lg:flex w-64 h-full panel flex-col px-4 py-6 shrink-0 mr-[18px]">
       {/* Logo */}
       <div className="flex items-center gap-3 mb-8 px-2">
         <div className="brand-tile w-9 h-9">

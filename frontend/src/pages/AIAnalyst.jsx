@@ -162,11 +162,11 @@ export default function AIAnalyst() {
   return (
     <div className="flex h-[calc(100vh-3rem)] flex-col gap-4 lg:flex-row">
       {/* Painel de sessões (interno à página — não é a sidebar do app) */}
-      <aside className="glass hidden w-72 shrink-0 flex-col gap-3 overflow-hidden p-4 lg:flex">
+      <aside className="panel hidden w-72 shrink-0 flex-col gap-3 overflow-hidden p-4 lg:flex">
         {sessionsContent}
       </aside>
 
-      <details className="glass shrink-0 p-4 lg:hidden">
+      <details className="panel shrink-0 p-4 lg:hidden">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-medium text-content [&::-webkit-details-marker]:hidden">
           <span className="flex items-center gap-2">
             <MessageCircle size={16} className="text-accent" />
@@ -180,7 +180,7 @@ export default function AIAnalyst() {
       </details>
 
       {/* Chat */}
-      <div className="glass flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+      <div className="panel flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         {/* Header */}
         <div className="flex items-center gap-3 border-b border-line/[0.08] px-4 py-4 sm:px-6">
           <div className="relative shrink-0">

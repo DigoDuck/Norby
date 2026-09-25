@@ -31,7 +31,7 @@ const heatGlow = (level) =>
  */
 export default function RitmoCard({ ritmo, dias }) {
   return (
-    <div className="lg:col-span-5 glass p-6 flex flex-col">
+    <div className="lg:col-span-5 panel p-6 flex flex-col">
       <div className="flex items-start justify-between gap-2">
         <div>
           <h2 className="font-semibold text-content">Ritmo financeiro</h2>

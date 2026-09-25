@@ -12,7 +12,7 @@ export default function Privacidade() {
           <ArrowLeft size={16} /> Voltar
         </Link>
 
-        <article className="glass p-8">
+        <article className="panel p-8">
           <h1 className="text-3xl font-bold tracking-tight text-content">
             Política de Privacidade
           </h1>

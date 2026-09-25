@@ -234,7 +234,7 @@ export default function Wallets() {
       {/* Grid de carteiras */}
       <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
         {wallets.length === 0 && (
-          <div className="col-span-full glass p-10 flex flex-col items-center text-center">
+          <div className="col-span-full panel p-10 flex flex-col items-center text-center">
             <div className="w-11 h-11 rounded-xl bg-accent/[0.15] flex items-center justify-center mb-3">
               <Wallet size={20} className="text-accent" />
             </div>
@@ -254,7 +254,7 @@ export default function Wallets() {
           return (
             <div
               key={w.id}
-              className="group relative overflow-hidden glass-hover p-6 flex min-h-[196px] flex-col"
+              className="group relative overflow-hidden panel-hover p-6 flex min-h-[196px] flex-col"
             >
               <div className="relative flex items-start justify-between mb-5">
                 <div

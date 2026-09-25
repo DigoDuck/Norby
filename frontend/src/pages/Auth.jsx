@@ -278,7 +278,7 @@ export default function Auth() {
 
         {/* Card de acesso */}
         <div className="relative z-10 order-1 w-full max-w-[34rem] justify-self-center xl:order-3">
-          <div className="glass w-full p-8 sm:p-10">
+          <div className="panel w-full p-8 sm:p-10">
             <div className="text-center">
               {/* mx-auto, não inline-grid: .brand-tile aplica display:grid e
                   vence o inline, então o text-center do pai não centralizaria. */}

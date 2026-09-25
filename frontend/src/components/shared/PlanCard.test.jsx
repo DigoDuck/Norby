@@ -201,7 +201,7 @@ describe("PlanCard", () => {
       "href",
       "/termos",
     );
-    const cartao = screen.getByText("Plano").closest("div.glass");
+    const cartao = screen.getByText("Plano").closest("div.panel");
     expect(cartao.textContent).toContain(PRECO_MENSAL);
     expect(cartao.textContent).toContain("renovação automática");
     expect(cartao.textContent).toContain("7 dias");
@@ -217,7 +217,7 @@ describe("PlanCard", () => {
     });
 
     expect(screen.getByRole("button", { name: "Gerenciar assinatura" })).toBeInTheDocument();
-    const cartao = screen.getByText("Plano").closest("div.glass");
+    const cartao = screen.getByText("Plano").closest("div.panel");
     expect(cartao.textContent).not.toContain(PRECO_MENSAL);
   });
 });
@@ -249,7 +249,7 @@ describe("PlanCard, medidor de uso de IA", () => {
     // chamada, não os tokens.
     expect(barra).toHaveAttribute("aria-valuenow", "3");
 
-    const cartao = screen.getByText("Plano").closest("div.glass");
+    const cartao = screen.getByText("Plano").closest("div.panel");
     expect(cartao.textContent).toContain("3 de 100 conversas");
     expect(cartao.textContent).toContain("2.100 de 120.000 tokens");
   });

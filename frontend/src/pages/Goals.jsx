@@ -339,7 +339,7 @@ export default function Goals() {
 
       {/* Banner Sugestão da Norby (some quando não há insight) */}
       {insight?.suggested_action && (
-        <div className="relative overflow-hidden glass border-accent/25 p-6">
+        <div className="relative overflow-hidden panel border-accent/25 p-6">
           <div className="relative flex items-center gap-5 flex-wrap">
             <div className="flex min-w-0 flex-1 items-start gap-4 sm:min-w-[300px]">
               <AiOrb size={44} className="mt-0.5" />
@@ -365,7 +365,7 @@ export default function Goals() {
       {/* Grid de metas */}
       <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
         {goals.length === 0 && (
-          <div className="col-span-full glass p-10 flex flex-col items-center text-center">
+          <div className="col-span-full panel p-10 flex flex-col items-center text-center">
             <div className="w-11 h-11 rounded-xl bg-accent/[0.15] flex items-center justify-center mb-3">
               <Target size={20} className="text-accent" />
             </div>
@@ -391,7 +391,7 @@ export default function Goals() {
           return (
             <div
               key={g.id}
-              className="group relative overflow-hidden glass-hover p-6 flex flex-col"
+              className="group relative overflow-hidden panel-hover p-6 flex flex-col"
             >
               {/* topo: tipo textual + status/prazo */}
               <div className="relative flex items-start justify-between mb-4">

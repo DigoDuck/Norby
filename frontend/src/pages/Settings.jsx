@@ -231,7 +231,7 @@ export default function Settings() {
       </div>
 
       {/* Aparência */}
-      <div className="glass p-6">
+      <div className="panel p-6">
         <SectionHead icon={Palette}>Aparência</SectionHead>
         <p className="text-sm text-content-2 mb-4 leading-relaxed">
           A escolha vale só neste navegador e não sincroniza entre dispositivos.
@@ -240,7 +240,7 @@ export default function Settings() {
       </div>
 
       {/* Perfil */}
-      <div className="glass p-6">
+      <div className="panel p-6">
         <SectionHead icon={User}>Perfil</SectionHead>
 
         <div className="flex items-center gap-4 mb-6">
@@ -354,7 +354,7 @@ export default function Settings() {
       <PlanCard />
 
       {/* Segurança */}
-      <div className="glass p-6">
+      <div className="panel p-6">
         <SectionHead icon={Lock}>Segurança</SectionHead>
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -368,7 +368,7 @@ export default function Settings() {
       </div>
 
       {/* Privacidade e dados (LGPD) */}
-      <div className="glass p-6">
+      <div className="panel p-6">
         <SectionHead icon={ShieldCheck}>Privacidade e dados</SectionHead>
         <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
           <div className="flex-1">
@@ -400,7 +400,7 @@ export default function Settings() {
       </div>
 
       {/* Zona de perigo: exclusão definitiva (LGPD) */}
-      <div className="glass border-danger/30 p-6">
+      <div className="panel border-danger/30 p-6">
         <SectionHead icon={Trash2} danger>
           Excluir minha conta
         </SectionHead>
@@ -437,7 +437,7 @@ export default function Settings() {
       </div>
 
       {/* Encerrar sessão */}
-      <div className="glass border-danger/25 p-5 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+      <div className="panel border-danger/25 p-5 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <p className="text-sm font-semibold text-content">
             Encerrar sessão
