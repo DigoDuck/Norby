@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 
 import { authApi } from "@/api/auth";
 import EsqueciSenha from "./EsqueciSenha";
@@ -111,6 +111,42 @@ describe("Redefinir senha", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: /salvar nova senha/i }));
 
+    await waitFor(() => expect(authApi.resetPassword).toHaveBeenCalledWith("tok-da-url", "senhaboa1"));
+  });
+
+  it("tira o token da URL assim que o lê, e ainda o usa no envio", async () => {
+    // O link vale por 30 min. Parado na barra de endereço e no histórico, ele
+    // fica ao alcance de quem usar o navegador depois, se a pessoa abandonar
+    // a página sem salvar. A página guarda o token em memória e limpa a URL.
+    function Endereco() {
+      const { search } = useLocation();
+      return <output data-testid="endereco">{search}</output>;
+    }
+    authApi.resetPassword.mockResolvedValue({ data: {} });
+    render(
+      <MemoryRouter initialEntries={["/redefinir-senha?token=tok-da-url"]}>
+        <Routes>
+          <Route
+            path="/redefinir-senha"
+            element={
+              <>
+                <RedefinirSenha />
+                <Endereco />
+              </>
+            }
+          />
+          <Route path="/" element={<p>login</p>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("endereco")).toHaveTextContent(/^$/));
+
+    fireEvent.change(screen.getByLabelText("Nova senha"), { target: { value: "senhaboa1" } });
+    fireEvent.change(screen.getByLabelText("Repita a nova senha"), {
+      target: { value: "senhaboa1" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /salvar nova senha/i }));
     await waitFor(() => expect(authApi.resetPassword).toHaveBeenCalledWith("tok-da-url", "senhaboa1"));
   });
 });

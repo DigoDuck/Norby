@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -12,8 +12,15 @@ import { Input } from "@/components/ui/input";
 import CartaoAcesso from "@/components/shared/CartaoAcesso";
 
 export default function RedefinirSenha() {
-  const [searchParams] = useSearchParams();
-  const token = searchParams.get("token") || "";
+  const [searchParams, setSearchParams] = useSearchParams();
+  // Lido UMA vez e guardado em memória: logo abaixo a URL é limpa. O link
+  // vale 30 min, e parado na barra de endereço e no histórico ficaria ao
+  // alcance de quem usasse o navegador depois, se a pessoa saísse sem salvar.
+  const [token] = useState(() => searchParams.get("token") || "");
+  useEffect(() => {
+    if (searchParams.has("token")) setSearchParams({}, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const navigate = useNavigate();
   const [erro, setErro] = useState("");
   const {
