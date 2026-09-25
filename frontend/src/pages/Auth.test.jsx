@@ -89,6 +89,36 @@ describe("Auth", () => {
     expect(registerSpy).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ["desmarcada, por padrão", false],
+    ["marcada", true],
+  ])("envia 'manter conectado' ao entrar: caixa %s (#175)", async (_caso, marcar) => {
+    // Desmarcada por padrão: sem ela, a sessão acaba 24h depois do login e o
+    // cookie some com o navegador. O computador compartilhado é o caso que o
+    // default protege; quem quer conforto no próprio aparelho marca.
+    const login = vi.spyOn(authApi, "login").mockResolvedValue({
+      data: { access_token: "tok", user: { name: "Al", email: "al@test.com" } },
+    });
+    const { container } = renderAuth();
+
+    const caixa = screen.getByRole("checkbox", { name: /manter conectado/i });
+    expect(caixa).not.toBeChecked();
+    if (marcar) fireEvent.click(caixa);
+
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "al@test.com" } });
+    fireEvent.change(screen.getByLabelText("Senha"), { target: { value: "senha1234" } });
+    fireEvent.click(container.querySelector('button[type="submit"]'));
+
+    await waitFor(() =>
+      expect(login).toHaveBeenCalledWith({
+        email: "al@test.com",
+        password: "senha1234",
+        remember: marcar,
+      }),
+    );
+    login.mockRestore();
+  });
+
   it("leva à recuperação de senha, que deixou de ser 'em breve'", () => {
     // Este link já foi um botão desabilitado com um chip "em breve", porque a
     // rota não existia. Com o #36 ela existe, e um rótulo de estado que não

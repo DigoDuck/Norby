@@ -535,7 +535,7 @@ async def test_a_cascade_catches_a_successor_committed_while_it_waited(client, d
 
     async with TestSessionLocal() as outra, TestSessionLocal() as sess_logout:
         await outra.execute(select(User.id).where(User.id == user_id).with_for_update())
-        sucessor = _new_refresh(str(user_id), outra)
+        sucessor = _new_refresh(str(user_id), outra).raw
         await outra.flush()
 
         cascata = asyncio.create_task(revoke_refresh_token(r0, sess_logout))

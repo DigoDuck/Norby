@@ -233,6 +233,21 @@ dias com rotação e detecção de reuso. O logout revoga só o refresh — um a
 token roubado vale até 15 min. Revogação imediata exigiria denylist de `jti`
 (consulta extra em toda request); adiada por custo/benefício.
 
+**"Manter conectado" (#175, 2026-09-25):** duas sessões, escolhidas por uma
+caixa no login, **desmarcada por padrão**. Sem marcar: teto absoluto de **24h**
+desde o login, que a rotação herda e nunca estica, e cookie de SESSÃO (sem
+`Max-Age`). Marcando: refresh de 7 dias renovando a cada uso, mas com teto
+absoluto de **90 dias** desde o login — antes não havia teto, e uma sessão em
+uso nunca expirava. O cadastro não tem a caixa e começa na sessão curta.
+O teto mora em `refresh_tokens.session_expires_at`, copiado a cada rotação
+(inclusive na janela de 30s, que também o respeita). ⚠️ O cookie de sessão
+**sozinho não encerra nada**: Chrome, Edge e Firefox com "continuar de onde
+parou" restauram cookies de sessão. Quem fecha a porta é o teto no banco —
+não trocar por "só cookie de sessão" achando que é equivalente. Constantes em
+`auth_service.py` (`SESSAO_NAO_LEMBRADA`, `TETO_SESSAO_LEMBRADA`). As sessões
+vivas no deploy da migration `b7d2e9f4a1c3` viraram lembradas com teto de
+deploy + 90 dias: ninguém foi deslogado.
+
 **Logout apresentando token já rotacionado = reuso (2026-08-15):** o
 `/auth/logout` trata isso igual ao `/auth/refresh` e revoga **todas** as sessões
 do usuário. Antes ele respondia 204 sem revogar nada: quem roubasse `R0`,

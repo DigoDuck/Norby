@@ -2,6 +2,7 @@ import asyncio
 import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
+from typing import NamedTuple
 
 import jwt  # PyJWT. Era: from jose import jwt
 from sqlalchemy import func, or_, select, update
@@ -60,27 +61,83 @@ def create_access_token(user_id: str, epoch: int) -> str:
 def _hash_token(raw: str) -> str:
     return hashlib.sha256(raw.encode()).hexdigest()
 
-def _new_refresh(user_id: str, db: AsyncSession) -> str:
-    """Enfileira um refresh novo na sessão (SEM commit) e devolve o token cru.
+# #175: "manter conectado". Sem marcar, a sessão acaba 24h depois do login,
+# sem renovar, e o cookie é de sessão. Marcando, os 7 dias de
+# `refresh_token_expire_days` renovam a cada uso, mas nunca além de 90 dias do
+# login — antes não havia teto nenhum, e um aparelho perdido e em uso ficava
+# logado para sempre.
+SESSAO_NAO_LEMBRADA = timedelta(hours=24)
+TETO_SESSAO_LEMBRADA = timedelta(days=90)
+
+
+class RefreshEmitido(NamedTuple):
+    """O token cru e o Max-Age do cookie que o leva. `max_age` None = cookie
+    de SESSÃO. Ele sozinho não encerra nada (navegadores restauram cookies de
+    sessão ao reabrir); quem encerra é o `session_expires_at` no banco."""
+
+    raw: str
+    max_age: int | None
+
+
+def teto_da_sessao(remember: bool) -> datetime:
+    """Teto absoluto de uma sessão que começa agora, pelo login."""
+    duracao = TETO_SESSAO_LEMBRADA if remember else SESSAO_NAO_LEMBRADA
+    return datetime.now(timezone.utc) + duracao
+
+
+def _new_refresh(
+    user_id: str,
+    db: AsyncSession,
+    *,
+    remember: bool = False,
+    session_expires_at: datetime | None = None,
+) -> RefreshEmitido:
+    """Enfileira um refresh novo na sessão (SEM commit).
 
     Separado do commit para a rotação conseguir revogar o antigo e inserir o
-    novo numa única transação.
+    novo numa única transação. A rotação passa `remember` e
+    `session_expires_at` do antecessor: a sessão herda os dois e o teto nunca
+    anda. Sem `session_expires_at`, é o início de uma sessão nova.
     """
+    agora = datetime.now(timezone.utc)
+    if session_expires_at is None:
+        session_expires_at = teto_da_sessao(remember)
+    if remember:
+        expires_at = min(
+            agora + timedelta(days=settings.refresh_token_expire_days), session_expires_at
+        )
+    else:
+        expires_at = session_expires_at
     raw = secrets.token_urlsafe(48)
-    expires_at = datetime.now(timezone.utc) + timedelta(days=settings.refresh_token_expire_days)
-    db.add(RefreshToken(user_id=user_id, token_hash=_hash_token(raw), expires_at=expires_at))
-    return raw
+    db.add(
+        RefreshToken(
+            user_id=user_id,
+            token_hash=_hash_token(raw),
+            expires_at=expires_at,
+            remember=remember,
+            session_expires_at=session_expires_at,
+        )
+    )
+    max_age = max(int((expires_at - agora).total_seconds()), 0) if remember else None
+    return RefreshEmitido(raw, max_age)
 
-async def create_refresh_token(user_id: str, db: AsyncSession) -> str:
-    """Gera um refresh token opaco, persiste só o hash e retorna o token cru."""
-    raw = _new_refresh(user_id, db)
+async def create_refresh_token(
+    user_id: str, db: AsyncSession, *, remember: bool = False
+) -> RefreshEmitido:
+    """Gera um refresh token opaco de sessão nova e persiste só o hash."""
+    emitido = _new_refresh(user_id, db, remember=remember)
     await db.commit()
-    return raw
+    return emitido
 
 
 async def emitir_sessao_do_login(
-    user: User, hash_verificado: str, hash_novo: str | None, db: AsyncSession
-) -> tuple[str, str] | None:
+    user: User,
+    hash_verificado: str,
+    hash_novo: str | None,
+    db: AsyncSession,
+    *,
+    remember: bool = False,
+) -> tuple[str, RefreshEmitido] | None:
     """Emite access + refresh do login SÓ se a senha conferida ainda vale (#165).
 
     O login confere a senha contra o hash lido antes do bcrypt, que leva
@@ -110,7 +167,7 @@ async def emitir_sessao_do_login(
         return None
     if hash_novo:
         user.password_hash = hash_novo
-    refresh = _new_refresh(str(user.id), db)
+    refresh = _new_refresh(str(user.id), db, remember=remember)
     await db.commit()
     return create_access_token(str(user.id), atual.token_epoch), refresh
 
@@ -179,7 +236,7 @@ async def _trava_usuario_do_token(raw: str, db: AsyncSession) -> RefreshToken | 
     return result.scalar_one_or_none()
 
 
-async def rotate_refresh_token(raw: str, db: AsyncSession) -> tuple[str, str, User] | None:
+async def rotate_refresh_token(raw: str, db: AsyncSession) -> tuple[str, RefreshEmitido, User] | None:
     """Valida, revoga o antigo e emite o par novo em uma transação só.
 
     O FOR UPDATE serializa duas rotações do mesmo token: a segunda só lê a linha
@@ -207,10 +264,20 @@ async def rotate_refresh_token(raw: str, db: AsyncSession) -> tuple[str, str, Us
             return None
         # Dentro da janela: sucessor NOVO para quem ficou com o antecessor. O
         # sucessor anterior continua válido; o servidor só tem o hash dele.
+        # Mas nunca além do teto da sessão (#175): a janela não olhava
+        # validade, e um token rotacionado segundos antes do teto ganharia
+        # vida depois dele.
+        if record.session_expires_at <= agora:
+            return None
         user = await db.get(User, record.user_id)
         if user is None:
             return None
-        new_refresh = _new_refresh(str(user.id), db)
+        new_refresh = _new_refresh(
+            str(user.id),
+            db,
+            remember=record.remember,
+            session_expires_at=record.session_expires_at,
+        )
         await db.commit()
         return create_access_token(str(user.id), user.token_epoch), new_refresh, user
 
@@ -223,7 +290,9 @@ async def rotate_refresh_token(raw: str, db: AsyncSession) -> tuple[str, str, Us
 
     record.revoked = True
     record.revoked_at = datetime.now(timezone.utc)
-    new_refresh = _new_refresh(str(user.id), db)
+    new_refresh = _new_refresh(
+        str(user.id), db, remember=record.remember, session_expires_at=record.session_expires_at
+    )
     await db.commit()
 
     return create_access_token(str(user.id), user.token_epoch), new_refresh, user

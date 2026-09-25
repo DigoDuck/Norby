@@ -26,6 +26,9 @@ import HeroRing from "../components/shared/HeroRing";
 const loginSchema = z.object({
   email: z.string().email("Email inválido"),
   password: z.string().min(8, "Mínimo de 8 caracteres"),
+  // #175: "manter conectado". Só o login usa; o cadastro herda o campo
+  // opcional e o ignora (a conta nova começa na sessão curta).
+  remember: z.boolean().optional(),
 });
 
 const registerSchema = loginSchema
@@ -153,7 +156,11 @@ export default function Auth() {
     try {
       const res =
         mode === "login"
-          ? await authApi.login({ email: data.email, password: data.password })
+          ? await authApi.login({
+              email: data.email,
+              password: data.password,
+              remember: Boolean(data.remember),
+            })
           : await authApi.register({
               name: data.name,
               email: data.email,
@@ -412,7 +419,20 @@ export default function Auth() {
                   existe. O botão desabilitado e o chip saíram junto — rótulo de
                   estado que não corresponde mais ao estado é pior que nenhum. */}
               {mode === "login" && (
-                <div className="flex justify-end pt-0.5">
+                <div className="flex items-center justify-between gap-3 pt-0.5">
+                  {/* #175: desmarcada por padrão. Sem ela, a sessão acaba 24h
+                      depois do login e o cookie some com o navegador — o
+                      default protege o computador compartilhado. Marcada: 7
+                      dias renovando a cada uso, até 90 dias. */}
+                  <label className="flex items-center gap-2 text-xs text-content-2">
+                    <input
+                      id="auth-remember"
+                      type="checkbox"
+                      {...register("remember")}
+                      className="accent-accent"
+                    />
+                    <span>Manter conectado neste dispositivo</span>
+                  </label>
                   <Link
                     to="/esqueci-senha"
                     className="text-sm text-accent hover:underline"

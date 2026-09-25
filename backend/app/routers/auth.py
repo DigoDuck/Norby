@@ -21,7 +21,7 @@ from app.services.auth_service import (
     hash_password, verify_password, verify_and_upgrade, create_access_token,
     create_refresh_token, rotate_refresh_token, revoke_refresh_token,
     create_password_reset, find_user_by_email, reset_password,
-    revoke_all_refresh_tokens, emitir_sessao_do_login, _DUMMY_HASH,
+    revoke_all_refresh_tokens, emitir_sessao_do_login, RefreshEmitido, _DUMMY_HASH,
 )
 from app.services.account_service import delete_account, export_data
 from app.services.photo_service import MAX_BYTES, PhotoInvalid, PhotoTooLarge, processar_foto
@@ -80,7 +80,7 @@ def _log_xff(request: Request) -> None:
     )
 
 
-def _set_refresh_cookie(response: Response, raw: str) -> None:
+def _set_refresh_cookie(response: Response, emitido: RefreshEmitido) -> None:
     # HttpOnly tira o token do alcance de qualquer script na página; Path=/auth
     # mantém o cookie fora de todas as outras rotas. SameSite=Strict, e não
     # Lax: o Lax do Chrome ("Lax-allowing-unsafe") ainda manda o cookie num
@@ -88,10 +88,14 @@ def _set_refresh_cookie(response: Response, raw: str) -> None:
     # — e este cookie nunca é lido por uma navegação, só por XHR same-site
     # disparado pelo próprio norby.com.br. Strict cobre exatamente os mesmos
     # casos legítimos e fecha também essa janela de 2 minutos.
+    # #175: sessão lembrada leva Max-Age (até o vencimento do token, que
+    # nunca passa do teto da sessão); não lembrada vai como cookie de SESSÃO.
+    # Este sozinho não encerra nada — navegadores restauram cookies de sessão
+    # ao reabrir —, quem encerra é o session_expires_at no banco.
     response.set_cookie(
         key=settings.refresh_cookie_name,
-        value=raw,
-        max_age=settings.refresh_token_expire_days * 86400,
+        value=emitido.raw,
+        max_age=emitido.max_age,
         httponly=True,
         secure=settings.refresh_cookie_secure,
         samesite="strict",
@@ -176,6 +180,8 @@ async def register(
     await record_success(payload.email, db)
 
     access = create_access_token(str(user.id), user.token_epoch)
+    # O cadastro não tem a caixa "manter conectado" (#175): começa na sessão
+    # curta, o lado seguro. Quem quiser a longa marca a caixa no próximo login.
     refresh = await create_refresh_token(str(user.id), db)
     _set_refresh_cookie(response, refresh)
     return Token(access_token=access, user=UserResponse.model_validate(user))
@@ -221,7 +227,9 @@ async def login(
     # A senha trocou durante o bcrypt (reset commitado no meio, #165): a que
     # foi digitada já não é a da conta. Sem stamp_failure — não é tentativa de
     # força bruta, é uma corrida perdida para a própria dona da conta.
-    sessao = await emitir_sessao_do_login(user, hash_verificado, upgraded_hash, db)
+    sessao = await emitir_sessao_do_login(
+        user, hash_verificado, upgraded_hash, db, remember=payload.remember
+    )
     if sessao is None:
         raise HTTPException(status_code=401, detail="Credenciais inválidas")
     access, refresh = sessao
