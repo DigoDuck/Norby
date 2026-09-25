@@ -256,7 +256,7 @@ export default function AIAnalyst() {
             {loading && (
               <div className="flex items-center gap-2.5">
                 <AiOrb size={28} />
-                <div className="inset-panel rounded-tl-md border-l-2 border-l-accent/40 px-4 py-3 text-xs text-content-2">
+                <div className="inset-panel rounded-tl-md px-4 py-3 text-xs text-content-2">
                   Norby está analisando…
                 </div>
               </div>
