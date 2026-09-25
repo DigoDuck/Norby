@@ -16,6 +16,7 @@ import {
   AreaChart,
   Area,
   XAxis,
+  YAxis,
   Tooltip,
   ResponsiveContainer,
   CartesianGrid,
@@ -72,6 +73,11 @@ const INCOME_COLOR = "rgb(var(--income))";
 const EXPENSE_COLOR = "rgb(var(--expense))";
 
 const axisTick = { fill: "rgb(var(--axis))", fontSize: 11 };
+
+// Eixo Y do fluxo em valor compacto ("R$ 6 mil"): sem ele a curva mostrava a
+// forma, mas não a escala.
+const reaisCompacto = (v) =>
+  `R$ ${Number(v).toLocaleString("pt-BR", { notation: "compact", maximumFractionDigits: 1 })}`;
 
 // "Hoje" / "Ontem" / "N dias atrás" / dd/mm/aaaa — para as movimentações.
 function relativeDay(value) {
@@ -545,6 +551,13 @@ export default function Dashboard() {
                 <CartesianGrid
                   stroke="rgb(var(--grid-line) / 0.08)"
                   vertical={false}
+                />
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  tick={axisTick}
+                  tickFormatter={reaisCompacto}
+                  width={64}
                 />
                 <XAxis
                   dataKey="month"

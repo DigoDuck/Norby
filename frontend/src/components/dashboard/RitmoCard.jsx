@@ -143,7 +143,15 @@ export default function RitmoCard({ transactions, erro = false }) {
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-2 mt-auto pt-4 text-[11px] text-content-3">
-        <span>Últimos {dias} dias</span>
+        {/* A cota é o que dá sentido a "no ritmo": dita em número, com a
+            regra no hover, em vez de só o tamanho da janela. */}
+        <span
+          title="Dia no ritmo é o dia em que você gastou até a cota. A cota é a sua receita do período dividida pelos dias."
+        >
+          {ritmo.hasPace
+            ? `Cota de ${formatBRL(ritmo.dailyPace)} por dia · ${dias} dias`
+            : `Últimos ${dias} dias`}
+        </span>
         <span className="flex items-center gap-1">
           Menos
           {[1, 2, 3, 4].map((level) => (
