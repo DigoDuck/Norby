@@ -25,8 +25,9 @@ export default function AppLayout() {
 
   // Recarrega o usuário a cada entrada na área autenticada.
   //
-  // O `user` (com o `plan` dentro) é gravado no localStorage no login e, sem
-  // isto, NUNCA mais era atualizado. O ADR 0002 aceitou o plano ficar velho
+  // O `user` (com o `plan` dentro) já foi gravado no localStorage e, sem
+  // isto, NUNCA mais era atualizado. Hoje ele vive só em memória, mas o
+  // login dentro da SPA também não passa pelo /auth/me do boot. O ADR 0002 aceitou o plano ficar velho
   // numa direção — a tela oferecer o que o backend recusa, que custa um 403
   // com mensagem clara. Mas a direção INVERSA não é aceitável e foi o que
   // aconteceu: quem já estava logado quando o paywall acendeu passava a levar
@@ -46,9 +47,9 @@ export default function AppLayout() {
   // Aqui pelo mesmo motivo das recorrências: é o ponto que monta tanto no boot
   // com token persistido quanto no login dentro da SPA. A rota é fechada, então
   // a foto não pode ser um `<img src>` — vem por axios com o token e vira data
-  // URI no store, que o zustand persiste. `photoFor` é a versão que está em
-  // mãos: igual à do usuário significa nada a fazer, e é o que impede um
-  // download por montagem.
+  // URI no store, só em memória. `photoFor` é a versão que está em mãos:
+  // igual à do usuário significa nada a fazer, e é o que impede um download
+  // por montagem (uma recarga completa baixa de novo).
   const marca = user?.photo_updated_at ?? null;
   useEffect(() => {
     if (!marca) {

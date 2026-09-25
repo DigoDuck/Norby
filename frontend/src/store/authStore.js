@@ -14,6 +14,7 @@ export const useAuthStore = create(
       // apontando para a rota, porque a rota exige token. `photoFor` guarda o
       // `photo_updated_at` que originou este data URI: é o que evita baixar de
       // novo a cada montagem e o que faz a foto trocar depois de um upload.
+      // Só em memória: uma recarga baixa de novo (poucos KB, 128px WebP).
       photo: null,
       photoFor: null,
 
@@ -30,13 +31,16 @@ export const useAuthStore = create(
     }),
     {
       name: "norby-auth",
-      // O que sobrevive à recarga. O token fica de fora de propósito.
-      partialize: (s) => ({
-        user: s.user,
-        isAuthenticated: s.isAuthenticated,
-        photo: s.photo,
-        photoFor: s.photoFor,
-      }),
+      // Só a flag sobrevive à recarga: é ela que manda o App tentar o
+      // /auth/refresh no boot. O token nunca (#110). Usuário e foto também
+      // não: o boot já busca /auth/me antes de liberar qualquer tela, então
+      // guardá-los não poupava requisição — só deixava nome, e-mail e o rosto
+      // de alguém num computador compartilhado sem prazo para sair.
+      partialize: (s) => ({ isAuthenticated: s.isAuthenticated }),
+      // Versão 0 guardava usuário e foto. A migração lê só a flag, então o
+      // que estava gravado não volta à memória, e a próxima escrita o apaga.
+      version: 1,
+      migrate: (persistido) => ({ isAuthenticated: Boolean(persistido?.isAuthenticated) }),
     },
   ),
 );
