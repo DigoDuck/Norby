@@ -30,7 +30,7 @@ export function Segmented({ value, onChange, options, className, ariaLabel }) {
             aria-pressed={isActive}
             onClick={() => onChange(opt.value)}
             className={cn(
-              "rounded-xl py-2 text-sm font-medium transition-all",
+              "rounded-md py-2 text-sm font-medium transition-all",
               isActive
                 ? (opt.activeClass ?? "bg-accent-fill text-accent-contrast")
                 : "bg-line/5 text-content-2 hover:text-content"

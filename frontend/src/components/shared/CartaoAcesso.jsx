@@ -16,7 +16,7 @@ import NorbyMark from "@/components/shared/Logo";
  */
 export default function CartaoAcesso({ titulo, descricao, children }) {
   return (
-    <div className="app-mesh flex min-h-screen items-center justify-center bg-bg-base px-4 py-10 text-content">
+    <div className="flex min-h-screen items-center justify-center bg-bg-base px-4 py-10 text-content">
       <main className="w-full max-w-md">
         <div className="glass p-8 sm:p-10">
           <div className="text-center">

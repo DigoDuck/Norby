@@ -82,7 +82,7 @@ export default function AppLayout() {
   }, [marca, photoFor, setPhoto]);
 
   return (
-    <div className="relative min-h-screen w-full overflow-hidden bg-bg-base app-mesh">
+    <div className="relative min-h-screen w-full overflow-hidden bg-bg-base">
       <div className="relative z-10 flex h-screen p-0 lg:p-[18px]">
         <Sidebar />
         <MobileNav />

@@ -184,7 +184,7 @@ export default function Auth() {
   }
 
   return (
-    <div className="app-mesh relative min-h-screen w-full overflow-x-hidden bg-bg-base">
+    <div className="relative min-h-screen w-full overflow-x-hidden bg-bg-base">
       {/* Marca no topo. Só no desktop amplo: abaixo de xl o card já traz o tile, e
           repetir a marca em duas alturas numa tela estreita é ruído. */}
       <header className="absolute left-8 top-8 z-10 hidden items-center gap-3 xl:flex">

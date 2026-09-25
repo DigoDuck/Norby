@@ -37,7 +37,7 @@ export default function Termos() {
   };
 
   return (
-    <div className="app-mesh min-h-screen bg-bg-base px-4 py-8 text-content sm:py-12">
+    <div className="min-h-screen bg-bg-base px-4 py-8 text-content sm:py-12">
       <main className="mx-auto max-w-3xl">
         <Link
           to="/"

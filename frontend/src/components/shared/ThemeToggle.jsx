@@ -19,7 +19,7 @@ function Preview({ theme }) {
     <div
       data-theme={theme}
       aria-hidden="true"
-      className="app-mesh flex h-20 w-full gap-1.5 overflow-hidden rounded-xl bg-bg-base p-2 pointer-events-none"
+      className="flex h-20 w-full gap-1.5 overflow-hidden rounded-xl bg-bg-base p-2 pointer-events-none"
     >
       <div className="w-1/4 rounded-md border border-line/10 bg-surface" />
       <div className="flex flex-1 flex-col gap-1.5">
