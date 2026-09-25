@@ -273,7 +273,7 @@ export default function Dashboard() {
     ...wallets.map((w) => ({ value: w.id, label: w.name })),
   ];
 
-  // Atalho: abre o form de Relatórios já com o tipo pré-selecionado
+  // Atalho: abre o form do Extrato já com o tipo pré-selecionado
   const newTransaction = (type) =>
     navigate("/transactions", { state: { newType: type } });
 

@@ -72,7 +72,7 @@ const benefits = [
   {
     icon: ShieldCheck,
     title: "Segurança e privacidade",
-    desc: "Conexão criptografada e senha guardada só como hash.",
+    desc: "Conexão criptografada; sua senha nunca é guardada em texto.",
   },
 ];
 
@@ -479,10 +479,6 @@ export default function Auth() {
               </Button>
             </form>
 
-            <p className="mt-6 flex items-center justify-center gap-2 text-center text-xs text-content-2">
-              <ShieldCheck size={15} aria-hidden="true" className="shrink-0 text-accent" />
-              Conexão criptografada e senha guardada só como hash.
-            </p>
           </div>
         </div>
         </div>

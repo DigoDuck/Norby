@@ -360,10 +360,13 @@ export default function Settings() {
           <div>
             <p className="text-sm font-medium text-content">Senha</p>
             <p className="text-xs text-content-2 mt-1 max-w-md leading-relaxed">
-              Sua senha é armazenada com hash bcrypt. Para alterá-la, entre em
-              contato com o suporte.
+              Sua senha nunca é guardada em texto. Para trocá-la, use a
+              redefinição: você recebe um link no seu e-mail.
             </p>
           </div>
+          <Button variant="secondary" onClick={() => navigate("/esqueci-senha")} className="shrink-0">
+            Trocar senha
+          </Button>
         </div>
       </div>
 

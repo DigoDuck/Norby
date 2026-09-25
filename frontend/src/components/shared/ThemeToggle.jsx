@@ -5,12 +5,12 @@ const OPTIONS = [
   {
     value: "dark",
     label: "Escuro",
-    hint: "Padrão. Painel de instrumentos sob pouca luz.",
+    hint: "Padrão. Preto neutro para conferir as contas à noite.",
   },
   {
     value: "light",
     label: "Claro",
-    hint: "Vidro leitoso sobre fundo lavanda.",
+    hint: "Página cinza e cards brancos, para o dia.",
   },
 ];
 

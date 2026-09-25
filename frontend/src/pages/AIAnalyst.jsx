@@ -176,7 +176,7 @@ export default function AIAnalyst() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-3rem)] flex-col gap-4 lg:flex-row">
+    <div className="flex h-[calc(100dvh-5rem)] flex-col gap-4 lg:h-[calc(100dvh-4.75rem)] lg:flex-row">
       {/* Painel de sessões (interno à página — não é a sidebar do app) */}
       <aside className="panel hidden w-72 shrink-0 flex-col gap-3 overflow-hidden p-4 lg:flex">
         {sessionsContent}

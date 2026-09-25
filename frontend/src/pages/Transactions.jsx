@@ -19,7 +19,6 @@ import { MoneyInput } from "@/components/ui/money-input";
 import { Field } from "@/components/ui/field";
 import { Segmented } from "@/components/ui/segmented";
 import { Select } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -316,10 +315,10 @@ export default function Transactions() {
       <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-3xl font-bold text-content tracking-tight">
-            Relatórios
+            Extrato
           </h1>
           <p className="text-content-2 text-sm mt-1">
-            Histórico completo de transações
+            Todas as suas entradas e saídas
           </p>
         </div>
         <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -554,7 +553,7 @@ export default function Transactions() {
         <table className="hidden w-full md:table">
           <thead>
             <tr className="border-b border-line/10">
-              {["Categoria", "Descrição", "Tipo", "Valor", "Data", ""].map((h) => (
+              {["Categoria", "Descrição", "Valor", "Data", ""].map((h) => (
                 <th
                   key={h}
                   className="microlabel px-4 py-3 text-left"
@@ -576,20 +575,12 @@ export default function Transactions() {
                 <td className="px-4 py-3 text-sm text-content-2">
                   {t.description || "-"}
                 </td>
-                <td className="px-4 py-3">
-                  <Badge
-                    className={
-                      t.type === "INCOME"
-                        ? "bg-income/[0.15] text-income border-income/20 rounded-lg"
-                        : "bg-expense/[0.15] text-expense border-expense/20 rounded-lg"
-                    }
-                  >
-                    {t.type === "INCOME" ? "Receita" : "Despesa"}
-                  </Badge>
-                </td>
+                {/* O sinal já diz entrada ou saída; o vermelho em toda linha de
+                    despesa pintava a tabela inteira. Verde só para entrada,
+                    como nas movimentações do dashboard. */}
                 <td
                   className={`px-4 py-3 text-sm font-semibold tnum ${
-                    t.type === "INCOME" ? "text-income" : "text-expense"
+                    t.type === "INCOME" ? "text-income" : "text-content"
                   }`}
                 >
                   {formatSinal(t.amount, t.type === "INCOME")}
@@ -632,60 +623,50 @@ export default function Transactions() {
 
         <div className="space-y-3 md:hidden">
           {transactions.map((t) => (
-            <article key={t.id} className="inset-panel p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="flex items-center gap-2 text-sm font-medium text-content">
-                    <CategoryIcon category={t.category} type={t.type} size={15} className="shrink-0 text-content-3" />
-                    <span className="truncate">{t.category}</span>
-                  </p>
-                  <p className="mt-1 truncate text-xs text-content-2">
-                    {t.description || "Sem descrição"}
-                  </p>
-                </div>
+            <article key={t.id} className="inset-panel px-3.5 py-3">
+              <div className="flex items-center justify-between gap-3">
+                <p className="flex min-w-0 items-center gap-2 text-sm font-medium text-content">
+                  <CategoryIcon category={t.category} type={t.type} size={15} className="shrink-0 text-content-3" />
+                  <span className="truncate">{t.category}</span>
+                </p>
                 <p
                   className={`shrink-0 text-sm font-semibold tnum ${
-                    t.type === "INCOME" ? "text-income" : "text-expense"
+                    t.type === "INCOME" ? "text-income" : "text-content"
                   }`}
                 >
                   {formatSinal(t.amount, t.type === "INCOME")}
                 </p>
               </div>
-
-              <div className="mt-4 flex items-center justify-between gap-3 border-t border-line/[0.08] pt-3">
-                <div className="flex items-center gap-2">
-                  <span className={t.type === "INCOME" ? "chip-pos" : "chip-neg"}>
-                    {t.type === "INCOME" ? "Receita" : "Despesa"}
-                  </span>
-                  <time className="text-xs text-content-3 tnum">
-                    {formatDateBR(t.date)}
-                  </time>
-                </div>
-                <div className="flex items-center gap-3">
+              <div className="mt-1 flex items-center justify-between gap-3">
+                <p className="min-w-0 truncate text-xs text-content-2">
+                  {t.description || "Sem descrição"} ·{" "}
+                  <time className="tnum">{formatDateBR(t.date)}</time>
+                </p>
+                <div className="-my-1 flex shrink-0 items-center gap-1">
                   <button
                     type="button"
                     onClick={() => openEdit(t)}
                     className="grid place-items-center size-8 rounded-md text-content-3 hover:text-content hover:bg-state/[0.06] transition-colors"
                   >
-                    <Pencil size={16} />
+                    <Pencil size={15} />
                     <span className="sr-only">Editar transação</span>
                   </button>
-                  <ConfirmDialog
-                    title="Remover esta transação?"
-                      description={`${t.description || t.category} · ${formatSinal(t.amount, t.type === "INCOME")} · ${formatDateBR(t.date)}`}
-                    confirmLabel="Remover"
-                    errorFallback="Não foi possível remover a transação."
-                    onConfirm={() => deleteTransaction(t.id)}
-                    trigger={
-                      <button
-                        type="button"
-                        className="grid place-items-center size-8 rounded-md text-content-3 hover:text-danger hover:bg-danger/10 transition-colors"
-                      >
-                        <Trash2 size={16} />
-                        <span className="sr-only">Excluir transação</span>
-                      </button>
-                    }
-                  />
+                    <ConfirmDialog
+                      title="Remover esta transação?"
+                        description={`${t.description || t.category} · ${formatSinal(t.amount, t.type === "INCOME")} · ${formatDateBR(t.date)}`}
+                      confirmLabel="Remover"
+                      errorFallback="Não foi possível remover a transação."
+                      onConfirm={() => deleteTransaction(t.id)}
+                      trigger={
+                        <button
+                          type="button"
+                          className="grid place-items-center size-8 rounded-md text-content-3 hover:text-danger hover:bg-danger/10 transition-colors"
+                        >
+                          <Trash2 size={16} />
+                          <span className="sr-only">Excluir transação</span>
+                        </button>
+                      }
+                    />
                 </div>
               </div>
             </article>
