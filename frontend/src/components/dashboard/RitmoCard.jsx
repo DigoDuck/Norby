@@ -10,10 +10,6 @@ const heatColor = (level) =>
 // Rótulo só em seg/qua/sex, como no GitHub: sete rótulos empilhados viram ruído.
 const DIAS = ["", "Seg", "", "Qua", "", "Sex", ""];
 
-// Linha do mês + 7 dias de 12px, como no GitHub: rótulos e semanas usam a
-// mesma grade, senão "Seg" deixa de alinhar com a linha da segunda-feira.
-const ROWS = "grid grid-rows-[1rem_repeat(7,0.75rem)] gap-[3px]";
-
 /**
  * Painel "Ritmo financeiro": dias dentro da cota diária, com streak como bônus.
  *
@@ -53,42 +49,57 @@ export default function RitmoCard({ ritmo, dias }) {
             ? `${ritmo.onPaceCount} dos últimos ${dias} dias dentro do seu ritmo de gasto diário`
             : `Sem ritmo calculado nos últimos ${dias} dias`
         }
-        className="flex gap-[3px] mt-4 self-start"
+        // Uma grade só, coluna a coluna: rótulo dos dias + uma coluna por
+        // semana, cada uma com 1fr da largura. As células são quadradas e
+        // preenchem o card; o teto de 40px de altura evita quadrados enormes
+        // em card largo (celular deitado, tablet), onde a célula alarga.
+        className="grid grid-flow-col gap-1 mt-4"
+        style={{
+          gridTemplateRows: "auto repeat(7, auto)",
+          gridTemplateColumns: `auto repeat(${weeks.length}, minmax(0, 1fr))`,
+        }}
       >
-        <div className={`${ROWS} pr-1.5 text-[11px] leading-3 text-content-3`}>
-          <span />
-          {DIAS.map((dia, i) => (
-            <span key={i}>{dia}</span>
-          ))}
-        </div>
-
-        {weeks.map((week, c) => (
-          <div key={c} className={ROWS}>
-            <span className="text-[11px] leading-4 text-content-3 whitespace-nowrap">
-              {months[c]}
-            </span>
-            {week.map((cell, r) =>
-              cell ? (
-                <div
-                  key={cell.key}
-                  title={`${formatDateBR(cell.key)} · ${
-                    cell.active
-                      ? `${formatBRL(cell.spent)} de ${formatBRL(ritmo.dailyPace)}`
-                      : "sem lançamentos"
-                  }`}
-                  style={{ backgroundColor: heatColor(heatLevel(cell, ritmo.dailyPace)) }}
-                  className={`heat-cell size-3 ${
-                    cell.key === hoje
-                      ? "ring-1 ring-accent ring-offset-1 ring-offset-surface"
-                      : ""
-                  }`}
-                />
-              ) : (
-                <div key={`vazio-${r}`} />
-              ),
-            )}
-          </div>
+        <span />
+        {DIAS.map((dia, i) => (
+          <span
+            key={i}
+            className="self-center pr-1.5 text-[11px] leading-none text-content-3"
+          >
+            {dia}
+          </span>
         ))}
+
+        {weeks.map((week, c) => [
+          <span
+            key={`mes-${c}`}
+            className="pb-0.5 text-[11px] leading-4 text-content-3 whitespace-nowrap"
+          >
+            {months[c]}
+          </span>,
+          // Sempre 7 casas por coluna, mesmo na última semana (que termina em
+          // hoje): o fluxo por coluna depende disso para alinhar as linhas.
+          ...Array.from({ length: 7 }, (_, r) => {
+            const cell = week[r];
+            return cell ? (
+              <div
+                key={cell.key}
+                title={`${formatDateBR(cell.key)} · ${
+                  cell.active
+                    ? `${formatBRL(cell.spent)} de ${formatBRL(ritmo.dailyPace)}`
+                    : "sem lançamentos"
+                }`}
+                style={{ backgroundColor: heatColor(heatLevel(cell, ritmo.dailyPace)) }}
+                className={`heat-cell w-full aspect-square max-h-10 ${
+                  cell.key === hoje
+                    ? "ring-1 ring-accent ring-offset-1 ring-offset-surface"
+                    : ""
+                }`}
+              />
+            ) : (
+              <div key={`vazio-${c}-${r}`} />
+            );
+          }),
+        ])}
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2 mt-auto pt-4 text-[11px] text-content-3">
