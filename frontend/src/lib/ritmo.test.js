@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeRitmo, headroom } from "./ritmo";
+import { computeRitmo, headroom, heatLevel, heatGrid } from "./ritmo";
 
 // Janela curta e data fixa: o cálculo depende de "hoje", então nada de new Date().
 const TODAY = new Date(2026, 6, 16); // 16/07/2026
@@ -97,5 +97,56 @@ describe("headroom", () => {
     // Regra antiga escalava pelo maior líquido positivo (o salário), então um
     // dia comum virava um teal quase invisível. A folga é relativa à cota.
     expect(headroom({ spent: 20 }, 100)).toBe(0.8);
+  });
+});
+
+describe("heatLevel", () => {
+  const PACE = 100;
+  const cell = (spent, active = true) => ({ spent, active, onPace: spent <= PACE });
+
+  it("sem cota tudo fica neutro, até o dia com gasto", () => {
+    // Antes o dia com gasto e sem receita na janela saía vermelho: "estourou"
+    // uma cota que nem existia.
+    expect(heatLevel({ spent: 50, active: true, onPace: false }, 0)).toBe(0);
+  });
+
+  it("dia sem lançamento é nível 1, no ritmo por omissão", () => {
+    // Casa o mapa com a frase "X dos últimos N dias": esses dias já contam lá.
+    expect(heatLevel(cell(0, false), PACE)).toBe(1);
+  });
+
+  it("dia com gasto sobe de nível conforme a folga", () => {
+    expect(heatLevel(cell(90), PACE)).toBe(2);
+    expect(heatLevel(cell(50), PACE)).toBe(3);
+    expect(heatLevel(cell(10), PACE)).toBe(4);
+  });
+
+  it("estourar a cota é over", () => {
+    expect(heatLevel({ spent: 150, active: true, onPace: false }, PACE)).toBe("over");
+  });
+});
+
+describe("heatGrid", () => {
+  // 25/09/2026 é sexta. Janela de 42 dias: 15/08 (sábado) a 25/09.
+  const r = computeRitmo([], 42, new Date(2026, 8, 25));
+  const grid = heatGrid(r.cells);
+
+  it("cada célula sabe o próprio dia da semana, pela data local", () => {
+    // Nada de new Date("2026-09-25"): isso é UTC e, em UTC-3, cai na quinta.
+    expect(r.cells.at(-1).weekday).toBe(5);
+    expect(r.cells[0].weekday).toBe(6);
+  });
+
+  it("colunas são semanas de domingo a sábado, preenchidas de cima para baixo", () => {
+    expect(grid.weeks[0]).toHaveLength(7);
+    expect(grid.weeks[0].slice(0, 6)).toEqual(Array(6).fill(null)); // dom-sex antes da janela
+    expect(grid.weeks[0][6].key).toBe("2026-08-15");
+    expect(grid.weeks[1][0].key).toBe("2026-08-16"); // domingo abre a coluna seguinte
+    expect(grid.weeks).toHaveLength(7); // 6 vazios + 42 dias = 48 casas
+    expect(grid.weeks.at(-1).at(-1).key).toBe("2026-09-25");
+  });
+
+  it("rotula o mês na primeira coluna e onde um mês começa", () => {
+    expect(grid.months).toEqual(["Ago", "", "", "Set", "", "", ""]);
   });
 });

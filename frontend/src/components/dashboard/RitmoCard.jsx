@@ -1,27 +1,18 @@
 import { formatBRL, formatDateBR } from "@/lib/utils";
-import { headroom } from "@/lib/ritmo";
+import { heatGrid, heatLevel } from "@/lib/ritmo";
 
 // Intensidade do heatmap: escala sequencial própria (--heat-*), nunca a paleta
-// categórica do donut — reusá-la aqui faria o painel parecer que codifica
-// categoria, quando codifica intensidade. 4 = folga total, 2 = raspou a cota,
-// over = estourou, 0 = dia sem lançamento. Nota: o nível 1 nunca é produzido,
-// por isso a legenda pinta [0, 2, 3, 4].
-function heatLevel(cell, dailyPace) {
-  if (!cell.active) return 0;
-  if (!cell.onPace) return "over";
-  const folga = headroom(cell, dailyPace);
-  if (folga > 0.66) return 4;
-  if (folga > 0.33) return 3;
-  return 2;
-}
-
+// categórica da pizza — reusá-la aqui faria o painel parecer que codifica
+// categoria, quando codifica intensidade. Regra dos níveis em lib/ritmo.js.
 const heatColor = (level) =>
   level === "over" ? "rgb(var(--heat-over))" : `rgb(var(--heat-${level}))`;
 
-const heatGlow = (level) =>
-  level === "over" || level >= 3
-    ? { boxShadow: `0 0 12px -2px ${heatColor(level)}` }
-    : undefined;
+// Rótulo só em seg/qua/sex, como no GitHub: sete rótulos empilhados viram ruído.
+const DIAS = ["", "Seg", "", "Qua", "", "Sex", ""];
+
+// Linha do mês + 7 dias de 24px: rótulos e semanas usam a mesma grade, senão
+// "Seg" deixa de alinhar com a linha da segunda-feira.
+const ROWS = "grid grid-rows-[1rem_repeat(7,1.5rem)] gap-1";
 
 /**
  * Painel "Ritmo financeiro": dias dentro da cota diária, com streak como bônus.
@@ -30,8 +21,11 @@ const heatGlow = (level) =>
  * @param {number} dias  tamanho da janela (só para os rótulos)
  */
 export default function RitmoCard({ ritmo, dias }) {
+  const { weeks, months } = heatGrid(ritmo.cells);
+  const hoje = ritmo.cells.at(-1)?.key;
+
   return (
-    <div className="lg:col-span-5 panel p-6 flex flex-col">
+    <div className="lg:col-span-4 panel p-6 flex flex-col">
       <div className="flex items-start justify-between gap-2">
         <div>
           <h2 className="font-semibold text-content">Ritmo financeiro</h2>
@@ -59,42 +53,61 @@ export default function RitmoCard({ ritmo, dias }) {
             ? `${ritmo.onPaceCount} dos últimos ${dias} dias dentro do seu ritmo de gasto diário`
             : `Sem ritmo calculado nos últimos ${dias} dias`
         }
-        className="grid gap-1 mt-4"
-        style={{ gridTemplateColumns: "repeat(14, minmax(0, 1fr))" }}
+        className="flex gap-1 mt-4 self-start"
       >
-        {ritmo.cells.map((cell, i) => {
-          const level = heatLevel(cell, ritmo.dailyPace);
-          return (
-            <div
-              key={cell.key}
-              title={`${formatDateBR(cell.key)} · ${
-                cell.active
-                  ? `${formatBRL(cell.spent)} de ${formatBRL(ritmo.dailyPace)}`
-                  : "sem lançamentos"
-              }`}
-              style={{ backgroundColor: heatColor(level), ...heatGlow(level) }}
-              className={`heat-cell ${
-                i === ritmo.cells.length - 1
-                  ? "ring-1 ring-accent ring-offset-1 ring-offset-surface"
-                  : ""
-              }`}
-            />
-          );
-        })}
+        <div className={`${ROWS} pr-1 text-[11px] leading-6 text-content-3`}>
+          <span />
+          {DIAS.map((dia, i) => (
+            <span key={i}>{dia}</span>
+          ))}
+        </div>
+
+        {weeks.map((week, c) => (
+          <div key={c} className={ROWS}>
+            <span className="text-[11px] leading-4 text-content-3 whitespace-nowrap">
+              {months[c]}
+            </span>
+            {week.map((cell, r) =>
+              cell ? (
+                <div
+                  key={cell.key}
+                  title={`${formatDateBR(cell.key)} · ${
+                    cell.active
+                      ? `${formatBRL(cell.spent)} de ${formatBRL(ritmo.dailyPace)}`
+                      : "sem lançamentos"
+                  }`}
+                  style={{ backgroundColor: heatColor(heatLevel(cell, ritmo.dailyPace)) }}
+                  className={`heat-cell size-6 ${
+                    cell.key === hoje
+                      ? "ring-1 ring-accent ring-offset-1 ring-offset-surface"
+                      : ""
+                  }`}
+                />
+              ) : (
+                <div key={`vazio-${r}`} />
+              ),
+            )}
+          </div>
+        ))}
       </div>
 
-      <div className="flex items-center justify-between mt-auto pt-4">
-        <span className="text-[11px] text-content-3">Últimos {dias} dias</span>
-        <span className="flex items-center gap-1 text-[11px] text-content-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 mt-auto pt-4 text-[11px] text-content-3">
+        <span>Últimos {dias} dias</span>
+        <span className="flex items-center gap-1">
           Menos
-          {[0, 2, 3, 4].map((level) => (
+          {[1, 2, 3, 4].map((level) => (
             <span
               key={level}
-              className="heat-cell w-2.5 h-2.5 shrink-0"
+              className="heat-cell size-2.5 shrink-0"
               style={{ backgroundColor: heatColor(level) }}
             />
           ))}
           Mais
+          <span
+            className="heat-cell size-2.5 shrink-0 ml-2"
+            style={{ backgroundColor: heatColor("over") }}
+          />
+          Estourou
         </span>
       </div>
     </div>

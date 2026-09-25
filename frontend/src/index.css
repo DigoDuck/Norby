@@ -63,15 +63,15 @@
   --grid-line: 255 255 255;
   --axis: 161 161 170;
 
-  /* Rampa sequencial monotônica, mínimo 3:1 contra o vidro do card já no nível
-     1 (medido: 3,01 / 4,37 / 6,18 / 9,43). A versão anterior começava em 1,69
-     e ainda invertia entre os níveis 1 e 2. */
-  --heat-0: 24 32 52;            /* dia sem lançamento (medido na referência) */
-  --heat-1: 46 100 176;
-  --heat-2: 40 130 220;
-  --heat-3: 60 160 250;
-  --heat-4: 130 200 255;
-  --heat-over: 251 113 133;      /* estourou a cota diária */
+  /* Rampa verde monotônica, como a do GitHub, com mínimo de 3:1 contra o card
+     já no nível 1 (3,8 / 5,7 / 8,3 / 10,8). O 0 é neutro: fora de ritmo ou
+     sem cota, não é dado. */
+  --heat-0: 39 39 42;
+  --heat-1: 21 128 61;           /* dia sem lançamento: no ritmo por omissão */
+  --heat-2: 22 163 74;
+  --heat-3: 34 197 94;
+  --heat-4: 74 222 128;
+  --heat-over: 248 113 113;      /* estourou a cota diária */
 }
 
 [data-theme="light"] {
@@ -115,14 +115,14 @@
   --grid-line: 9 9 11;
   --axis: 82 82 91;
 
-  /* No claro a intensidade cresce escurecendo (medido: 3,18 / 4,27 / 6,27 /
-     9,56 contra o vidro). Não é o escuro invertido: os passos são próprios. */
-  --heat-0: 226 230 241;
-  --heat-1: 110 143 206;
-  --heat-2: 86 120 190;
-  --heat-3: 60 92 168;
-  --heat-4: 37 63 138;
-  --heat-over: 225 66 92;
+  /* No claro a intensidade cresce escurecendo (3,3 / 5,0 / 7,0 / 9,1 contra
+     branco). Não é o escuro invertido: os passos são próprios. */
+  --heat-0: 228 228 231;
+  --heat-1: 22 163 74;
+  --heat-2: 21 128 61;
+  --heat-3: 22 101 52;
+  --heat-4: 20 83 45;
+  --heat-over: 220 38 38;
 }
 
 /* Tokens de composição: carregam alpha próprio, então NÃO passam pelo
@@ -222,9 +222,10 @@
   box-shadow: var(--elev-1);
 }
 
-/* Célula do heatmap. A cor vem inline via backgroundColor. */
+/* Célula do heatmap: azulejo de canto quase reto, como no GitHub. O tamanho
+   vem de quem usa (célula ou amostra da legenda); a cor, inline. */
 .heat-cell {
-  @apply aspect-square rounded-lg border border-line/[0.07] transition-colors;
+  @apply rounded-[3px] border border-line/[0.06];
 }
 
 /* Estrela-norte pulsando: substituto de spinner genérico (assinatura da marca) */

@@ -13,7 +13,7 @@ export default function CategoryDonut({ data, total }) {
   const maiorFatiaPct = total ? Math.round((data[0]?.value / total) * 100) : 0;
 
   return (
-            <div className="lg:col-span-4 panel p-6">
+            <div className="lg:col-span-5 panel p-6">
         <div>
           <h2 className="font-semibold text-content">
             Onde vai seu dinheiro
