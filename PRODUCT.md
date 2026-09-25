@@ -17,7 +17,7 @@ recorrências, e receber leitura de IA sobre o próprio comportamento financeiro
 Norby é um organizador financeiro pessoal com IA ("seu norte financeiro"):
 carteiras, transações, recorrências, metas (SAVINGS/BUDGET) e a Norby IA
 (Gemini), que gera score, leitura do mês e chat. Plano gratuito com limite de 2
-carteiras e sem IA; o Norby+ libera os dois. Sucesso = o usuário confia nos
+carteiras e sem IA; o plano Premium libera os dois. Sucesso = o usuário confia nos
 números à primeira vista e volta todo dia sem fricção.
 
 ## Brand Personality
@@ -39,7 +39,7 @@ copiloto, não como uma consultora pomposa.
 - Dashboard-template: hero-metric com gradiente, cards idênticos em grade.
 - Emoji como ícone.
 - Banco digital que "vende" (badges, confete, banner de upsell). Norby organiza, não
-  vende: o Norby+ aparece só onde um recurso está bloqueado, e diz isso antes da ação.
+  vende: o plano Premium aparece só onde um recurso está bloqueado, e diz isso antes da ação.
 
 ## Design Principles
 

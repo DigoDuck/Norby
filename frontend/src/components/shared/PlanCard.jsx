@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { CreditCard } from "lucide-react";
+import { CreditCard, Check } from "lucide-react";
 
 import { billingApi } from "@/api/billing";
 import { authApi } from "@/api/auth";
@@ -179,6 +179,24 @@ export default function PlanCard() {
       </div>
 
       <p className="text-sm text-content-2 leading-relaxed">{descricao()}</p>
+
+      {/* Quem chega por um "Conhecer o plano Premium" precisa ver o que conhece. */}
+      {restringido && (
+        <div className="mt-4">
+          <p className="text-sm font-medium text-content">O plano Premium libera:</p>
+          <ul className="mt-2 space-y-2 text-sm text-content">
+            {[
+              "Norby IA: a leitura do seu mês, o score financeiro e a conversa",
+              "Carteiras sem o limite de 2 do plano gratuito",
+            ].map((item) => (
+              <li key={item} className="flex items-start gap-2">
+                <Check size={16} aria-hidden="true" className="mt-0.5 shrink-0 text-accent" />
+                {item}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {plan.ai_allowed && uso && (
         <div className="mt-4">

@@ -277,8 +277,8 @@ Se um elemento "brilha", ele está errado.
 - **Tile de KPI:** 16px de canto, bloco interno, padding 16px, rótulo + ícone Lucide
   num círculo + número + chip de variação. O tile focal é safira com texto branco.
 - **Estados:** carregando é esqueleto no formato final (`LoadingCards`); falha é
-  `LoadError` com "Tentar de novo"; recurso do Norby+ é `PremiumLock` (cadeado + uma
-  frase + "Conhecer o Norby+"), nunca um vazio falso.
+  `LoadError` com "Tentar de novo"; recurso do plano Premium é `PremiumLock` (cadeado + uma
+  frase + "Conhecer o plano Premium"), nunca um vazio falso.
 
 ### Inputs / Fields
 - **Estilo:** 12px de canto, 40px de altura, fundo `line/5`, borda `line/15`.
@@ -318,7 +318,7 @@ Se um elemento "brilha", ele está errado.
 - **Do** medir contraste no pixel renderizado, nos dois temas: 4,5:1 para texto, 3:1
   para elementos gráficos. O valor do token sozinho não prova nada.
 - **Do** manter um só preenchimento safira por tela (The One Sapphire Rule).
-- **Do** dizer o plano antes da ação: recurso do Norby+ aparece como `PremiumLock`,
+- **Do** dizer o plano antes da ação: recurso do plano Premium aparece como `PremiumLock`,
   limite de carteiras como "2 de 2 no plano gratuito".
 - **Do** fazer a pizza fechar com o total do tile de Despesas ("Demais categorias").
 - **Do** respeitar `prefers-reduced-motion`; transições de 150–250ms com ease-out,

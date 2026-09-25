@@ -168,7 +168,7 @@ export default function AIAnalyst() {
     return (
       <div className="panel p-10 flex items-center justify-center min-h-[420px]">
         <PremiumLock
-          title="A Norby IA faz parte do Norby+"
+          title="A Norby IA faz parte do plano Premium"
           text="Converse sobre seus gastos, peça sugestões de economia e receba a leitura do seu mês."
         />
       </div>

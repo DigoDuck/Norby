@@ -3,8 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 
 /**
- * Estado bloqueado pelo plano, um só para o app inteiro: diz o que o Norby+
- * libera e leva ao card de Plano (Configurações), onde fica o "Assinar".
+ * Estado bloqueado pelo plano, um só para o app inteiro: diz o que o Premium
+ * libera e leva à aba Plano das Configurações, onde fica o "Assinar".
  * Substitui recursos que antes apareciam e falhavam em silêncio no gratuito.
  */
 export default function PremiumLock({ title, text, className = "" }) {
@@ -18,8 +18,8 @@ export default function PremiumLock({ title, text, className = "" }) {
         <p className="font-semibold text-content">{title}</p>
         <p className="text-sm text-content-2 mt-1 max-w-xs leading-relaxed">{text}</p>
       </div>
-      <Button variant="secondary" onClick={() => navigate("/settings")}>
-        Conhecer o Norby+
+      <Button variant="secondary" onClick={() => navigate("/settings?aba=plano")}>
+        Conhecer o plano Premium
       </Button>
     </div>
   );

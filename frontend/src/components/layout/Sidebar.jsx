@@ -94,7 +94,7 @@ export default function Sidebar() {
           <p className="text-[11px] text-content-2 leading-snug mt-0.5">
             {iaLiberada
               ? "Análises personalizadas do seu perfil financeiro"
-              : "Disponível no Norby+"}
+              : "Disponível no plano Premium"}
           </p>
         </div>
       </NavLink>

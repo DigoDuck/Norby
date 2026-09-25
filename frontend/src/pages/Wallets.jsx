@@ -302,7 +302,7 @@ export default function Wallets() {
         {status === "ok" && noLimite && (
           <div className="inset-panel min-h-[196px] border-dashed border-line/20 flex items-center justify-center p-6">
             <PremiumLock
-              title="Mais carteiras no Norby+"
+              title="Mais carteiras no plano Premium"
               text={`O plano gratuito tem ${limiteCarteiras} carteiras.`}
             />
           </div>
