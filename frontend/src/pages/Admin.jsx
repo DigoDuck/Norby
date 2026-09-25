@@ -14,13 +14,14 @@ const STATUS_TERMINAIS = new Set(["canceled", "incomplete_expired"]);
 
 // Card de métrica: rótulo em microlabel + número em destaque. `tone` sinaliza
 // o valor sem trocar o layout: "warning" perto do limite, "danger" no limite.
-function MetricCard({ label, value, tone }) {
+function MetricCard({ label, value, tone, hint }) {
   const toneClass =
     tone === "danger" ? "text-danger" : tone === "warning" ? "text-warning" : "text-content";
   return (
     <div className="glass p-5">
       <p className="microlabel">{label}</p>
       <p className={`mt-2 text-2xl font-semibold tnum tracking-tight ${toneClass}`}>{value}</p>
+      {hint && <p className="mt-1 text-xs text-content-3">{hint}</p>}
     </div>
   );
 }
@@ -220,12 +221,35 @@ export default function Admin() {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-        <MetricCard label="Usuários" value={metrics.users} />
+      {/* Receita primeiro: é onde há algo a fazer. Números absolutos, sem
+          porcentagem: com a base pequena, uma pessoa a mais vira 20%. */}
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+        <MetricCard
+          label="MRR líquido"
+          value={formatBRL(metrics.mrr_net_brl)}
+          hint="renova no próximo mês, sem a taxa do Stripe"
+        />
         <MetricCard label="Premium ativos" value={metrics.premium} />
+        <MetricCard
+          label="Cancelando"
+          value={metrics.canceling}
+          tone={metrics.canceling > 0 ? "warning" : undefined}
+          hint="pagam só até o fim do período"
+        />
+        <MetricCard
+          label="Pagamento recusado"
+          value={metrics.past_due}
+          tone={metrics.past_due > 0 ? "danger" : undefined}
+          hint="o Stripe ainda está tentando cobrar"
+        />
+        <MetricCard
+          label="Cadastros (7 dias)"
+          value={metrics.signups_7d}
+          hint={`semana anterior: ${metrics.signups_prev_7d}`}
+        />
+        <MetricCard label="Usuários" value={metrics.users} />
         <MetricCard label="Em trial" value={metrics.trial} />
         <MetricCard label="Vencidos" value={metrics.expired} />
-        <MetricCard label="MRR" value={formatBRL(metrics.mrr_brl)} />
         <MetricCard
           label="IA hoje"
           value={`${metrics.ai_calls_today} / ${metrics.ai_calls_project_limit}`}

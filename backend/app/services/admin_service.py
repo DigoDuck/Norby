@@ -8,9 +8,10 @@ métricas. Service não conhece HTTP: as exceções daqui viram status no router
 
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import and_, func, not_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.sql_models import AdminAction, AiUsageDaily, User
@@ -29,7 +30,11 @@ logger = logging.getLogger(__name__)
 # só para a tela mostrar "X de 500". Não é aplicado em lugar nenhum: quem
 # aplica por usuário é a cota diária do ai_service.
 PROJECT_RPD = 500
-PRECO_MENSAL_BRL = 20
+PRECO_MENSAL_BRL = Decimal("20.00")
+# Taxa do Stripe por cobrança de R$ 20,00, medida na compra real de validação
+# (AGENTS.md, "Ciclo de cobrança validado em produção", 2026-09-06). Se o
+# preço ou o plano do Stripe mudar, este número muda junto.
+TAXA_STRIPE_POR_COBRANCA = Decimal("1.19")
 LIMITE_LISTA = 500
 
 
@@ -50,13 +55,35 @@ async def metricas(db: AsyncSession) -> dict:
     e agregação entram no dia em que este `count` doer."""
     agora = datetime.now(timezone.utc)
     sem_premium = or_(User.premium_until.is_(None), User.premium_until <= agora)
+    ativo = User.premium_until > agora
+    cancelando = and_(ativo, User.cancel_at_period_end.is_(True))
+    # O Stripe não move o premium_until quando o cartão falha (ADR 0001):
+    # quem está past_due ainda aparece como ativo até o período acabar.
+    # `coalesce`: sem ele, status NULL dá `= 'past_due'` NULL, o NOT(...)
+    # abaixo também vira NULL, e a pessoa some do MRR em vez de contar nele.
+    recusado = and_(ativo, func.coalesce(User.subscription_status, "") == "past_due")
+    semana = timedelta(days=7)
     linha = (
         await db.execute(
             select(
                 func.count(User.id).label("users"),
-                func.count(User.id).filter(User.premium_until > agora).label("premium"),
+                func.count(User.id).filter(ativo).label("premium"),
                 func.count(User.id).filter(User.premium_until <= agora).label("expired"),
                 func.count(User.id).filter(User.ai_trial_ends_at > agora, sem_premium).label("trial"),
+                func.count(User.id).filter(cancelando).label("canceling"),
+                func.count(User.id).filter(recusado).label("past_due"),
+                # Renova no mês que vem: ativo, sem cancelamento marcado e sem
+                # cartão recusado. Quem está nos dois conta uma vez só.
+                func.count(User.id)
+                .filter(ativo, not_(or_(cancelando, recusado)))
+                .label("renovando"),
+                func.count(User.id).filter(User.created_at > agora - semana).label("signups_7d"),
+                func.count(User.id)
+                .filter(
+                    User.created_at > agora - 2 * semana,
+                    User.created_at <= agora - semana,
+                )
+                .label("signups_prev_7d"),
             )
         )
     ).one()
@@ -72,7 +99,14 @@ async def metricas(db: AsyncSession) -> dict:
         "premium": linha.premium,
         "trial": linha.trial,
         "expired": linha.expired,
-        "mrr_brl": linha.premium * PRECO_MENSAL_BRL,
+        "canceling": linha.canceling,
+        "past_due": linha.past_due,
+        # MRR que de fato volta no mês que vem, já sem a taxa do Stripe. O
+        # "premium × R$ 20" de antes somava quem cancelou e quem teve o cartão
+        # recusado, e era bruto.
+        "mrr_net_brl": linha.renovando * (PRECO_MENSAL_BRL - TAXA_STRIPE_POR_COBRANCA),
+        "signups_7d": linha.signups_7d,
+        "signups_prev_7d": linha.signups_prev_7d,
         "ai_calls_today": int(chamadas_hoje),
         "ai_calls_project_limit": PROJECT_RPD,
     }

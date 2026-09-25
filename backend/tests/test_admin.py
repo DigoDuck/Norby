@@ -128,7 +128,7 @@ async def test_metrics_count_the_plan_bands_and_todays_ai_calls(make_auth_client
     assert m["premium"] == 1
     assert m["expired"] == 1
     assert m["trial"] == 2  # admin + trial
-    assert m["mrr_brl"] == 20
+    assert Decimal(m["mrr_net_brl"]) == admin_service.PRECO_MENSAL_BRL - admin_service.TAXA_STRIPE_POR_COBRANCA
     assert m["ai_calls_today"] == 5  # ontem não conta
     assert m["ai_calls_project_limit"] == admin_service.PROJECT_RPD
 
@@ -325,3 +325,51 @@ async def test_recovery_email_without_brevo_is_a_503(make_auth_client, db_sessio
         settings.brevo_api_key = antes
     assert res.status_code == 503, res.text
     assert await _auditoria(db_session) == []
+
+
+@pytest.mark.asyncio
+async def test_mrr_counts_only_revenue_that_renews_net_of_the_stripe_fee(make_auth_client, db_session):
+    # O MRR antigo era premium ativos × R$ 20. Contava quem já cancelou (paga
+    # até o fim do período e não renova), quem está com cartão recusado (o
+    # Stripe não mexe no premium_until quando a cobrança falha) e ignorava a
+    # taxa do Stripe. O número otimista é o que leva a decidir errado.
+    admin = await make_auth_client("Admin")
+    await _promover(admin, db_session)
+    agora = datetime.now(timezone.utc)
+
+    renova = await _usuario(await make_auth_client("Renova"), db_session)
+    renova.premium_until = agora + timedelta(days=20)
+    renova.subscription_status = "active"
+    cancelando = await _usuario(await make_auth_client("Cancelando"), db_session)
+    cancelando.premium_until = agora + timedelta(days=10)
+    cancelando.subscription_status = "active"
+    cancelando.cancel_at_period_end = True
+    recusado = await _usuario(await make_auth_client("Recusado"), db_session)
+    recusado.premium_until = agora + timedelta(days=5)
+    recusado.subscription_status = "past_due"
+    await db_session.commit()
+
+    m = (await admin.get("/admin/metrics")).json()
+    assert m["premium"] == 3
+    assert m["canceling"] == 1
+    assert m["past_due"] == 1
+    assert Decimal(m["mrr_net_brl"]) == admin_service.PRECO_MENSAL_BRL - admin_service.TAXA_STRIPE_POR_COBRANCA
+    assert "mrr_brl" not in m, "o número bruto saiu: não pode ser lido por engano"
+
+
+@pytest.mark.asyncio
+async def test_signups_are_counted_for_this_week_and_the_one_before(make_auth_client, db_session):
+    # Sem eixo de tempo não dá para saber se está entrando gente. Números
+    # absolutos, sem porcentagem: com base pequena, uma pessoa vira 20%.
+    admin = await make_auth_client("Admin")
+    await _promover(admin, db_session)
+    agora = datetime.now(timezone.utc)
+    antiga = await _usuario(await make_auth_client("Antiga"), db_session)
+    antiga.created_at = agora - timedelta(days=10)
+    muito_antiga = await _usuario(await make_auth_client("MuitoAntiga"), db_session)
+    muito_antiga.created_at = agora - timedelta(days=30)
+    await db_session.commit()
+
+    m = (await admin.get("/admin/metrics")).json()
+    assert m["signups_7d"] == 1  # só o próprio admin, que acabou de se cadastrar
+    assert m["signups_prev_7d"] == 1
