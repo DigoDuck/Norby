@@ -8,6 +8,7 @@ import { aiApi } from "@/api/ai";
 import { useAuthStore } from "@/store/authStore";
 import { apiErrorMessage, formatDateBR } from "@/lib/utils";
 import { PRECO_MENSAL } from "@/lib/plano";
+import { urlDoStripe } from "@/lib/stripe";
 import { Button } from "@/components/ui/button";
 
 /**
@@ -112,8 +113,15 @@ export default function PlanCard() {
           ? await billingApi.checkoutSession()
           : await billingApi.portalSession();
       // Checkout e Portal são HOSPEDADOS: a pessoa sai do app de propósito,
-      // para a CSP não precisar abrir para js.stripe.com (ADR 0001).
-      window.location.assign(data.url);
+      // para a CSP não precisar abrir para js.stripe.com (ADR 0001). O
+      // destino é conferido antes (lib/stripe.js): fora do Stripe, não sai.
+      const destino = urlDoStripe(data?.url);
+      if (!destino) {
+        setErro("Não foi possível abrir agora. Tente de novo.");
+        setCarregando("");
+        return;
+      }
+      window.location.assign(destino);
     } catch (err) {
       setErro(apiErrorMessage(err, "Não foi possível abrir agora. Tente de novo."));
       setCarregando("");
