@@ -282,3 +282,96 @@ async def test_the_photo_travels_in_the_lgpd_export(make_auth_client, mongo):
     assert dump["profile"]["photo_webp_base64"]
     bruto = base64.b64decode(dump["profile"]["photo_webp_base64"])
     assert Image.open(io.BytesIO(bruto)).format == "WEBP"
+
+
+class _DecodeTravado:
+    """`processar_foto` falso que fica parado até o teste liberar, contando
+    quantos decodes rodam AO MESMO TEMPO — é esse número que o teto protege
+    (cada decode real custa dezenas de MB, #155)."""
+
+    def __init__(self):
+        import threading
+
+        self.liberar = threading.Event()
+        self._trava = threading.Lock()
+        self.rodando = 0
+        self.maximo = 0
+
+    def __call__(self, corpo):
+        with self._trava:
+            self.rodando += 1
+            self.maximo = max(self.maximo, self.rodando)
+        try:
+            self.liberar.wait(timeout=10)
+            return b"RIFF-falso-webp"
+        finally:
+            with self._trava:
+                self.rodando -= 1
+
+    async def espera_rodando(self, n, timeout=5.0):
+        import asyncio
+
+        prazo = asyncio.get_running_loop().time() + timeout
+        while self.rodando < n:
+            if asyncio.get_running_loop().time() > prazo:
+                raise AssertionError(f"só {self.rodando} decode(s) começaram, esperava {n}")
+            await asyncio.sleep(0.01)
+
+
+@pytest.mark.asyncio
+async def test_a_cancelled_upload_does_not_free_a_decode_slot(make_auth_client, monkeypatch):
+    # #165: com o semáforo, cancelar o request (cliente cai, timeout do
+    # proxy) liberava a vaga enquanto a thread do decode seguia rodando — o
+    # teto de 2 decodes simultâneos virava 3, 4, ... Com o pool dedicado, a
+    # vaga é a própria thread: só volta quando o decode termina.
+    import asyncio
+
+    import app.routers.auth as auth_router
+
+    decode = _DecodeTravado()
+    monkeypatch.setattr(auth_router, "processar_foto", decode)
+    alice = await make_auth_client("Alice")
+
+    def _upload():
+        return asyncio.create_task(alice.put("/auth/me/photo", content=b"img"))
+
+    try:
+        primeiros = [_upload(), _upload()]
+        await decode.espera_rodando(2)
+        for tarefa in primeiros:
+            tarefa.cancel()
+        await asyncio.gather(*primeiros, return_exceptions=True)
+
+        terceiro = _upload()
+        await asyncio.sleep(0.3)
+        assert decode.maximo <= 2, f"{decode.maximo} decodes rodaram ao mesmo tempo"
+    finally:
+        decode.liberar.set()
+    assert (await asyncio.wait_for(terceiro, timeout=10)).status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_a_upload_waiting_too_long_for_a_slot_gets_503(make_auth_client, monkeypatch):
+    # #165: quem esperava vaga no semáforo segurava o corpo (até 2 MB) na
+    # memória sem limite de tempo. Agora a espera tem teto e vira 503, que o
+    # frontend pode repetir.
+    import asyncio
+
+    import app.routers.auth as auth_router
+
+    decode = _DecodeTravado()
+    monkeypatch.setattr(auth_router, "processar_foto", decode)
+    monkeypatch.setattr(auth_router, "_ESPERA_MAXIMA_DECODE_FOTO", 0.2)
+    alice = await make_auth_client("Alice")
+
+    try:
+        ocupando = [
+            asyncio.create_task(alice.put("/auth/me/photo", content=b"img")) for _ in range(2)
+        ]
+        await decode.espera_rodando(2)
+        esperando = await alice.put("/auth/me/photo", content=b"img")
+        assert esperando.status_code == 503
+        assert decode.maximo == 2
+    finally:
+        decode.liberar.set()
+    await asyncio.gather(*ocupando)

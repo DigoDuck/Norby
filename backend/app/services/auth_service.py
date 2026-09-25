@@ -78,6 +78,43 @@ async def create_refresh_token(user_id: str, db: AsyncSession) -> str:
     return raw
 
 
+async def emitir_sessao_do_login(
+    user: User, hash_verificado: str, hash_novo: str | None, db: AsyncSession
+) -> tuple[str, str] | None:
+    """Emite access + refresh do login SÓ se a senha conferida ainda vale (#165).
+
+    O login confere a senha contra o hash lido antes do bcrypt, que leva
+    centenas de ms. Se um reset_password commitar nesse intervalo, a cascata
+    dele derruba toda sessão existente — mas o refresh deste login, gravado
+    depois, escapava e ficava vivo por 7 dias. Quem redefiniu a senha porque
+    desconfiava de alguém ficava com esse alguém logado.
+
+    Mesma fila por usuário da rotação e do logout (ver _trava_usuario_do_token):
+    trava a linha, relê o hash e o epoch, e só emite se o hash ainda é o que
+    foi conferido. Se mudou, a senha que a pessoa digitou já não é a da conta:
+    devolve None, e a rota responde como credencial inválida. O epoch vem da
+    releitura, não do objeto carregado antes, pelo mesmo motivo.
+
+    `hash_novo` é a regravação do bcrypt legado (verify_and_upgrade), feita
+    aqui dentro para sair no mesmo commit do refresh.
+    """
+    atual = (
+        await db.execute(
+            select(User.password_hash, User.token_epoch)
+            .where(User.id == user.id)
+            .with_for_update()
+        )
+    ).one_or_none()
+    if atual is None or atual.password_hash != hash_verificado:
+        await db.rollback()
+        return None
+    if hash_novo:
+        user.password_hash = hash_novo
+    refresh = _new_refresh(str(user.id), db)
+    await db.commit()
+    return create_access_token(str(user.id), atual.token_epoch), refresh
+
+
 async def revoke_all_refresh_tokens(user_id, db: AsyncSession) -> None:
     """Cascata TERMINAL: usada nos 4 pontos que precisam derrubar toda sessão
     de um usuário — as duas cascatas de roubo abaixo (rotação e logout com
