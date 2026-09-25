@@ -48,4 +48,17 @@ describe("CSP de produção", () => {
     // conteúdo exato, e só ele.
     expect(diretiva(cspDeProducao(), "script-src")).not.toContain("unsafe-inline");
   });
+
+  it("isola a janela de outras origens com Cross-Origin-Opener-Policy", () => {
+    // Sem COOP, uma página de outro site que abra o Norby (ou que o Norby
+    // abra) guarda uma referência à janela dele: dá para trocar a URL dela
+    // por uma cópia falsa (tabnabbing reverso) e medir o que ela carrega. O
+    // Checkout do Stripe não é afetado: ele é aberto na MESMA aba, por
+    // location.assign, não por window.open.
+    const vercel = JSON.parse(readFileSync(resolve("vercel.json"), "utf8"));
+    const coop = vercel.headers
+      .flatMap((entrada) => entrada.headers)
+      .find((cabecalho) => cabecalho.key === "Cross-Origin-Opener-Policy");
+    expect(coop?.value).toBe("same-origin");
+  });
 });

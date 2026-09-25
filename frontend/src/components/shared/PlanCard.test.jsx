@@ -90,6 +90,27 @@ describe("PlanCard", () => {
     );
   });
 
+  it.each([
+    ["outro domínio", "https://evil.example/pay"],
+    ["sufixo enganoso", "https://checkout.stripe.com.evil.example/pay"],
+    ["sem TLS", "http://checkout.stripe.com/c/pay/cs_1"],
+    ["esquema javascript", "javascript:alert(1)"],
+  ])("does not follow a Checkout URL outside Stripe (%s)", async (_caso, url) => {
+    // O botão "Assinar" leva a pessoa para fora do app, para onde a API
+    // mandar. Se a API for comprometida (ou uma resposta adulterada), o
+    // botão vira um redirecionamento aberto para uma página de pagamento
+    // falsa. Só as duas origens do Stripe hospedado passam.
+    const assign = vi.fn();
+    vi.spyOn(window, "location", "get").mockReturnValue({ assign });
+    billingApi.checkoutSession.mockResolvedValue({ data: { url } });
+    renderCard({ ...LIBERADO, ai_allowed: false, wallet_cap_applies: true });
+
+    fireEvent.click(screen.getByRole("button", { name: "Assinar" }));
+
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(assign).not.toHaveBeenCalled();
+  });
+
   it("says it failed instead of pretending the redirect is coming", async () => {
     billingApi.checkoutSession.mockRejectedValue({
       response: { data: { detail: "Assinatura ainda não disponível" } },
