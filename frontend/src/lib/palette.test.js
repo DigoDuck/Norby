@@ -9,7 +9,7 @@ describe("palette", () => {
     expect(antes).toBe(depois);
   });
 
-  // O donut mostra o top-5 de despesas do mês, e o top-5 muda de mês para mês.
+  // A pizza mostra o top-5 de despesas do mês, e o top-5 muda de mês para mês.
   // Como a cor precisa ser estável por categoria, qualquer par de despesas pode
   // acabar na mesma rosca: TODAS as 9 têm que ser distintas, não só as 6
   // primeiras. A versão fraca deste teste deixou passar Moradia e

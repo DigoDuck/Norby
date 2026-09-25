@@ -25,7 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import NorthStar from "@/components/shared/NorthStar";
 import InsightCard from "@/components/dashboard/InsightCard";
-import CategoryDonut from "@/components/dashboard/CategoryDonut";
+import CategoryPie from "@/components/dashboard/CategoryPie";
 import ChartTooltip from "@/components/dashboard/ChartTooltip";
 import RitmoCard from "@/components/dashboard/RitmoCard";
 import Money from "@/components/shared/Money";
@@ -345,7 +345,7 @@ export default function Dashboard() {
 
       {/* ── Linha 2: categorias + ritmo + meta ──────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        <CategoryDonut data={categoryData} total={categoryTotal} />
+        <CategoryPie data={categoryData} total={categoryTotal} />
 
         <RitmoCard ritmo={ritmo} dias={STREAK_DAYS} />
 

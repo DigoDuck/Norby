@@ -4,7 +4,7 @@ import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from "./categories";
 // como atributo de apresentação SVG e o navegador resolve a var (verificado no
 // browser) — a mesma string serve para os dois temas.
 //
-// São 9 porque existem 9 categorias de despesa e o donut do dashboard mostra o
+// São 9 porque existem 9 categorias de despesa e a pizza do dashboard mostra o
 // top-5 do mês. Como o top-5 muda de mês para mês e a cor tem que ser estável
 // por categoria, qualquer par de despesas pode dividir a mesma rosca: com menos
 // de 9 cores, duas fatias vizinhas saem idênticas.

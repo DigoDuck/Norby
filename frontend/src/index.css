@@ -48,18 +48,23 @@
   --danger: 239 68 68;
   --warning: 251 146 60;
 
-  /* Uma cor por categoria de despesa (são 9 em lib/categories.js). Menos que
-     isso e duas fatias do mesmo donut saem iguais — ver Desvios da Fase 1. */
-  /* As quatro primeiras vêm dos pontos da legenda do donut na referência. */
-  --chart-1: 13 127 249;
-  --chart-2: 34 211 238;
-  --chart-3: 151 75 250;
-  --chart-4: 252 167 50;
-  --chart-5: 52 211 153;
-  --chart-6: 244 114 182;
-  --chart-7: 163 230 53;
-  --chart-8: 99 102 241;         /* índigo: o sky anterior colidia com --chart-2 */
-  --chart-9: 148 163 184;        /* neutro: cai em "Outros", a categoria-resto */
+  /* Uma cor por categoria de despesa, na ordem de lib/categories.js
+     (Alimentação, Moradia, Transporte, Saúde, Educação, Lazer, Compras,
+     Contas & Serviços, Outros). Degraus da paleta validada da skill dataviz,
+     sem o vermelho (se confundia com o laranja até em visão normal) e com uma
+     ameixa no lugar. Com 9 categorias, qualquer par pode ficar vizinho na
+     pizza, e nenhum conjunto de 8 matizes passa em todos os pares para
+     daltonismo: a legenda com nome, % e valor é a codificação secundária
+     obrigatória, nunca opcional. "Outros" é cinza, a categoria-resto. */
+  --chart-1: 217 89 38;          /* #D95926 laranja */
+  --chart-2: 57 135 229;         /* #3987E5 azul */
+  --chart-3: 25 158 112;         /* #199E70 água */
+  --chart-4: 0 131 0;            /* #008300 verde */
+  --chart-5: 147 53 180;         /* #9335B4 ameixa */
+  --chart-6: 201 133 0;          /* #C98500 amarelo */
+  --chart-7: 213 81 129;         /* #D55181 magenta */
+  --chart-8: 144 133 233;        /* #9085E9 violeta */
+  --chart-9: 113 113 122;        /* #71717A cinza, "Outros" */
   --grid-line: 255 255 255;
   --axis: 161 161 170;
 
@@ -103,15 +108,17 @@
   --danger: 185 28 28;
   --warning: 194 65 12;          /* #C2410C */
 
-  --chart-1: 29 101 219;
-  --chart-2: 14 138 168;
-  --chart-3: 124 78 230;
-  --chart-4: 194 96 12;
-  --chart-5: 4 120 87;
-  --chart-6: 190 24 93;
-  --chart-7: 77 124 15;
-  --chart-8: 3 105 161;
-  --chart-9: 71 85 105;          /* neutro: cai em "Outros", a categoria-resto */
+  /* Mesmos matizes, degraus do claro. Água, amarelo e magenta ficam abaixo de
+     3:1 sobre branco: a legenda sempre visível é o alívio que isso exige. */
+  --chart-1: 235 104 52;         /* #EB6834 */
+  --chart-2: 42 120 214;         /* #2A78D6 */
+  --chart-3: 27 175 122;         /* #1BAF7A */
+  --chart-4: 0 131 0;            /* #008300 */
+  --chart-5: 163 71 192;         /* #A347C0 */
+  --chart-6: 237 161 0;          /* #EDA100 */
+  --chart-7: 232 123 164;        /* #E87BA4 */
+  --chart-8: 74 58 167;          /* #4A3AA7 */
+  --chart-9: 113 113 122;        /* #71717A */
   --grid-line: 9 9 11;
   --axis: 82 82 91;
 
