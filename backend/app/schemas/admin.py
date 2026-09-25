@@ -8,6 +8,7 @@ Dashboard do Stripe a busca é por e-mail.
 """
 
 from datetime import datetime
+from decimal import Decimal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -32,7 +33,15 @@ class AdminMetrics(BaseModel):
     premium: int
     trial: int
     expired: int
-    mrr_brl: int
+    # Dentro de `premium`: já cancelaram e pagam só até o fim do período.
+    canceling: int
+    # Dentro de `premium`: cobrança recusada, o Stripe ainda está tentando.
+    past_due: int
+    # Receita que volta no mês que vem, sem cancelando/recusado e líquida da
+    # taxa do Stripe. Substitui o antigo `mrr_brl` (premium × R$ 20, bruto).
+    mrr_net_brl: Decimal
+    signups_7d: int
+    signups_prev_7d: int
     ai_calls_today: int
     ai_calls_project_limit: int
 
