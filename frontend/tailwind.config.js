@@ -68,14 +68,9 @@ export default {
             "0%, 100%": { opacity: "0.85", transform: "scale(1)" },
             "50%": { opacity: "1", transform: "scale(1.03)" },
           },
-          "fade-up": {
-            from: { opacity: "0", transform: "translateY(6px)" },
-            to: { opacity: "1", transform: "translateY(0)" },
-          },
         },
         animation: {
           "orb-pulse": "orb-pulse 4s ease-in-out infinite",
-          "fade-up": "fade-up 0.25s ease-out both",
         },
     },
   },

@@ -23,12 +23,7 @@ export default function InsightCard({ insight }) {
   const insightItems = insight?.summary_text?.split("|") || [];
 
   return (
-    <div className="lg:col-span-4 relative overflow-hidden panel border-accent/20 p-6 flex flex-col gap-3">
-      {/* Segundo e último glow do dashboard: presença da IA (ver DESIGN.md) */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{ background: "var(--glow-accent)" }}
-      />
+    <div className="lg:col-span-4 panel p-6 flex flex-col gap-3">
       <div className="relative flex items-center gap-3">
         <AiOrb size={34} />
         <div>
@@ -51,7 +46,7 @@ export default function InsightCard({ insight }) {
               return (
                 <div
                   key={i}
-                  className="stroke-iris p-3.5 rounded-xl text-[13px] font-semibold text-content leading-relaxed"
+                  className="inset-panel p-3.5 text-[13px] font-semibold text-content leading-relaxed"
                 >
                   {text}
                 </div>
@@ -63,7 +58,7 @@ export default function InsightCard({ insight }) {
                 key={i}
                 className="inset-panel flex items-start gap-3 p-3 text-xs text-content-2 leading-relaxed"
               >
-                <span className="shrink-0 w-9 h-9 rounded-xl bg-accent/[0.12] border border-accent/25 grid place-items-center text-accent">
+                <span className="shrink-0 w-9 h-9 rounded-md bg-accent/[0.12] border border-accent/25 grid place-items-center text-accent">
                   <Icon size={16} />
                 </span>
                 {text}
@@ -74,7 +69,7 @@ export default function InsightCard({ insight }) {
       )}
 
       {insight?.suggested_action && (
-        <div className="p-3 rounded-xl bg-accent/10 border border-accent/20">
+        <div className="p-3 rounded-md bg-accent/10 border border-accent/20">
           <p className="text-[11px] font-semibold text-accent mb-1 uppercase tracking-wider">
             Sugestão prática
           </p>
@@ -84,8 +79,8 @@ export default function InsightCard({ insight }) {
 
       <Button
         onClick={() => navigate("/ai")}
-        variant="ghost"
-        className="w-full stroke-iris bg-transparent text-accent font-semibold hover:bg-accent/[0.06]"
+        variant="outline"
+        className="w-full font-semibold"
       >
         Conversar com a Norby <ArrowRight size={14} />
       </Button>

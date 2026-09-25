@@ -229,7 +229,7 @@ export default function Dashboard() {
     <div className="space-y-4">
       {/* ── Linha contextual: a data, sozinha, à esquerda ────────────── */}
       <div className="flex items-center">
-        <span className="control-raised inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[11px] font-semibold text-content-2 uppercase tracking-widest">
+        <span className="control-raised inline-flex items-center gap-2 rounded-md px-3.5 py-1.5 text-[11px] font-semibold text-content-2 uppercase tracking-widest">
           <CalendarDays size={13} className="text-accent" />
           {todayLabel}
         </span>
@@ -238,8 +238,8 @@ export default function Dashboard() {
       {/* ── Linha 1: hero (7 col) + saldo total (5 col) ──────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* Hero: saudação + convite à IA + anel da marca */}
-        <section className="hero-card lg:col-span-7 relative overflow-hidden panel p-6 md:pr-[250px] flex items-center min-h-[228px] animate-fade-up">
-          <div className="hero-card__content min-w-0">
+        <section className="lg:col-span-7 relative overflow-hidden panel p-6 md:pr-[250px] flex items-center min-h-[228px]">
+          <div className="min-w-0">
             <h1 className="text-3xl font-bold text-content tracking-tight">
               Olá, {firstName} 👋
             </h1>
@@ -249,10 +249,10 @@ export default function Dashboard() {
             </p>
             <Button
               onClick={() => navigate("/ai")}
-              className="hero-cta mt-5 h-11 min-w-[208px] justify-between px-6 font-medium"
+              size="lg"
+              className="mt-5"
             >
               Falar com a Norby
-              <span className="hero-cta__sep" aria-hidden="true" />
               <NorthStar size={14} />
             </Button>
           </div>
@@ -261,7 +261,7 @@ export default function Dashboard() {
         </section>
 
         {/* Saldo total */}
-        <section className="lg:col-span-5 panel p-6 flex flex-col gap-4 animate-fade-up">
+        <section className="lg:col-span-5 panel p-6 flex flex-col gap-4">
           <div className="relative flex items-center justify-between gap-3">
             <span className="microlabel">Saldo total</span>
             {wallets.length > 1 && (
@@ -350,18 +350,11 @@ export default function Dashboard() {
         <RitmoCard ritmo={ritmo} dias={STREAK_DAYS} />
 
         {/* Meta em destaque */}
-        <div className="lg:col-span-3 relative overflow-hidden panel border-income/25 p-6 flex flex-col">
-          <div
-            className="absolute inset-0 pointer-events-none"
-            style={{
-              background:
-                "radial-gradient(circle at 15% 90%, rgb(var(--income) / 0.13), transparent 55%)",
-            }}
-          />
+        <div className="lg:col-span-3 panel p-6 flex flex-col">
           {featuredGoal ? (
             <>
               <div className="relative flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-income/15 flex items-center justify-center shrink-0 text-base">
+                <div className="w-9 h-9 rounded-md bg-income/15 flex items-center justify-center shrink-0 text-base">
                   🎯
                 </div>
                 <div className="min-w-0">
@@ -413,7 +406,7 @@ export default function Dashboard() {
           ) : (
             <>
               <div className="relative flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-income/15 flex items-center justify-center shrink-0 text-base">
+                <div className="w-9 h-9 rounded-md bg-income/15 flex items-center justify-center shrink-0 text-base">
                   🎯
                 </div>
                 <h2 className="font-semibold text-content">Metas</h2>
@@ -424,8 +417,8 @@ export default function Dashboard() {
               </p>
               <Button
                 onClick={() => navigate("/goals")}
-                variant="ghost"
-                className="w-full stroke-iris bg-transparent text-accent font-semibold hover:bg-accent/[0.06]"
+                variant="outline"
+                className="w-full font-semibold"
               >
                 Criar uma meta <ArrowRight size={14} />
               </Button>

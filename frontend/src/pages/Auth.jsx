@@ -57,7 +57,7 @@ const registerSchema = loginSchema
 // Visual próprio da tela de entrada (mais alto e arredondado que o dos
 // formulários internos), por isso não usa o shadcnInputCls compartilhado.
 const authInputCls =
-  "h-14 rounded-2xl pl-12 bg-surface/60 border-line/10 text-content placeholder:text-content-3 focus-visible:ring-focus";
+  "h-14 rounded-md pl-12 bg-surface/60 border-line/10 text-content placeholder:text-content-3 focus-visible:ring-focus";
 
 const benefits = [
   {
@@ -203,7 +203,7 @@ export default function Auth() {
             para entrar quer o formulário primeiro, não o argumento de venda. */}
         <section className="auth-copy relative z-10 order-2 xl:order-1">
           <div>
-            <p className="control-raised inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm text-content">
+            <p className="control-raised inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm text-content">
               <NorthStar size={15} className="text-accent" />
               IA que entende suas finanças
             </p>
@@ -231,7 +231,7 @@ export default function Auth() {
                   {/* Tile neutro com o ícone em azure: o princípio "um brilho só"
                       do PRODUCT.md reserva a cor para ação e seleção, então três
                       tintas decorativas aqui competiriam com o CTA. */}
-                  <span className="control-raised grid h-11 w-11 shrink-0 place-items-center rounded-2xl text-accent">
+                  <span className="control-raised grid h-11 w-11 shrink-0 place-items-center rounded-md text-accent">
                     <Icon size={19} aria-hidden="true" />
                   </span>
                   <span>
@@ -265,13 +265,11 @@ export default function Auth() {
             <div className="mt-2.5 h-1.5 w-2/3 rounded-full bg-income/40" />
           </div>
 
-          {/* O palco cria o apoio óptico visto na referência sem introduzir
-              outra camada de backdrop-filter. */}
           {/* Largura fixa em 22rem: o 2xl:w-[26rem] levava o anel a 416px numa
               coluna de 416px em 1536, sem deixar nada para o painel ao lado, e
               o "Receitas" saía cortado. Em telas maiores o scale do
               .auth-layout já amplia a peça. */}
-          <div className="auth-ring-stage absolute left-[29%] top-1/2 w-[22rem] -translate-x-1/2 -translate-y-1/2">
+          <div className="absolute left-[29%] top-1/2 w-[22rem] -translate-x-1/2 -translate-y-1/2">
             <HeroRing className="hero-ring--inline" />
           </div>
         </div>
@@ -306,7 +304,7 @@ export default function Auth() {
             <div
               role="group"
               aria-label="Entrar ou cadastrar"
-              className="mt-7 flex gap-1 rounded-full bg-line/[0.06] p-1"
+              className="mt-7 flex gap-1 rounded-lg bg-line/[0.06] p-1"
             >
               {["login", "register"].map((m) => (
                 <button
@@ -314,7 +312,7 @@ export default function Auth() {
                   type="button"
                   aria-pressed={mode === m}
                   onClick={() => setMode(m)}
-                  className={`flex-1 rounded-full py-2.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-focus-offset ${
+                  className={`flex-1 rounded-md py-2.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-focus-offset ${
                     mode === m
                       ? // A aba já selecionada não ganha hover: clicar nela não
                         // faz nada, e prometer resposta seria mentira.
@@ -330,7 +328,7 @@ export default function Auth() {
             {senhaRedefinida && (
               <div
                 role="status"
-                className="mt-5 rounded-xl border border-accent/20 bg-accent/10 p-3 text-sm text-accent"
+                className="mt-5 rounded-md border border-accent/20 bg-accent/10 p-3 text-sm text-accent"
               >
                 Senha redefinida. Entre com a nova senha.
               </div>
@@ -339,7 +337,7 @@ export default function Auth() {
             {emailAlterado && (
               <div
                 role="status"
-                className="mt-5 rounded-xl border border-accent/20 bg-accent/10 p-3 text-sm text-accent"
+                className="mt-5 rounded-md border border-accent/20 bg-accent/10 p-3 text-sm text-accent"
               >
                 E-mail alterado. Entre com o novo endereço.
               </div>
@@ -485,7 +483,7 @@ export default function Auth() {
               {error && (
                 <div
                   role="alert"
-                  className="rounded-xl border border-danger/20 bg-danger/10 p-3 text-sm text-danger"
+                  className="rounded-md border border-danger/20 bg-danger/10 p-3 text-sm text-danger"
                 >
                   {error}
                 </div>
@@ -494,7 +492,7 @@ export default function Auth() {
               <Button
                 type="submit"
                 disabled={loading}
-                className="hero-cta h-14 w-full justify-between px-6 text-base font-semibold"
+                className="h-12 w-full justify-between px-6 text-base font-semibold"
               >
                 {loading ? (
                   <>

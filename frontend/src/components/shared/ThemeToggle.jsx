@@ -19,7 +19,7 @@ function Preview({ theme }) {
     <div
       data-theme={theme}
       aria-hidden="true"
-      className="flex h-20 w-full gap-1.5 overflow-hidden rounded-xl bg-bg-base p-2 pointer-events-none"
+      className="flex h-20 w-full gap-1.5 overflow-hidden rounded-md bg-bg-base p-2 pointer-events-none"
     >
       <div className="w-1/4 rounded-md border border-line/10 bg-surface" />
       <div className="flex flex-1 flex-col gap-1.5">
@@ -52,7 +52,7 @@ export default function ThemeToggle() {
             role="radio"
             aria-checked={selected}
             onClick={() => choose(option.value)}
-            className={`rounded-2xl border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-focus-offset ${
+            className={`rounded-lg border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-focus-offset ${
               selected
                 ? "border-accent bg-accent/[0.08]"
                 : "border-line/10 hover:border-line/20"

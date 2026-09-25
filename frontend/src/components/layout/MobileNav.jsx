@@ -72,9 +72,9 @@ export default function MobileNav() {
                   to={item.to}
                   onClick={() => setOpen(false)}
                   className={({ isActive }) =>
-                    `relative flex items-center gap-3 px-3.5 py-3 rounded-2xl text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
+                    `relative flex items-center gap-3 px-3.5 py-3 rounded-md text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
                       isActive
-                        ? "nav-active text-accent dark:text-content"
+                        ? "bg-state/[0.07] text-content"
                         : "text-content-2"
                     }`
                   }
@@ -88,7 +88,7 @@ export default function MobileNav() {
             <button
               type="button"
               onClick={handleLogout}
-              className="mt-auto flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-danger hover:bg-danger/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+              className="mt-auto flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium text-danger hover:bg-danger/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
             >
               <LogOut size={18} /> Sair
             </button>

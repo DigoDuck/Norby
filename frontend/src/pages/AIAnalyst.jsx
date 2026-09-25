@@ -135,7 +135,7 @@ export default function AIAnalyst() {
                       key={s.session_id}
                       type="button"
                       onClick={() => openSession(s.session_id)}
-                      className={`flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-[13px] transition-colors ${
+                      className={`flex items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-[13px] transition-colors ${
                         active
                           ? "bg-accent/[0.12] text-accent"
                           : "text-content-2 hover:bg-state/5 hover:text-content"
@@ -273,7 +273,7 @@ export default function AIAnalyst() {
                 onClick={sendMessage}
                 disabled={loading || !input.trim()}
                 size="icon-lg"
-                className="shrink-0 rounded-xl bg-accent-fill text-accent-contrast hover:bg-accent-fill/90 disabled:opacity-40"
+                className="shrink-0 rounded-md bg-accent-fill text-accent-contrast hover:bg-accent-fill/90 disabled:opacity-40"
               >
                 <Send size={17} />
                 <span className="sr-only">Enviar</span>

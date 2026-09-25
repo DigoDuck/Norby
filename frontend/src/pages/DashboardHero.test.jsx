@@ -1,8 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 
 import { aiApi } from "@/api/ai";
 import { dashboardApi } from "@/api/dashboard";
@@ -50,25 +48,13 @@ describe("Dashboard hero", () => {
     goalsApi.list.mockResolvedValue({ data: [] });
   });
 
-  it("renders the dedicated glass hero CTA while keeping the hero ring", async () => {
+  it("keeps the hero ring next to a solid primary CTA", async () => {
     renderDashboard();
 
     const hero = await screen.findByRole("heading", { name: "Olá, Alice 👋" });
     const section = hero.closest("section");
-    const button = screen.getByRole("button", { name: "Falar com a Norby" });
 
-    expect(section).toHaveClass("hero-card");
-    expect(hero.parentElement).toHaveClass("hero-card__content");
-    expect(button).toHaveClass("hero-cta", "h-11", "min-w-[208px]");
-    expect(button.querySelector(".hero-cta__sep")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Falar com a Norby" })).toHaveClass("bg-primary");
     expect(section.querySelector(".hero-ring")).toBeInTheDocument();
-  });
-
-  it("limits the CTA highlight before it reduces white text contrast", () => {
-    const css = readFileSync(resolve("src/index.css"), "utf8");
-
-    expect(css).toContain(
-      "linear-gradient(180deg, rgb(255 255 255 / 0.18), transparent 30%)",
-    );
   });
 });

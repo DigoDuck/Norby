@@ -16,11 +16,10 @@ describe("HeroRing", () => {
     );
   });
 
-  it("expõe o toro e a cáustica apenas como decoração", () => {
+  it("expõe o toro apenas como decoração", () => {
     const { container } = render(<HeroRing />);
 
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
     expect(container.firstChild).toHaveAttribute("aria-hidden", "true");
-    expect(container.querySelector('[data-hero-caustic="true"]')).toBeInTheDocument();
   });
 });

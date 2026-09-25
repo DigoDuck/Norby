@@ -17,11 +17,10 @@ function NavItem({ to, icon, label }) {
     <NavLink
       to={to}
       className={({ isActive }) =>
-        `group relative flex items-center gap-3 px-3.5 py-3 rounded-2xl text-sm font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-focus-offset ${
+        `group relative flex items-center gap-3 px-3.5 py-3 rounded-md text-sm font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-focus-offset ${
           isActive
-            ? // No escuro a referência mantém o label branco e deixa o azure só
-              // no ícone e na estrela; no claro o label é que carrega o acento.
-              "nav-active text-accent dark:text-content"
+            ? // Fundo neutro: o azure fica só no ícone e na estrela.
+              "bg-state/[0.07] text-content"
             : "text-content-2 hover:text-content hover:bg-state/[0.04]"
         }`
       }
@@ -85,7 +84,7 @@ export default function Sidebar() {
       {/* IA do Mês — atalho para o analista */}
       <NavLink
         to="/ai"
-        className="group flex items-center gap-3 p-3.5 mb-4 bg-accent/[0.08] border border-accent/20 rounded-2xl transition-colors hover:bg-accent/[0.14] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-focus-offset"
+        className="group flex items-center gap-3 p-3.5 mb-4 bg-accent/[0.08] border border-accent/20 rounded-md transition-colors hover:bg-accent/[0.14] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-focus-offset"
       >
         <AiOrb size={34} pulse={false} />
         <div className="min-w-0">
