@@ -21,7 +21,11 @@ const METRICS = {
   premium: 1,
   trial: 2,
   expired: 1,
-  mrr_brl: 20,
+  canceling: 0,
+  past_due: 0,
+  mrr_net_brl: "18.81",
+  signups_7d: 2,
+  signups_prev_7d: 3,
   ai_calls_today: 5,
   ai_calls_project_limit: 500,
 };
@@ -102,10 +106,40 @@ describe("Admin", () => {
 
     // Usuários (métrica).
     expect(screen.getByText("5")).toBeInTheDocument();
-    // MRR em BRL.
-    expect(screen.getByText("R$ 20,00")).toBeInTheDocument();
+    // MRR líquido em BRL (vem como string decimal da API).
+    expect(screen.getByText("R$ 18,81")).toBeInTheDocument();
     // IA hoje: chamadas / limite do projeto.
     expect(screen.getByText("5 / 500")).toBeInTheDocument();
+  });
+
+  it("mostra o que ameaça a receita e os cadastros com a semana anterior", async () => {
+    // O MRR antigo somava quem já cancelou e quem teve o cartão recusado. Os
+    // dois agora têm card próprio, com cor quando não são zero: é onde há
+    // algo a fazer (falar com quem cancelou, cobrar quem teve o cartão
+    // recusado).
+    adminApi.metrics.mockResolvedValue({
+      data: { ...METRICS, canceling: 2, past_due: 1 },
+    });
+    renderAdmin();
+
+    const cancelando = await screen.findByText("Cancelando");
+    expect(cancelando.nextElementSibling).toHaveTextContent("2");
+    expect(cancelando.nextElementSibling).toHaveClass("text-warning");
+
+    const recusado = screen.getByText("Pagamento recusado");
+    expect(recusado.nextElementSibling).toHaveTextContent("1");
+    expect(recusado.nextElementSibling).toHaveClass("text-danger");
+
+    expect(screen.getByText("MRR líquido")).toBeInTheDocument();
+    expect(screen.getByText("Cadastros (7 dias)").nextElementSibling).toHaveTextContent("2");
+    expect(screen.getByText("semana anterior: 3")).toBeInTheDocument();
+  });
+
+  it("não pinta de alerta quando não há ninguém cancelando nem recusado", async () => {
+    renderAdmin();
+    const cancelando = await screen.findByText("Cancelando");
+    expect(cancelando.nextElementSibling).toHaveClass("text-content");
+    expect(screen.getByText("Pagamento recusado").nextElementSibling).toHaveClass("text-content");
   });
 
   it("filtra por nome ou e-mail", async () => {
