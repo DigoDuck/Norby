@@ -114,6 +114,27 @@ function Field({ id, label, icon, error, children }) {
   );
 }
 
+// Bloco que entra e sai com o modo (Entrar/Cadastrar) sem salto de layout:
+// anima a linha do grid (0fr ↔ 1fr), não `height`. Fechado fica `inert`: fora
+// do Tab e do leitor de tela, mesmo continuando no DOM. O -mx-1/px-1 dá folga
+// para o anel de foco dos campos não ser cortado pelo overflow. O espaçamento
+// (className) vai no filho de dentro: padding na div do min-h-0 não encolhe, e
+// o bloco fechado ficava com 12px, dobrando o vão entre os campos.
+function Reveal({ open, className = "", children }) {
+  return (
+    <div
+      inert={!open}
+      className={`grid transition-[grid-template-rows,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+        open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+      }`}
+    >
+      <div className="-mx-1 min-h-0 overflow-hidden px-1">
+        <div className={className}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
 export default function Auth() {
   const [mode, setMode] = useState("login"); // "login" | "register"
   const [showPass, setShowPass] = useState(false);
@@ -273,20 +294,27 @@ export default function Auth() {
             <div
               role="group"
               aria-label="Entrar ou cadastrar"
-              className="mt-7 flex gap-1 rounded-full bg-line/[0.06] p-1"
+              className="relative mt-7 flex gap-1 rounded-full bg-line/[0.06] p-1"
             >
+              {/* Pílula de tinta que desliza para o modo escolhido: a troca
+                  vira movimento, não um salto de cor. */}
+              <span
+                aria-hidden="true"
+                className="absolute inset-y-1 left-1 w-[calc(50%-6px)] rounded-full bg-content transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
+                style={{ transform: mode === "register" ? "translateX(calc(100% + 4px))" : "none" }}
+              />
               {["login", "register"].map((m) => (
                 <button
                   key={m}
                   type="button"
                   aria-pressed={mode === m}
                   onClick={() => setMode(m)}
-                  className={`flex-1 rounded-full py-2.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-focus-offset ${
+                  className={`relative z-10 flex-1 rounded-full py-2.5 text-sm font-semibold transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-focus-offset ${
                     mode === m
                       ? // A aba já selecionada não ganha hover: clicar nela não
                         // faz nada, e prometer resposta seria mentira.
-                        "auth-mode-active"
-                      : "text-content-2 hover:bg-state/[0.05] hover:text-content"
+                        "text-bg-base"
+                      : "text-content-2 hover:text-content"
                   }`}
                 >
                   {m === "login" ? "Entrar" : "Cadastrar"}
@@ -312,8 +340,8 @@ export default function Auth() {
               </div>
             )}
 
-            <form className="mt-5 space-y-3" onSubmit={handleSubmit(onSubmit)}>
-              {mode === "register" && (
+            <form className="mt-5 flex flex-col" onSubmit={handleSubmit(onSubmit)}>
+              <Reveal open={mode === "register"} className="pb-3">
                 <Field
                   id="auth-name"
                   label="Seu nome"
@@ -322,7 +350,7 @@ export default function Auth() {
                 >
                   <Input placeholder="Seu nome" {...register("name")} className={authInputCls} />
                 </Field>
-              )}
+              </Reveal>
 
               <Field
                 id="auth-email"
@@ -339,6 +367,7 @@ export default function Auth() {
                 />
               </Field>
 
+              <div className="mt-3">
               <Field
                 id="auth-password"
                 label="Senha"
@@ -364,8 +393,9 @@ export default function Auth() {
                   </span>
                 </button>
               </Field>
+              </div>
 
-              {mode === "register" && (
+              <Reveal open={mode === "register"} className="pt-3">
                 <Field
                   id="auth-confirm-password"
                   label="Confirmar senha"
@@ -380,12 +410,12 @@ export default function Auth() {
                     className={authInputCls}
                   />
                 </Field>
-              )}
+              </Reveal>
 
               {/* Deixou de ser "em breve" com o #36: /auth/forgot-password
                   existe. O botão desabilitado e o chip saíram junto — rótulo de
                   estado que não corresponde mais ao estado é pior que nenhum. */}
-              {mode === "login" && (
+              <Reveal open={mode === "login"} className="pt-3">
                 <div className="flex items-center justify-between gap-3 pt-0.5">
                   {/* #175: desmarcada por padrão. Sem ela, a sessão acaba 24h
                       depois do login e o cookie some com o navegador — o
@@ -407,9 +437,9 @@ export default function Auth() {
                     Esqueceu a senha?
                   </Link>
                 </div>
-              )}
+              </Reveal>
 
-              {mode === "register" && (
+              <Reveal open={mode === "register"} className="pt-3">
                 <div>
                   <label className="flex items-start gap-2 text-xs text-content-2">
                     <input
@@ -447,12 +477,12 @@ export default function Auth() {
                     </p>
                   )}
                 </div>
-              )}
+              </Reveal>
 
               {error && (
                 <div
                   role="alert"
-                  className="rounded-xl border border-danger/20 bg-danger/10 p-3 text-sm text-danger"
+                  className="mt-3 rounded-xl border border-danger/20 bg-danger/10 p-3 text-sm text-danger"
                 >
                   {error}
                 </div>
@@ -461,7 +491,7 @@ export default function Auth() {
               <Button
                 type="submit"
                 disabled={loading}
-                className="h-12 w-full justify-between px-6 text-base font-semibold"
+                className="mt-3 h-12 w-full justify-between px-6 text-base font-semibold"
               >
                 {loading ? (
                   <>

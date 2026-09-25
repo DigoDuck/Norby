@@ -263,10 +263,24 @@
 }
 .star-loading { animation: star-pulse 1.4s ease-in-out infinite; }
 
-/* Aba selecionada do login: a mesma tinta do botão principal. */
-.auth-mode-active {
-  color: rgb(var(--bg-base));
-  background: rgb(var(--content));
+/* Movimento: estado e entrada, nunca decoração. Curva ease-out-quint, sem
+   bounce. Os dois começam do estado final com `both`: se a animação não
+   rodar, o conteúdo já está lá (o prefers-reduced-motion abaixo zera tudo). */
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+/* Troca de página ou de aba: 220ms, curto o bastante para não atrasar a tarefa. */
+.motion-page { animation: page-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+/* Entrada escalonada de um grupo (KPIs): --i é a posição no grupo, 60ms entre
+   um e outro. Só dentro de um grupo pequeno, nunca a página inteira. */
+.motion-rise {
+  animation: rise-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--i, 0) * 60ms);
 }
 
 .auth-layout {
