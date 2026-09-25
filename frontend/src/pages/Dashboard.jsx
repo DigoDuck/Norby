@@ -9,6 +9,7 @@ import {
   ArrowDownLeft,
   PiggyBank,
   Sparkles,
+  Lock,
 } from "lucide-react";
 import {
   AreaChart,
@@ -34,6 +35,7 @@ import StatTile from "@/components/dashboard/StatTile";
 import Money from "@/components/shared/Money";
 import WalletMark from "@/components/shared/WalletMark";
 import { LoadError } from "@/components/shared/LoadState";
+import { usePlano } from "@/lib/plan";
 import { useAuthStore } from "@/store/authStore";
 import { formatDateBR, formatBRL, parseDateOnly } from "@/lib/utils";
 import { emojiForCategory } from "@/lib/categories";
@@ -101,6 +103,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
+  const { iaLiberada } = usePlano();
 
   // Falha nunca vira zero. Saldo e resumo são o coração da tela: sem eles, a
   // tela troca os números por um aviso. Os outros painéis falham sozinhos.
@@ -277,9 +280,14 @@ export default function Dashboard() {
             Seu saldo, seus gastos e seu ritmo neste mês.
           </p>
         </div>
-        <Button onClick={() => navigate("/ai")} size="lg">
-          Falar com a Norby
-          <NorthStar size={14} />
+        {/* Sem IA no plano, o convite não pode ser a ação principal da tela. */}
+        <Button
+          onClick={() => navigate(iaLiberada ? "/ai" : "/settings")}
+          size="lg"
+          variant={iaLiberada ? "default" : "secondary"}
+        >
+          {iaLiberada ? "Falar com a Norby" : "IA no Norby+"}
+          {iaLiberada ? <NorthStar size={14} /> : <Lock size={14} aria-hidden="true" />}
         </Button>
       </header>
 
@@ -387,6 +395,7 @@ export default function Dashboard() {
             label="Score IA"
             value={insight?.score != null ? `${insight.score}/100` : "—"}
             icon={Sparkles}
+            note={iaLiberada ? "este mês" : "disponível no Norby+"}
           />
         </section>
 
@@ -562,7 +571,7 @@ export default function Dashboard() {
           )}
         </div>
 
-        <InsightCard insight={insight} />
+        <InsightCard insight={insight} bloqueada={!iaLiberada} />
       </div>
 
       {/* ── Linha 4: movimentações recentes ──────────────────────────── */}

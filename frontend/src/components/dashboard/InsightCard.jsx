@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { AlertTriangle, ArrowRight, Check, Sparkles } from "lucide-react";
 import AiOrb from "@/components/shared/AiOrb";
+import PremiumLock from "@/components/shared/PremiumLock";
 import { Button } from "@/components/ui/button";
 
 // Ícone contextual dos insights da IA (heurística simples em pt-BR).
@@ -17,8 +18,9 @@ function insightIcon(text) {
  * Painel "Leitura da IA" do dashboard.
  *
  * @param {{ summary_text?: string, suggested_action?: string|null } | null} insight
+ * @param {boolean} [bloqueada]  plano sem IA: mostra o convite, não um vazio falso
  */
-export default function InsightCard({ insight }) {
+export default function InsightCard({ insight, bloqueada = false }) {
   const navigate = useNavigate();
   const insightItems = insight?.summary_text?.split("|") || [];
 
@@ -33,7 +35,13 @@ export default function InsightCard({ insight }) {
           </p>
         </div>
       </div>
-      {insightItems.length === 0 ? (
+      {bloqueada ? (
+        <PremiumLock
+          className="flex-1 justify-center"
+          title="A leitura da IA é do Norby+"
+          text="Assine para receber a análise do seu mês e sugestões práticas."
+        />
+      ) : insightItems.length === 0 ? (
         <div className="flex-1 flex items-center justify-center text-content-3 text-xs text-center">
           Adicione transações para gerar sua análise de IA
         </div>
@@ -77,13 +85,15 @@ export default function InsightCard({ insight }) {
         </div>
       )}
 
-      <Button
-        onClick={() => navigate("/ai")}
-        variant="outline"
-        className="w-full font-semibold"
-      >
-        Conversar com a Norby <ArrowRight size={14} />
-      </Button>
+      {!bloqueada && (
+        <Button
+          onClick={() => navigate("/ai")}
+          variant="outline"
+          className="w-full font-semibold"
+        >
+          Conversar com a Norby <ArrowRight size={14} />
+        </Button>
+      )}
     </div>
   );
 }

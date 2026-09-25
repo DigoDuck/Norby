@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import NorthStar from "@/components/shared/NorthStar";
 import AiOrb from "@/components/shared/AiOrb";
+import PremiumLock from "@/components/shared/PremiumLock";
+import { usePlano } from "@/lib/plan";
 
 const WELCOME = {
   role: "assistant",
@@ -42,10 +44,13 @@ export default function AIAnalyst() {
   const [insight, setInsight] = useState(null);
   const bottomRef = useRef(null);
 
+  const { iaLiberada } = usePlano();
+
   useEffect(() => {
+    if (!iaLiberada) return;
     aiApi.getSessions().then((r) => setSessions(r.data)).catch(() => {});
     aiApi.getInsight().then((r) => setInsight(r.data)).catch(() => {});
-  }, []);
+  }, [iaLiberada]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -158,6 +163,17 @@ export default function AIAnalyst() {
       </div>
     </>
   );
+
+  if (!iaLiberada) {
+    return (
+      <div className="panel p-10 flex items-center justify-center min-h-[420px]">
+        <PremiumLock
+          title="A analista da Norby é do Norby+"
+          text="Converse sobre seus gastos, peça sugestões de economia e receba a leitura do seu mês."
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-[calc(100vh-3rem)] flex-col gap-4 lg:flex-row">

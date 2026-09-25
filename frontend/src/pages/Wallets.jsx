@@ -8,6 +8,8 @@ import Money from "@/components/shared/Money";
 import WalletMark from "@/components/shared/WalletMark";
 import { LoadError, LoadingCards } from "@/components/shared/LoadState";
 import { useLoad } from "@/lib/useLoad";
+import { usePlano } from "@/lib/plan";
+import PremiumLock from "@/components/shared/PremiumLock";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MoneyInput } from "@/components/ui/money-input";
@@ -38,6 +40,9 @@ export default function Wallets() {
     setWallets((await walletsApi.list()).data);
   }, []);
   const { status, reload } = useLoad(load);
+  const { limiteCarteiras } = usePlano();
+  // No limite do gratuito, "nova carteira" daria 403 depois do form preenchido.
+  const noLimite = limiteCarteiras !== null && wallets.length >= limiteCarteiras;
 
   async function handleSave() {
     if (!form.name.trim()) return setError("Informe um nome.");
@@ -118,6 +123,7 @@ export default function Wallets() {
                 <span className="text-accent font-medium tnum">
                   {formatBRL(totalBalance)}
                 </span>
+                {noLimite && ` · ${wallets.length} de ${limiteCarteiras} no plano gratuito`}
               </>
             ) : (
               <span aria-hidden="true" className="inline-block h-3.5 w-48 rounded-full bg-line/[0.07] motion-safe:animate-pulse align-middle" />
@@ -126,6 +132,7 @@ export default function Wallets() {
         </div>
         <Button
           onClick={openNew}
+          disabled={noLimite}
           className="font-medium"
         >
           <Plus size={16} /> Nova carteira
@@ -301,8 +308,17 @@ export default function Wallets() {
           );
         })}
 
+        {status === "ok" && noLimite && (
+          <div className="inset-panel min-h-[196px] border-dashed border-line/20 flex items-center justify-center p-6">
+            <PremiumLock
+              title="Mais carteiras no Norby+"
+              text={`O plano gratuito tem ${limiteCarteiras} carteiras.`}
+            />
+          </div>
+        )}
+
         {/* Card tracejado "adicionar" */}
-        {status === "ok" && wallets.length > 0 && (
+        {status === "ok" && wallets.length > 0 && !noLimite && (
           <button
             type="button"
             onClick={openNew}

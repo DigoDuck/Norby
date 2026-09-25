@@ -14,7 +14,9 @@ const buttonVariants = cva(
         outline:
           "border-line/15 bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground",
         secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80 aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
+          // Borda própria: o fundo inset sozinho some sobre painel e tile, e o
+          // botão lia como texto solto (ou desabilitado, no tema claro).
+          "border-line/15 bg-secondary text-secondary-foreground hover:bg-state/[0.08] aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
         ghost:
           "hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground",
         destructive:

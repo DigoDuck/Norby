@@ -15,6 +15,7 @@ export default function StatTile({
   delta,
   upIsGood = true,
   hint = "vs. mês passado",
+  note = "este mês",
   highlight = false,
 }) {
   const good = delta === undefined || (upIsGood ? delta >= 0 : delta <= 0);
@@ -62,7 +63,7 @@ export default function StatTile({
           </span>
         )}
         <span className={highlight ? "" : "text-content-3"}>
-          {delta !== undefined ? hint : "este mês"}
+          {delta !== undefined ? hint : note}
         </span>
       </div>
     </div>

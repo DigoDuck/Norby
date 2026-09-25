@@ -7,6 +7,7 @@ import NorthStar from "../shared/NorthStar";
 import AiOrb from "../shared/AiOrb";
 import { mainItems, prefItems, adminItems } from "./navItems";
 import Avatar from "@/components/shared/Avatar";
+import { usePlano } from "@/lib/plan";
 
 // Item de navegação: ativo = moldura iridescente + acento no ícone, no label e
 // na estrela. O acento chapado segue reservado ao CTA primário (ver DESIGN.md);
@@ -37,6 +38,7 @@ function NavItem({ to, icon, label }) {
 }
 
 export default function Sidebar() {
+  const { iaLiberada } = usePlano();
   const user = useAuthStore((s) => s.user);
   const isAdmin = Boolean(user?.is_admin);
   const navigate = useNavigate();
@@ -90,7 +92,9 @@ export default function Sidebar() {
         <div className="min-w-0">
           <p className="text-xs font-semibold text-accent">IA do Mês</p>
           <p className="text-[11px] text-content-2 leading-snug mt-0.5">
-            Análises personalizadas do seu perfil financeiro
+            {iaLiberada
+              ? "Análises personalizadas do seu perfil financeiro"
+              : "Disponível no Norby+"}
           </p>
         </div>
       </NavLink>
