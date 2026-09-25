@@ -51,6 +51,11 @@ const EMPTY_SUMMARY = {
   top_categories: [],
 };
 
+// Centavos dos tiles: um degrau menor, como no saldo. No tile azul, branco a
+// 75% ainda passa 4,5:1 sobre o royal.
+const TILE_CENTS = "text-base sm:text-lg text-content-2";
+const TILE_CENTS_ON_ACCENT = "text-base sm:text-lg text-accent-contrast/75";
+
 const INCOME_COLOR = "rgb(var(--income))";
 const EXPENSE_COLOR = "rgb(var(--expense))";
 
@@ -189,12 +194,19 @@ export default function Dashboard() {
     Saídas: parseFloat(p.expenses),
   }));
 
-  const categoryData = s.top_categories.map((c) => ({
+  // O backend manda o top-5; o que sobra vira "Demais categorias" para a
+  // pizza fechar com o tile de Despesas. Antes ela somava só o top-5 e dizia
+  // um total menor que o do tile ao lado.
+  const topCategorias = s.top_categories.map((c) => ({
     name: c.category,
     value: parseFloat(c.total),
   }));
-  const categoryTotal = categoryData.reduce((sum, c) => sum + c.value, 0);
-  const categoryMax = Math.max(1, ...categoryData.map((c) => c.value));
+  const resto = monthExpenses - topCategorias.reduce((sum, c) => sum + c.value, 0);
+  const categoryData =
+    resto >= 0.01
+      ? [...topCategorias, { name: "Demais categorias", value: resto, resto: true }]
+      : topCategorias;
+  const categoryTotal = monthExpenses;
 
   // Ponto de fim de linha do fluxo de caixa (detalhe do rascunho aprovado)
   const endDot = (color) =>
@@ -225,13 +237,6 @@ export default function Dashboard() {
   const todayLabel = new Date()
     .toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "long" })
     .replace(".", "");
-  // "julho de 2026" → "Julho de 2026" (capitalize do CSS pegaria o "De" também)
-  const rawMonthYear = new Date().toLocaleDateString("pt-BR", {
-    month: "long",
-    year: "numeric",
-  });
-  const monthYearLabel =
-    rawMonthYear.charAt(0).toUpperCase() + rawMonthYear.slice(1);
 
   if (loading) {
     return (
@@ -357,25 +362,26 @@ export default function Dashboard() {
         {/* KPIs do mês: um tile só leva o acento, é o ponto focal da tela */}
         <section className="lg:col-span-5 panel p-4 grid grid-cols-2 gap-3 content-start">
           <h2 className="sr-only">Resumo do mês</h2>
+          {/* A Sobra é o foco: responde "como estou este mês?" de relance. */}
           <StatTile
             highlight
+            label="Sobra do mês"
+            value={<Money value={monthNet} centsClassName={TILE_CENTS_ON_ACCENT} />}
+            icon={PiggyBank}
+            delta={netChange}
+          />
+          <StatTile
             label="Receitas"
-            value={formatBRL(monthIncome)}
+            value={<Money value={monthIncome} centsClassName={TILE_CENTS} />}
             icon={ArrowDownLeft}
             delta={incomeChange}
           />
           <StatTile
             label="Despesas"
-            value={formatBRL(monthExpenses)}
+            value={<Money value={monthExpenses} centsClassName={TILE_CENTS} />}
             icon={ArrowUpRight}
             delta={expenseChange}
             upIsGood={false}
-          />
-          <StatTile
-            label="Sobra do mês"
-            value={formatBRL(monthNet)}
-            icon={PiggyBank}
-            delta={netChange}
           />
           <StatTile
             label="Score IA"
@@ -559,62 +565,10 @@ export default function Dashboard() {
         <InsightCard insight={insight} />
       </div>
 
-      {/* ── Linha 4: gastos por categoria + movimentações recentes ──── */}
+      {/* ── Linha 4: movimentações recentes ──────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        {/* Gastos por categoria (barras) */}
-        <div className="lg:col-span-6 panel p-6">
-          <div className="flex items-center justify-between mb-5">
-            <h2 className="font-semibold text-content">
-              Gastos por categoria
-            </h2>
-            <span className="text-xs text-content-3">
-              {monthYearLabel}
-            </span>
-          </div>
-
-          {categoryData.length === 0 ? (
-            <div className="flex items-center justify-center h-[150px] text-content-3 text-xs text-center px-4">
-              Registre despesas para ver o ranking de categorias
-            </div>
-          ) : (
-            <div className="flex flex-col gap-4">
-              {categoryData.map((c, i) => {
-                const width = Math.max(6, (c.value / categoryMax) * 92);
-                const barOpacity = [1, 0.55, 0.45, 0.4, 0.35][i] ?? 0.3;
-                return (
-                  <div key={c.name}>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-[13px] text-content-2">
-                        {c.name}
-                      </span>
-                      <span
-                        className={`text-[13px] tnum ${
-                          i === 0
-                            ? "font-semibold text-accent"
-                            : "font-medium text-content-2"
-                        }`}
-                      >
-                        {formatBRL(c.value)}
-                      </span>
-                    </div>
-                    <div className="h-2 rounded-full bg-line/[0.06] overflow-hidden">
-                      <div
-                        className="h-full rounded-full"
-                        style={{
-                          width: `${width}%`,
-                          background: `rgb(var(--accent) / ${barOpacity})`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
         {/* Movimentações recentes */}
-        <div className="lg:col-span-6 panel p-6 flex flex-col">
+        <div className="lg:col-span-12 panel p-6 flex flex-col">
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-semibold text-content">
               Movimentações recentes

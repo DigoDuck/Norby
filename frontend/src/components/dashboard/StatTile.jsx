@@ -50,7 +50,9 @@ export default function StatTile({
         </span>
       </div>
 
-      <p className="text-2xl font-semibold tnum tracking-tight truncate">{value}</p>
+      {/* Sem truncate: valor cortado ("R$ 6.200,…") é pior que valor que
+          quebra linha. Em tela estreita a fonte desce um degrau. */}
+      <p className="text-xl sm:text-2xl font-semibold tnum tracking-tight break-words">{value}</p>
 
       <div className="flex items-center gap-2 text-[11px]">
         {delta !== undefined && (

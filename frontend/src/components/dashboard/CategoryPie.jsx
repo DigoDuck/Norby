@@ -5,12 +5,14 @@ import ChartTooltip from "./ChartTooltip";
 // Cor pela posição da fatia (maior primeiro), num matiz só: a cor mostra o
 // peso, e quem diz a categoria é a legenda, sempre visível ao lado.
 const pieColor = (i) => `rgb(var(--pie-${Math.min(i, 4) + 1}))`;
+// "Demais categorias" é o resto, não uma categoria: fica em cinza, por último.
+const sliceColor = (c, i) => (c.resto ? "rgb(var(--chart-9))" : pieColor(i));
 
 /**
  * Painel "Onde vai seu dinheiro": pizza do top-5 de despesas do mês + legenda.
  *
  * @param {{ name: string, value: number }[]} data  maior fatia primeiro
- * @param {number} total  soma das fatias (para os percentuais)
+ * @param {number} total  despesas do mês (as fatias já incluem o resto)
  */
 export default function CategoryPie({ data, total }) {
   return (
@@ -50,7 +52,7 @@ export default function CategoryPie({ data, total }) {
                   isAnimationActive={false}
                 >
                   {data.map((c, i) => (
-                    <Cell key={c.name} fill={pieColor(i)} />
+                    <Cell key={c.name} fill={sliceColor(c, i)} />
                   ))}
                 </Pie>
                 <Tooltip content={<ChartTooltip />} cursor={false} />
@@ -67,7 +69,7 @@ export default function CategoryPie({ data, total }) {
                 <li key={c.name} className="flex items-center gap-2.5">
                   <span
                     className="w-2.5 h-2.5 rounded-sm shrink-0"
-                    style={{ background: pieColor(i) }}
+                    style={{ background: sliceColor(c, i) }}
                   />
                   <span className="flex-1 min-w-0">
                     <span className="block text-xs text-content-2 truncate">{c.name}</span>
