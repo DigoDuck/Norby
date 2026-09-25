@@ -25,7 +25,7 @@ export default function RitmoCard({ ritmo, dias }) {
   const hoje = ritmo.cells.at(-1)?.key;
 
   return (
-    <div className="lg:col-span-4 panel p-6 flex flex-col">
+    <div className="lg:col-span-3 panel p-6 flex flex-col">
       <div className="flex items-start justify-between gap-2">
         <div>
           <h2 className="font-semibold text-content">Ritmo financeiro</h2>

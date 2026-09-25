@@ -6,7 +6,9 @@ import {
   ArrowRight,
   ArrowUpRight,
   ArrowDownRight,
-  CalendarDays,
+  ArrowDownLeft,
+  PiggyBank,
+  Sparkles,
 } from "lucide-react";
 import {
   AreaChart,
@@ -28,7 +30,9 @@ import InsightCard from "@/components/dashboard/InsightCard";
 import CategoryPie from "@/components/dashboard/CategoryPie";
 import ChartTooltip from "@/components/dashboard/ChartTooltip";
 import RitmoCard from "@/components/dashboard/RitmoCard";
+import StatTile from "@/components/dashboard/StatTile";
 import Money from "@/components/shared/Money";
+import WalletMark from "@/components/shared/WalletMark";
 import { useAuthStore } from "@/store/authStore";
 import { formatDateBR, formatBRL, parseDateOnly } from "@/lib/utils";
 import { emojiForCategory } from "@/lib/categories";
@@ -145,6 +149,18 @@ export default function Dashboard() {
   // Variação do saldo total vs. fim do mês anterior (derivável do resultado do
   // mês corrente). Só faz sentido na visão "todas as carteiras".
   const prevBalance = totalBalance - monthNet;
+
+  // Variação de cada KPI contra o mês anterior, lida do próprio fluxo de caixa
+  // (que já vem por mês do backend). Sem o mês anterior, o tile não mostra %.
+  const hoje = new Date();
+  const anterior = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
+  const prevKey = `${anterior.getFullYear()}-${String(anterior.getMonth() + 1).padStart(2, "0")}`;
+  const prevMonth = s.cash_flow.find((p) => p.month === prevKey);
+  const prevIncome = prevMonth ? parseFloat(prevMonth.income) : 0;
+  const prevExpenses = prevMonth ? parseFloat(prevMonth.expenses) : 0;
+  const incomeChange = pctChange(monthIncome, prevIncome);
+  const expenseChange = pctChange(monthExpenses, prevExpenses);
+  const netChange = pctChange(monthNet, prevIncome - prevExpenses);
   const balanceChange =
     selectedWallet === "all" ? pctChange(totalBalance, prevBalance) : undefined;
 
@@ -226,44 +242,30 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-4">
-      {/* ── Linha contextual: a data, sozinha, à esquerda ────────────── */}
-      <div className="flex items-center">
-        <span className="control-raised inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[11px] font-semibold text-content-2 uppercase tracking-widest">
-          <CalendarDays size={13} className="text-accent" />
-          {todayLabel}
-        </span>
-      </div>
+      {/* ── Cabeçalho: saudação solta na página, sem card nem ilustração ── */}
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-xs text-content-3 first-letter:uppercase">{todayLabel}</p>
+          <h1 className="text-3xl font-bold text-content tracking-tight mt-1">
+            Olá, {firstName} 👋
+          </h1>
+          <p className="text-sm text-content-2 mt-1">
+            Seu saldo, seus gastos e seu ritmo neste mês.
+          </p>
+        </div>
+        <Button onClick={() => navigate("/ai")} size="lg">
+          Falar com a Norby
+          <NorthStar size={14} />
+        </Button>
+      </header>
 
-      {/* ── Linha 1: hero (7 col) + saldo total (5 col) ──────────────── */}
+      {/* ── Linha 1: saldo (4) + KPIs do mês (5) + ritmo (3) ──────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        {/* Hero: saudação + convite à IA + anel da marca */}
-        <section className="lg:col-span-7 relative overflow-hidden panel p-6 md:pr-[250px] flex items-center min-h-[228px]">
-          <div className="min-w-0">
-            <h1 className="text-3xl font-bold text-content tracking-tight">
-              Olá, {firstName} 👋
-            </h1>
-            <p className="text-sm text-content-2 mt-2 max-w-sm leading-relaxed">
-              Pergunte qualquer coisa sobre suas finanças — a Norby está pronta
-              para te ajudar hoje.
-            </p>
-            <Button
-              onClick={() => navigate("/ai")}
-              size="lg"
-              className="mt-5"
-            >
-              Falar com a Norby
-              <NorthStar size={14} />
-            </Button>
-          </div>
-
-        </section>
-
-        {/* Saldo total */}
-        <section className="lg:col-span-5 panel p-6 flex flex-col gap-4">
-          <div className="relative flex items-center justify-between gap-3">
-            <span className="microlabel">Saldo total</span>
+        <section className="lg:col-span-4 panel p-6 flex flex-col gap-5">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-sm font-medium text-content-2">Saldo total</h2>
             {wallets.length > 1 && (
-              <div className="w-48 shrink-0">
+              <div className="w-44 shrink-0">
                 <Select
                   id="wallet-filter"
                   value={selectedWallet}
@@ -274,7 +276,7 @@ export default function Dashboard() {
             )}
           </div>
 
-          <div className="relative">
+          <div>
             <div className="flex items-baseline gap-2">
               <Money
                 value={shownBalance}
@@ -298,54 +300,77 @@ export default function Dashboard() {
             )}
           </div>
 
-          {/* Duas pílulas tingidas, não um CTA sólido: na referência os dois
-              atalhos têm o mesmo peso e carregam a cor do próprio fluxo. O
-              sólido do painel é só o "Falar com a Norby". */}
-          <div className="relative flex gap-2">
-            <Button
-              onClick={() => newTransaction("INCOME")}
-              variant="ghost"
-              className="flex-1 border-income/25 bg-income/[0.12] text-income hover:bg-income/[0.18] hover:text-income"
-            >
+          {/* Tinta para a ação principal, cinza para a segunda: os dois
+              atalhos continuam lado a lado, mas não disputam atenção. */}
+          <div className="flex gap-2">
+            <Button onClick={() => newTransaction("INCOME")} className="flex-1">
               <Plus size={15} /> Receita
             </Button>
             <Button
               onClick={() => newTransaction("EXPENSE")}
-              variant="ghost"
-              className="flex-1 border-expense/25 bg-expense/[0.10] text-expense hover:bg-expense/[0.16] hover:text-expense"
+              variant="secondary"
+              className="flex-1"
             >
               <Minus size={15} /> Despesa
             </Button>
           </div>
 
-          <div className="relative grid grid-cols-3 divide-x divide-line/[0.08] border-t border-dashed border-line/10 pt-4 mt-auto">
-            <div className="pr-3">
-              <p className="microlabel">Receitas</p>
-              <p className="text-sm font-semibold text-income tnum mt-1">
-                {formatBRL(monthIncome)}
+          {wallets.length > 0 && (
+            <div className="mt-auto pt-4 border-t border-line/[0.08]">
+              <p className="text-xs text-content-3 mb-2.5">
+                Carteiras · {wallets.length}
               </p>
+              <ul className="flex flex-col gap-2">
+                {wallets.slice(0, 3).map((w) => (
+                  <li key={w.id} className="flex items-center gap-2.5 min-w-0">
+                    <WalletMark wallet={w} className="size-7 rounded-lg text-[11px]" />
+                    <span className="flex-1 truncate text-sm text-content-2">{w.name}</span>
+                    <span className="text-sm font-medium text-content tnum">
+                      {formatBRL(w.balance)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             </div>
-            <div className="px-3">
-              <p className="microlabel">Despesas</p>
-              <p className="text-sm font-semibold text-expense tnum mt-1">
-                {formatBRL(monthExpenses)}
-              </p>
-            </div>
-            <div className="pl-3">
-              <p className="microlabel">Score IA</p>
-              <p className="text-sm font-semibold text-accent tnum mt-1">
-                {insight?.score != null ? `${insight.score}/100` : "—"}
-              </p>
-            </div>
-          </div>
+          )}
         </section>
-      </div>
 
-      {/* ── Linha 2: categorias + ritmo + meta ──────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        <CategoryPie data={categoryData} total={categoryTotal} />
+        {/* KPIs do mês: um tile só leva o acento, é o ponto focal da tela */}
+        <section className="lg:col-span-5 panel p-4 grid grid-cols-2 gap-3 content-start">
+          <h2 className="sr-only">Resumo do mês</h2>
+          <StatTile
+            highlight
+            label="Receitas"
+            value={formatBRL(monthIncome)}
+            icon={ArrowDownLeft}
+            delta={incomeChange}
+          />
+          <StatTile
+            label="Despesas"
+            value={formatBRL(monthExpenses)}
+            icon={ArrowUpRight}
+            delta={expenseChange}
+            upIsGood={false}
+          />
+          <StatTile
+            label="Sobra do mês"
+            value={formatBRL(monthNet)}
+            icon={PiggyBank}
+            delta={netChange}
+          />
+          <StatTile
+            label="Score IA"
+            value={insight?.score != null ? `${insight.score}/100` : "—"}
+            icon={Sparkles}
+          />
+        </section>
 
         <RitmoCard ritmo={ritmo} dias={STREAK_DAYS} />
+      </div>
+
+      {/* ── Linha 2: categorias + meta + leitura da IA ──────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        <CategoryPie data={categoryData} total={categoryTotal} />
 
         {/* Meta em destaque */}
         <div className="lg:col-span-3 panel p-6 flex flex-col">
@@ -423,11 +448,13 @@ export default function Dashboard() {
             </>
           )}
         </div>
+
+        <InsightCard insight={insight} />
       </div>
 
-      {/* ── Linha 3: fluxo de caixa + leitura da IA ─────────────────── */}
+      {/* ── Linha 3: fluxo de caixa ──────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        <div className="lg:col-span-8 panel p-6">
+        <div className="lg:col-span-12 panel p-6">
           <div className="flex items-start justify-between mb-4">
             <div>
               <h2 className="font-semibold text-content">Fluxo de caixa</h2>
@@ -510,8 +537,6 @@ export default function Dashboard() {
             </ResponsiveContainer>
           )}
         </div>
-
-        <InsightCard insight={insight} />
       </div>
 
       {/* ── Linha 4: gastos por categoria + movimentações recentes ──── */}

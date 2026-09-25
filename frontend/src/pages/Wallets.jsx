@@ -2,10 +2,10 @@ import { useEffect, useId, useRef, useState } from "react";
 import { Plus, Pencil, Trash2, Wallet } from "lucide-react";
 import { walletsApi } from "@/api/wallets";
 import { apiErrorMessage, formatBRL, shadcnInputCls } from "@/lib/utils";
-import { CHART_SERIES, hashIndex } from "@/lib/palette";
-import { banco, OPCOES_BANCO } from "@/lib/bancos";
+import { OPCOES_BANCO } from "@/lib/bancos";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import Money from "@/components/shared/Money";
+import WalletMark from "@/components/shared/WalletMark";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MoneyInput } from "@/components/ui/money-input";
@@ -16,13 +16,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-
-// Cor do chip, determinística e só apresentação. Chaveada pelo BANCO quando
-// existe um, para que todas as carteiras do mesmo banco fiquem iguais entre si;
-// sem banco, cai no nome, que é como sempre foi. A paleta continua sendo a do
-// app: cor de marca seria hex fixo, e o DESIGN.md mede contraste sobre o vidro
-// nos DOIS temas — um hex passa num e reprova no outro.
-const chipColor = (chave) => CHART_SERIES[hashIndex(chave, CHART_SERIES.length)];
 
 export default function Wallets() {
   const [wallets, setWallets] = useState([]);
@@ -249,24 +242,13 @@ export default function Wallets() {
         )}
 
         {wallets.map((w) => {
-          const b = banco(w.bank);
-          const color = chipColor(w.bank || w.name);
           return (
             <div
               key={w.id}
               className="group relative overflow-hidden panel-hover p-6 flex min-h-[196px] flex-col"
             >
               <div className="relative flex items-start justify-between mb-5">
-                <div
-                  className="w-12 h-12 rounded-2xl flex items-center justify-center text-lg font-semibold"
-                  style={{
-                    background: `color-mix(in srgb, ${color} 13%, transparent)`,
-                    border: `1px solid color-mix(in srgb, ${color} 24%, transparent)`,
-                    color,
-                  }}
-                >
-                  {b ? b.marca : w.name?.[0]?.toUpperCase() || "?"}
-                </div>
+                <WalletMark wallet={w} />
               </div>
 
               <p className="relative text-sm text-content-2 mb-1">
