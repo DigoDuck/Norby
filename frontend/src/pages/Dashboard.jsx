@@ -229,7 +229,7 @@ export default function Dashboard() {
     <div className="space-y-4">
       {/* ── Linha contextual: a data, sozinha, à esquerda ────────────── */}
       <div className="flex items-center">
-        <span className="control-raised inline-flex items-center gap-2 rounded-md px-3.5 py-1.5 text-[11px] font-semibold text-content-2 uppercase tracking-widest">
+        <span className="control-raised inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[11px] font-semibold text-content-2 uppercase tracking-widest">
           <CalendarDays size={13} className="text-accent" />
           {todayLabel}
         </span>
@@ -354,7 +354,7 @@ export default function Dashboard() {
           {featuredGoal ? (
             <>
               <div className="relative flex items-center gap-3">
-                <div className="w-9 h-9 rounded-md bg-income/15 flex items-center justify-center shrink-0 text-base">
+                <div className="w-9 h-9 rounded-xl bg-income/15 flex items-center justify-center shrink-0 text-base">
                   🎯
                 </div>
                 <div className="min-w-0">
@@ -406,7 +406,7 @@ export default function Dashboard() {
           ) : (
             <>
               <div className="relative flex items-center gap-3">
-                <div className="w-9 h-9 rounded-md bg-income/15 flex items-center justify-center shrink-0 text-base">
+                <div className="w-9 h-9 rounded-xl bg-income/15 flex items-center justify-center shrink-0 text-base">
                   🎯
                 </div>
                 <h2 className="font-semibold text-content">Metas</h2>

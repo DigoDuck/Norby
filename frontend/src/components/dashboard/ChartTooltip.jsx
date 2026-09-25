@@ -4,7 +4,7 @@ import { formatBRL } from "@/lib/utils";
 export default function ChartTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-md bg-surface-inset border border-line/10 px-3 py-2 shadow-xl">
+    <div className="rounded-xl bg-surface-inset border border-line/10 px-3 py-2 shadow-xl">
       {label && (
         <p className="text-[11px] font-medium text-content-2 mb-1 capitalize">
           {label}

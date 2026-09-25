@@ -58,7 +58,7 @@ export default function InsightCard({ insight }) {
                 key={i}
                 className="inset-panel flex items-start gap-3 p-3 text-xs text-content-2 leading-relaxed"
               >
-                <span className="shrink-0 w-9 h-9 rounded-md bg-accent/[0.12] border border-accent/25 grid place-items-center text-accent">
+                <span className="shrink-0 w-9 h-9 rounded-xl bg-accent/[0.12] border border-accent/25 grid place-items-center text-accent">
                   <Icon size={16} />
                 </span>
                 {text}
@@ -69,7 +69,7 @@ export default function InsightCard({ insight }) {
       )}
 
       {insight?.suggested_action && (
-        <div className="p-3 rounded-md bg-accent/10 border border-accent/20">
+        <div className="p-3 rounded-xl bg-accent/10 border border-accent/20">
           <p className="text-[11px] font-semibold text-accent mb-1 uppercase tracking-wider">
             Sugestão prática
           </p>

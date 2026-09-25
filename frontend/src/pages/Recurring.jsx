@@ -360,7 +360,7 @@ export default function Recurring() {
             className="panel-hover flex flex-col gap-4 p-4 lg:flex-row lg:items-center"
           >
             <div className="flex min-w-0 items-center gap-3 lg:flex-1">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-accent/[0.15]">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent/[0.15]">
                 <Repeat size={18} className="text-accent" />
               </div>
               <p className="truncate text-sm font-medium text-content">

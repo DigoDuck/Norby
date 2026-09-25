@@ -499,7 +499,7 @@ export default function Transactions() {
                   setFilterType(t);
                   load(filtroAtivo(t), 0);
                 }}
-                className={`rounded-md px-3 py-2 text-sm transition-colors ${
+                className={`rounded-xl px-3 py-2 text-sm transition-colors ${
                   filterType === t
                     ? "bg-accent-fill text-accent-contrast font-medium"
                     : "bg-line/5 text-content-2 hover:text-content"

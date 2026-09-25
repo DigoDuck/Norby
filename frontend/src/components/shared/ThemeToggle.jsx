@@ -52,7 +52,7 @@ export default function ThemeToggle() {
             role="radio"
             aria-checked={selected}
             onClick={() => choose(option.value)}
-            className={`rounded-lg border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-focus-offset ${
+            className={`rounded-2xl border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-focus-offset ${
               selected
                 ? "border-accent bg-accent/[0.08]"
                 : "border-line/10 hover:border-line/20"

@@ -54,7 +54,7 @@ describe("Dashboard hero", () => {
     const hero = await screen.findByRole("heading", { name: "Olá, Alice 👋" });
     const section = hero.closest("section");
 
-    expect(screen.getByRole("button", { name: "Falar com a Norby" })).toHaveClass("bg-primary");
+    expect(screen.getByRole("button", { name: "Falar com a Norby" })).toHaveClass("bg-content");
     expect(section.querySelector(".hero-ring")).toBeInTheDocument();
   });
 });

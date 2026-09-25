@@ -82,7 +82,7 @@ export function apiErrorMessage(err, fallback) {
  * do shadcn, que tem estilo próprio). Compartilhada por Goals/Recurring/Transactions.
  */
 export const inputCls =
-  "w-full h-10 px-3 rounded-md bg-line/5 border border-line/10 text-content text-sm placeholder:text-content-3 focus:outline-none focus:ring-2 focus:ring-focus/50 transition";
+  "w-full h-10 px-3 rounded-xl bg-line/5 border border-line/10 text-content text-sm placeholder:text-content-3 focus:outline-none focus:ring-2 focus:ring-focus/50 transition";
 
 /**
  * Classe do `<Input>` do shadcn nos formulários. Diferente do `inputCls` acima,

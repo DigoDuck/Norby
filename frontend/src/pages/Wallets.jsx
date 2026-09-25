@@ -147,7 +147,7 @@ export default function Wallets() {
         >
           <DialogHeader>
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-md bg-accent-fill flex items-center justify-center shrink-0">
+              <div className="w-10 h-10 rounded-xl bg-accent-fill flex items-center justify-center shrink-0">
                 <Wallet size={20} className="text-accent-contrast" />
               </div>
               <div>
@@ -235,7 +235,7 @@ export default function Wallets() {
       <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
         {wallets.length === 0 && (
           <div className="col-span-full panel p-10 flex flex-col items-center text-center">
-            <div className="w-11 h-11 rounded-md bg-accent/[0.15] flex items-center justify-center mb-3">
+            <div className="w-11 h-11 rounded-xl bg-accent/[0.15] flex items-center justify-center mb-3">
               <Wallet size={20} className="text-accent" />
             </div>
             <p className="text-sm font-medium text-content">
@@ -258,7 +258,7 @@ export default function Wallets() {
             >
               <div className="relative flex items-start justify-between mb-5">
                 <div
-                  className="w-12 h-12 rounded-lg flex items-center justify-center text-lg font-semibold"
+                  className="w-12 h-12 rounded-2xl flex items-center justify-center text-lg font-semibold"
                   style={{
                     background: `color-mix(in srgb, ${color} 13%, transparent)`,
                     border: `1px solid color-mix(in srgb, ${color} 24%, transparent)`,
@@ -321,7 +321,7 @@ export default function Wallets() {
             onClick={openNew}
             className="inset-panel min-h-[196px] border-dashed border-line/20 flex flex-col items-center justify-center gap-3 text-content-2 hover:border-accent/40 hover:text-content hover:bg-state/[0.02] transition-colors"
           >
-            <div className="w-11 h-11 rounded-md bg-accent/[0.12] flex items-center justify-center">
+            <div className="w-11 h-11 rounded-xl bg-accent/[0.12] flex items-center justify-center">
               <Plus size={20} className="text-accent" />
             </div>
             <span className="text-sm font-medium">Adicionar carteira</span>
