@@ -21,7 +21,6 @@ import {
 } from "lucide-react";
 import NorbyMark from "../components/shared/Logo";
 import NorthStar from "../components/shared/NorthStar";
-import HeroRing from "../components/shared/HeroRing";
 
 const loginSchema = z.object({
   email: z.string().email("Email inválido"),
@@ -198,7 +197,7 @@ export default function Auth() {
       </header>
 
       <main className="flex min-h-screen w-full items-center">
-        <div className="auth-layout mx-auto grid w-full max-w-[100rem] items-center gap-12 px-6 py-12 xl:grid-cols-[minmax(0,22rem)_minmax(18rem,1fr)_minmax(0,30rem)] xl:gap-6 xl:py-16 2xl:grid-cols-[minmax(0,28rem)_minmax(24rem,1fr)_minmax(0,34rem)] 2xl:px-10">
+        <div className="auth-layout mx-auto grid w-full max-w-6xl items-center gap-12 px-6 py-12 xl:grid-cols-2 xl:gap-20 xl:py-16">
         {/* Proposta de valor. Abaixo de xl desce para baixo do card: quem volta
             para entrar quer o formulário primeiro, não o argumento de venda. */}
         <section className="auth-copy relative z-10 order-2 xl:order-1">
@@ -244,38 +243,8 @@ export default function Auth() {
           </ul>
         </section>
 
-        {/* Cena: anel + pódio + painéis de dashboard ao fundo. Puramente
-            decorativa, e por isso inteira em aria-hidden — os valores são de
-            exemplo e não podem ser anunciados como saldo de ninguém. */}
-        <div
-          aria-hidden="true"
-          className="relative z-0 order-3 hidden h-[32rem] xl:order-2 xl:block"
-        >
-          <div className="ghost-panel absolute right-0 top-[6%] w-48 p-4 opacity-75">
-            <p className="text-xs text-content-3">Saldo total</p>
-            <p className="mt-1.5 text-xl font-bold tnum text-content-2">
-              R$ 8.822,<span className="text-sm">00</span>
-            </p>
-            <p className="mt-1.5 text-[11px] text-content-3">↑ 13,1% vs. mês passado</p>
-          </div>
-
-          <div className="ghost-panel absolute right-0 top-[50%] w-44 p-4 opacity-75">
-            <p className="text-xs text-content-3">Receitas</p>
-            <p className="mt-1.5 text-lg font-bold tnum text-content-2">R$ 1.200,00</p>
-            <div className="mt-2.5 h-1.5 w-2/3 rounded-full bg-income/40" />
-          </div>
-
-          {/* Largura fixa em 22rem: o 2xl:w-[26rem] levava o anel a 416px numa
-              coluna de 416px em 1536, sem deixar nada para o painel ao lado, e
-              o "Receitas" saía cortado. Em telas maiores o scale do
-              .auth-layout já amplia a peça. */}
-          <div className="absolute left-[29%] top-1/2 w-[22rem] -translate-x-1/2 -translate-y-1/2">
-            <HeroRing className="hero-ring--inline" />
-          </div>
-        </div>
-
         {/* Card de acesso */}
-        <div className="relative z-10 order-1 w-full max-w-[34rem] justify-self-center xl:order-3">
+        <div className="relative z-10 order-1 w-full max-w-[34rem] justify-self-center xl:order-2 xl:justify-self-end">
           <div className="panel w-full p-8 sm:p-10">
             <div className="text-center">
               {/* mx-auto, não inline-grid: .brand-tile aplica display:grid e

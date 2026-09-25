@@ -244,62 +244,6 @@
 }
 .star-loading { animation: star-pulse 1.4s ease-in-out infinite; }
 
-/* O anel da marca é UM só, e é o toro renderizado. É o único elemento
-   iridescente que ficou: sem cáustica, atmosfera ou halo em volta. */
-.hero-ring {
-  position: absolute;
-  right: -2.375rem;
-  bottom: -2.625rem;
-  width: 20rem;
-  aspect-ratio: 1;
-  pointer-events: none;
-}
-
-/* Fora do card do herói (login) o anel não é sangria de canto: ocupa o próprio
-   espaço. Duas classes para vencer .hero-ring independente da ordem. */
-.hero-ring.hero-ring--inline {
-  position: relative;
-  inset: auto;
-  width: 100%;
-}
-
-.hero-ring__asset {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  user-select: none;
-  animation: hero-ring-float 11s ease-in-out infinite;
-}
-
-.hero-ring__asset--light {
-  display: none;
-}
-
-[data-theme="light"] .hero-ring__asset--dark {
-  display: none;
-}
-
-[data-theme="light"] .hero-ring__asset--light {
-  display: block;
-}
-
-@keyframes hero-ring-float {
-  0%, 100% { transform: translate3d(0, 0, 0); }
-  50% { transform: translate3d(0, -4px, 0); }
-}
-
-/* Painel fantasma: os cards de dashboard ao fundo do login. São decoração — o
-   conteúdo fica em aria-hidden no JSX, para que um leitor de tela nunca
-   anuncie os valores de exemplo como saldo do usuário. */
-.ghost-panel {
-  border: 1px solid var(--panel-border);
-  background: rgb(var(--surface));
-  box-shadow: var(--elev-1);
-  border-radius: 0.5rem;
-}
-
 /* Aba selecionada do login: a mesma tinta do botão principal. */
 .auth-mode-active {
   color: rgb(var(--bg-base));

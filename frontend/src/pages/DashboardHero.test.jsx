@@ -48,13 +48,11 @@ describe("Dashboard hero", () => {
     goalsApi.list.mockResolvedValue({ data: [] });
   });
 
-  it("keeps the hero ring next to a solid primary CTA", async () => {
+  it("greets the user with a primary CTA to the AI", async () => {
     renderDashboard();
 
-    const hero = await screen.findByRole("heading", { name: "Olá, Alice 👋" });
-    const section = hero.closest("section");
+    await screen.findByRole("heading", { name: "Olá, Alice 👋" });
 
     expect(screen.getByRole("button", { name: "Falar com a Norby" })).toHaveClass("bg-content");
-    expect(section.querySelector(".hero-ring")).toBeInTheDocument();
   });
 });

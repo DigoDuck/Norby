@@ -29,7 +29,6 @@ import CategoryPie from "@/components/dashboard/CategoryPie";
 import ChartTooltip from "@/components/dashboard/ChartTooltip";
 import RitmoCard from "@/components/dashboard/RitmoCard";
 import Money from "@/components/shared/Money";
-import HeroRing from "@/components/shared/HeroRing";
 import { useAuthStore } from "@/store/authStore";
 import { formatDateBR, formatBRL, parseDateOnly } from "@/lib/utils";
 import { emojiForCategory } from "@/lib/categories";
@@ -257,7 +256,6 @@ export default function Dashboard() {
             </Button>
           </div>
 
-          <HeroRing className="hidden md:block" />
         </section>
 
         {/* Saldo total */}
