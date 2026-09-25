@@ -4,8 +4,8 @@
 
 /* Tokens de cor em canais RGB: o Tailwind aplica a opacidade via
    rgb(var(--x) / <alpha-value>), então bg-surface/70 continua funcionando.
-   Valores de superfície amostrados dos PNGs de referência — a calibração
-   canônica acontece na Task 19 do plano. */
+   Design system "A Bússola de Safira": o DESIGN.md na raiz documenta cada
+   token, o papel dele e as regras de uso. */
 /* :root junto de [data-theme="dark"] de propósito: o escuro é o default do
    CSS, não só do JavaScript. Sem isso, um <html> sem data-theme deixa TODO
    token indefinido, cada rgb(var(--x) / a) vira inválido e a página inteira

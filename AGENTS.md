@@ -67,10 +67,12 @@ npm run test     # Vitest
   e reuso de enums existentes (`create_type=False`).
 - Frontend: **API client centralizado** em `src/api/` (axios em `axios.js`, um
   módulo fino por recurso). Componentes/páginas não chamam `axios` direto.
-- UI em **português** (pt-BR); tema "Vidro Iridescente", escuro e claro, via
-  `data-theme` no `<html>`. Cor **só** por token semântico (`bg-surface`,
-  `text-content-2`, `--glass-bg`…) — hex fixo em componente e o namespace
-  `norby-*` não existem mais. Ver [DESIGN.md](DESIGN.md).
+- UI em **português** (pt-BR); design system "A Bússola de Safira" (desde
+  2026-09-25, substituiu o "Vidro Iridescente"), escuro e claro, via `data-theme`
+  no `<html>`. Cor **só** por token semântico (`bg-surface`, `text-content-2`,
+  `bg-accent-fill`, `--panel-border`…): hex fixo em componente não existe. Botão
+  principal é o default do `Button` (tinta), sem cor forçada por cima. Ver
+  [DESIGN.md](DESIGN.md).
 - Specs e planos vivem no Second Brain (Obsidian), **não** no repo (`docs/*`
   está no `.gitignore`). Duas exceções, essas versionadas: `docs/agents/`
   (config das engineering skills) e `docs/adr/` (decisões de arquitetura). O
@@ -101,10 +103,11 @@ Roteamento geral em `~/.claude/SKILLS.md`. Aqui só o que é específico do Norb
   **Não** usar `taste-skill` nem `ui-ux-pro-max`: as duas trazem paleta e
   tipografia próprias e brigariam com os tokens amostrados das referências.
   Register do projeto é **product** (design serve a tarefa).
-- **Referências visuais são obrigatórias.** Abrir os PNGs de
-  `design-references/` (não rastreados) antes de implementar e a cada revisão
-  visual. Contraste se mede **no pixel renderizado sobre o vidro**, nunca no
-  valor do token.
+- **O DESIGN.md é a referência visual.** A referência externa vigente é o
+  dashboard Finexy (enviada pelo dono em 2026-09-25); os PNGs em
+  `design-references/liquid-glass/` (não rastreados) são do tema anterior e
+  servem só como anti-referência. Contraste se mede **no pixel renderizado**, nos
+  dois temas, nunca no valor do token.
 - **`graphify-out/` existe** → pergunta sobre arquitetura vira `graphify query`
   antes de varrer arquivo.
 - **Verificação visual** usa a skill de projeto `run-app` (sobe a stack e
@@ -119,9 +122,9 @@ Roteamento geral em `~/.claude/SKILLS.md`. Aqui só o que é específico do Norb
   `.claude/hooks/session-start.sh` sobe o Postgres do próprio container e o
   Mongo via Docker, cria o venv 3.12 em `backend/.venv` e roda `npm install`.
   `pytest` e `alembic` rodam direto no host. O hook não roda na máquina local.
-  Sem `design-references/`, `graphify-out/` e as skills locais, **UI na nuvem
-  não cumpre a regra das referências visuais**: trabalho de UI fica para a
-  máquina local.
+  Sem `graphify-out/`, as skills locais e um navegador para medir contraste no
+  pixel, **UI na nuvem não cumpre a verificação visual**: trabalho de UI fica
+  para a máquina local.
 
 ## Agent skills
 
