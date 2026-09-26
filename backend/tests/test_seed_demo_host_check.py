@@ -38,3 +38,26 @@ async def test_is_local_host_accepts_real_localhost(monkeypatch):
     module = _load_seed_demo(monkeypatch)
     assert module._is_local_host("http://localhost:8000") is True
     assert module._is_local_host("http://127.0.0.1:8000") is True
+
+
+async def test_a_429_waits_retry_after_and_retries_instead_of_aborting(monkeypatch):
+    # POST /transactions aceita 120/min por usuário e o seed cria ~150
+    # lançamentos: sem esperar o 429, a conta de demo ficava pela metade.
+    import httpx
+
+    module = _load_seed_demo(monkeypatch)
+    respostas = iter([
+        httpx.Response(429, headers={"Retry-After": "7"}),
+        httpx.Response(201, json={"id": "criado"}),
+    ])
+    cliente = httpx.Client(
+        base_url="http://localhost:8000",
+        transport=httpx.MockTransport(lambda request: next(respostas)),
+    )
+    esperas = []
+    monkeypatch.setattr(module.time, "sleep", esperas.append)
+
+    resposta = module._post(cliente, "/transactions/", {"amount": "10.00"})
+
+    assert resposta.status_code == 201
+    assert esperas == [7]
