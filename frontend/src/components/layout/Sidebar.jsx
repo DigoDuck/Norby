@@ -83,7 +83,10 @@ export default function Sidebar() {
           adminItems.map((item) => <NavItem key={item.to} {...item} />)}
       </nav>
 
-      {/* Norby IA: atalho para a analista */}
+      {/* Norby IA: atalho para a analista, só para quem a tem. No free o item
+          "Norby IA" do menu já leva ao cadeado da página; um cartão a mais aqui
+          era o terceiro convite na mesma tela. */}
+      {iaLiberada && (
       <NavLink
         to="/ai"
         className="group flex items-center gap-3 p-3.5 mb-4 bg-accent/[0.08] border border-accent/20 rounded-2xl transition-colors hover:bg-accent/[0.14] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-focus-offset"
@@ -92,12 +95,11 @@ export default function Sidebar() {
         <div className="min-w-0">
           <p className="text-xs font-semibold text-accent">Norby IA</p>
           <p className="text-[11px] text-content-2 leading-snug mt-0.5">
-            {iaLiberada
-              ? "Análises personalizadas do seu perfil financeiro"
-              : "Disponível no plano Premium"}
+            Análises personalizadas do seu perfil financeiro
           </p>
         </div>
       </NavLink>
+      )}
 
       {/* User */}
       <div className="flex items-center gap-3 pt-4 border-t border-line/[0.08] px-1">

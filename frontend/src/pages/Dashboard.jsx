@@ -9,7 +9,6 @@ import {
   ArrowDownLeft,
   PiggyBank,
   Percent,
-  Lock,
   Target,
   Search,
 } from "lucide-react";
@@ -378,15 +377,13 @@ export default function Dashboard() {
         </form>
         <div className="flex items-center gap-2">
           <ThemeButton />
-          {/* Sem IA no plano, o convite não pode ser a ação principal da tela. */}
-          <Button
-            onClick={() => navigate(iaLiberada ? "/ai" : "/settings?aba=plano")}
-            size="lg"
-            variant={iaLiberada ? "default" : "secondary"}
-          >
-            {iaLiberada ? "Falar com a Norby" : "IA no plano Premium"}
-            {iaLiberada ? <NorthStar size={14} /> : <Lock size={14} aria-hidden="true" />}
-          </Button>
+          {/* Só para quem tem a IA. No free o convite mora no card da Leitura,
+              onde o recurso fica: três convites na mesma tela era insistência. */}
+          {iaLiberada && (
+            <Button onClick={() => navigate("/ai")} size="lg">
+              Falar com a Norby <NorthStar size={14} />
+            </Button>
+          )}
         </div>
       </header>
 
