@@ -219,8 +219,10 @@
   .chip {
     @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold tnum;
   }
-  .chip-pos { @apply chip bg-income/20 text-income; }
-  .chip-neg { @apply chip bg-expense/20 text-expense; }
+  /* Fundo a 12%: a 20% o vermelho do chip ficava em 4,3:1 sobre o texto,
+     abaixo dos 4,5 (medido no render, nos dois temas). */
+  .chip-pos { @apply chip bg-income/[0.12] text-income; }
+  .chip-neg { @apply chip bg-expense/[0.12] text-expense; }
   .chip-neutral { @apply chip bg-line/[0.06] text-content-2; }
 
   /* Label micro em uppercase: padrão único de rótulo de dado */
@@ -318,10 +320,15 @@
      composição com 157px de margem à esquerda e 383px à direita. */
 }
 
+/* Zera também os ATRASOS: o motion-rise espera até 300ms (--i × 60ms) com
+   fill-mode both, e sem isto os KPIs ficavam invisíveis durante a espera e
+   surgiam de uma vez, um pisca-pisca justamente para quem pediu menos movimento. */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
   }
 }

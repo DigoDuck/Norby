@@ -70,10 +70,10 @@ const EMPTY_SUMMARY = {
   top_categories: [],
 };
 
-// Centavos dos tiles: um degrau menor, como no saldo. No tile azul, branco a
-// 75% ainda passa 4,5:1 sobre o royal.
+// Centavos dos tiles: um degrau menor, como no saldo. No tile safira o branco
+// fica a 85% (4,8:1): a 75% media 4,05:1, abaixo do mínimo para 18px.
 const TILE_CENTS = "text-base sm:text-lg text-content-2";
-const TILE_CENTS_ON_ACCENT = "text-base sm:text-lg text-accent-contrast/75";
+const TILE_CENTS_ON_ACCENT = "text-base sm:text-lg text-accent-contrast/[0.85]";
 
 const INCOME_COLOR = "rgb(var(--income))";
 const EXPENSE_COLOR = "rgb(var(--expense))";
