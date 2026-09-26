@@ -59,7 +59,7 @@ const brl = (v) =>
 
 // Sinal de menos tipográfico (U+2212), antes do R$: "−R$ 200,00". O hífen
 // depois do símbolo ("R$ -200,00") era o que o toLocaleString dava sozinho.
-const MENOS = "−";
+export const MENOS = "−";
 
 export const formatBRL = (v) => `${Number(v) < 0 ? MENOS : ""}R$ ${brl(v)}`;
 

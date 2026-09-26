@@ -104,7 +104,7 @@ export default function CategoryPie({ data, total, destaques }) {
 
           {destaques && (
             <dl className="grid grid-cols-[repeat(auto-fit,minmax(6rem,1fr))] gap-x-3 gap-y-4 mt-6 pt-4 border-t border-line/[0.08]">
-              <div className="min-w-0">
+              <div className="min-w-0 text-center">
                 <dt className="text-xs text-content-3">Média por dia</dt>
                 <dd className="mt-1 text-sm font-semibold text-content tnum">
                   {formatBRL(destaques.mediaDiaria)}
@@ -113,7 +113,7 @@ export default function CategoryPie({ data, total, destaques }) {
                   em {destaques.diasDecorridos} {destaques.diasDecorridos === 1 ? "dia" : "dias"}
                 </dd>
               </div>
-              <div className="min-w-0">
+              <div className="min-w-0 text-center">
                 <dt className="text-xs text-content-3">Maior lançamento</dt>
                 <dd className="mt-1 text-sm font-semibold text-content tnum">
                   {destaques.maiorGasto ? formatBRL(destaques.maiorGasto.amount) : "—"}
@@ -124,14 +124,14 @@ export default function CategoryPie({ data, total, destaques }) {
                     : "sem despesas"}
                 </dd>
               </div>
-              <div className="min-w-0">
+              <div className="min-w-0 text-center">
                 <dt className="text-xs text-content-3">Vs. mês passado</dt>
                 {destaques.variacao === undefined ? (
                   <dd className="mt-1 text-sm font-semibold text-content-3">—</dd>
                 ) : (
                   // Despesa que sobe é notícia ruim: vermelho na alta, verde na queda.
                   <dd
-                    className={`mt-1 flex items-center gap-1 text-sm font-semibold tnum ${
+                    className={`mt-1 flex items-center justify-center gap-1 text-sm font-semibold tnum ${
                       destaques.variacao > 0 ? "text-expense" : "text-income"
                     }`}
                   >

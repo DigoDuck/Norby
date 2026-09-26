@@ -29,7 +29,11 @@ export default function StatTile({
       : "chip-neg";
 
   return (
+    // Grupo com o nome do KPI: o leitor de tela anuncia "Receitas, grupo" antes
+    // do número, em vez de um valor solto.
     <div
+      role="group"
+      aria-label={label}
       style={style}
       className={`rounded-2xl p-4 flex flex-col gap-3 min-w-0 ${className} ${
         highlight

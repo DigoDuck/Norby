@@ -8,7 +8,7 @@ import {
   ArrowDownRight,
   ArrowDownLeft,
   PiggyBank,
-  Sparkles,
+  Percent,
   Lock,
   Target,
 } from "lucide-react";
@@ -39,7 +39,7 @@ import WalletMark from "@/components/shared/WalletMark";
 import { LoadError } from "@/components/shared/LoadState";
 import { usePlano } from "@/lib/plan";
 import { useAuthStore } from "@/store/authStore";
-import { formatDateBR, formatBRL, parseDateOnly, formatSinal, formatPct } from "@/lib/utils";
+import { formatDateBR, formatBRL, parseDateOnly, formatSinal, formatPct, MENOS } from "@/lib/utils";
 import CategoryIcon from "@/components/shared/CategoryIcon";
 
 // "Boa noite, Diogo": a saudação acompanha o horário, sem emoji no título
@@ -187,6 +187,9 @@ export default function Dashboard() {
   const monthIncome = parseFloat(s.month_income);
   const monthExpenses = parseFloat(s.month_expenses);
   const monthNet = monthIncome - monthExpenses;
+  // Quanto da receita sobrou. Sem receita não existe proporção: fica undefined
+  // e o tile diz isso, em vez de mostrar Infinity%.
+  const taxaPoupanca = monthIncome > 0 ? (monthNet / monthIncome) * 100 : undefined;
 
   // Variação do saldo total vs. fim do mês anterior (derivável do resultado do
   // mês corrente). Só faz sentido na visão "todas as carteiras".
@@ -326,9 +329,13 @@ export default function Dashboard() {
           e cortava o nome das carteiras. Abaixo de xl cada card ocupa a
           largura toda, como no tablet. */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
-        <section className="xl:col-span-4 panel p-6 flex flex-col gap-5 motion-rise" style={{ "--i": 0 }}>
+        <section
+          aria-labelledby="saldo-titulo"
+          className="xl:col-span-4 panel p-6 flex flex-col gap-5 motion-rise"
+          style={{ "--i": 0 }}
+        >
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-sm font-medium text-content-2">Saldo total</h2>
+            <h2 id="saldo-titulo" className="text-sm font-medium text-content-2">Saldo total</h2>
             {wallets.length > 1 && (
               <div className="w-44 shrink-0">
                 <Select
@@ -341,6 +348,10 @@ export default function Dashboard() {
             )}
           </div>
 
+          {/* O Score é do premium e mora junto do saldo: os dois respondem
+              "como estou?". No free ele não aparece em lugar nenhum; o convite
+              ao Premium já tem o botão do cabeçalho. */}
+          <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
           <div>
             <div className="flex items-baseline gap-2">
               <Money
@@ -363,6 +374,16 @@ export default function Dashboard() {
                 <span className="text-xs text-content-3">vs. mês passado</span>
               </div>
             )}
+          </div>
+          {iaLiberada && insight?.score != null && (
+            <div className="text-right">
+              <p className="text-xs text-content-3">Score financeiro</p>
+              <p className="mt-1 tnum tracking-tight">
+                <span className="text-2xl font-semibold text-content">{Math.round(insight.score)}</span>
+                <span className="text-sm font-medium text-content-3">/100</span>
+              </p>
+            </div>
+          )}
           </div>
 
           {/* Tinta para a ação principal, cinza para a segunda: os dois
@@ -430,13 +451,18 @@ export default function Dashboard() {
             delta={expenseChange}
             upIsGood={false}
           />
+          {/* Gratuito para todos: a Sobra dita em proporção da receita. */}
           <StatTile
-            label="Score financeiro"
+            label="Taxa de poupança"
             className="motion-rise"
             style={{ "--i": 4 }}
-            value={insight?.score != null ? `${insight.score}/100` : "—"}
-            icon={Sparkles}
-            note={iaLiberada ? "este mês" : "disponível no plano Premium"}
+            value={
+              taxaPoupanca === undefined
+                ? "—"
+                : `${taxaPoupanca < 0 ? MENOS : ""}${formatPct(taxaPoupanca, 0)}`
+            }
+            icon={Percent}
+            note={taxaPoupanca === undefined ? "sem receita no mês" : "da receita do mês"}
           />
         </section>
 
