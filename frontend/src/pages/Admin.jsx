@@ -18,7 +18,7 @@ function MetricCard({ label, value, tone, hint }) {
   const toneClass =
     tone === "danger" ? "text-danger" : tone === "warning" ? "text-warning" : "text-content";
   return (
-    <div className="glass p-5">
+    <div className="panel p-5">
       <p className="microlabel">{label}</p>
       <p className={`mt-2 text-2xl font-semibold tnum tracking-tight ${toneClass}`}>{value}</p>
       {hint && <p className="mt-1 text-xs text-content-3">{hint}</p>}
@@ -181,21 +181,21 @@ export default function Admin() {
 
   if (loading) {
     return (
-      <div className="max-w-5xl mx-auto space-y-5">
+      <div className="space-y-5">
         <div className="h-9 w-32 rounded-lg bg-line/10 animate-pulse" />
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="glass p-5 h-[72px] animate-pulse" />
+            <div key={i} className="panel p-5 h-[72px] animate-pulse" />
           ))}
         </div>
-        <div className="glass p-6 h-48 animate-pulse" />
+        <div className="panel p-6 h-48 animate-pulse" />
       </div>
     );
   }
 
   if (loadError) {
     return (
-      <div className="max-w-5xl mx-auto space-y-4">
+      <div className="space-y-4">
         <p role="alert" className="text-danger text-sm">
           {loadError}
         </p>
@@ -213,7 +213,7 @@ export default function Admin() {
   const iaTone = iaProporcao >= 1 ? "danger" : iaProporcao >= 0.8 ? "warning" : undefined;
 
   return (
-    <div className="max-w-5xl mx-auto space-y-5">
+    <div className="space-y-5">
       <div>
         <h1 className="text-3xl font-bold text-content tracking-tight">Admin</h1>
         <p className="text-content-2 text-sm mt-1">
@@ -263,7 +263,7 @@ export default function Admin() {
         </p>
       )}
 
-      <div className="glass p-6">
+      <div className="panel p-6">
         <div className="flex items-center gap-3 mb-5">
           <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-accent/[0.12] text-accent">
             <Search size={16} />

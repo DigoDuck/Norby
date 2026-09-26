@@ -29,6 +29,10 @@ vi.mock("@/api/recurring", () => ({
 // dashboard), igual ao mock do Dashboard acima.
 vi.mock("./pages/Admin", () => ({ default: () => <div>Admin</div> }));
 
+// Erro no formato do axios: é o `response.status` que diz se foi recusa da
+// sessão (4xx) ou o servidor fora do ar (5xx).
+const erroHttp = (status) => Object.assign(new Error(String(status)), { response: { status } });
+
 describe("rota raiz", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -72,7 +76,7 @@ describe("rota raiz", () => {
     // chama /auth/refresh (que aqui sucede), depois /auth/me, que rejeita ->
     // logout() -> raiz precisa mostrar Auth uma única vez, sem re-navegar
     // (RootRoute não redireciona quando desloga).
-    authApi.me.mockRejectedValueOnce(new Error("401"));
+    authApi.me.mockRejectedValueOnce(erroHttp(401));
     useAuthStore.getState().login("token-invalido", { name: "Alice" });
 
     render(<App />);
@@ -86,7 +90,7 @@ describe("rota raiz", () => {
     // O boot chama /auth/refresh primeiro. Se ele falha (cookie ausente ou
     // revogado), não há token novo para validar, então /auth/me nem deveria
     // ser chamado.
-    authApi.refresh.mockRejectedValueOnce(new Error("401"));
+    authApi.refresh.mockRejectedValueOnce(erroHttp(401));
     useAuthStore.getState().login("token-velho", { name: "Alice" });
 
     render(<App />);
@@ -94,5 +98,17 @@ describe("rota raiz", () => {
     expect(await screen.findAllByRole("button", { name: /entrar/i })).not.toHaveLength(0);
     expect(authApi.me).not.toHaveBeenCalled();
     expect(useAuthStore.getState().isAuthenticated).toBe(false);
+  });
+
+  it("servidor fora do ar no boot mantém a sessão e oferece tentar de novo", async () => {
+    // 5xx ou rede não é recusa da sessão: deslogar ali jogava a pessoa no
+    // login sem motivo. Ela fica logada, com o aviso e o botão.
+    authApi.refresh.mockRejectedValueOnce(erroHttp(503));
+    useAuthStore.getState().login("token-bom", { name: "Alice" });
+
+    render(<App />);
+
+    expect(await screen.findByRole("button", { name: /tentar de novo/i })).toBeInTheDocument();
+    expect(useAuthStore.getState().isAuthenticated).toBe(true);
   });
 });

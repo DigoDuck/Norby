@@ -21,6 +21,13 @@ class TransactionUpdate(BaseModel):
     description: LongText | None = None
     date: datetime.date | None = None
 
+class TransactionSummary(BaseModel):
+    """Totais do que a listagem mostraria com os mesmos filtros."""
+    count: int
+    income: Decimal
+    expenses: Decimal
+
+
 class TransactionResponse(BaseModel):
     id: UUID
     wallet_id: UUID

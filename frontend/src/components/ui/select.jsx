@@ -12,8 +12,9 @@ import { cn, inputCls } from "@/lib/utils";
  * @param {{ value: string; label: string }[]} options
  * @param {(value: string) => void} onChange - receives the VALUE string, not a DOM event
  * @param {boolean} [disabled]
+ * @param {string} [ariaLabel] - nome acessível quando não há <label> visível
  */
-export function Select({ id, value, placeholder, options, onChange, disabled }) {
+export function Select({ id, value, placeholder, options, onChange, disabled, ariaLabel }) {
   // Base UI onValueChange receives (value, eventDetails)
   function handleValueChange(newValue) {
     if (onChange) onChange(newValue ?? "");
@@ -33,6 +34,7 @@ export function Select({ id, value, placeholder, options, onChange, disabled }) 
       {/* Trigger */}
       <SelectPrimitive.Trigger
         data-slot="select-trigger"
+        aria-label={ariaLabel}
         className={cn(
           inputCls,
           "flex items-center justify-between cursor-pointer",

@@ -470,3 +470,56 @@ async def test_search_does_not_break_on_a_null_description(make_auth_client):
     por_termo_qualquer = await alice.get("/transactions/", params={"q": "feira"})
     assert por_termo_qualquer.status_code == 200
     assert por_termo_qualquer.json() == []
+
+
+# ── /transactions/summary: os totais do que a listagem mostraria ──────────
+
+
+@pytest.mark.asyncio
+async def test_summary_totals_only_the_requested_month(make_auth_client):
+    # O Extrato filtrado por agosto mostra os totais de agosto: a despesa de
+    # setembro não entra, nem na contagem nem na soma.
+    ac = await make_auth_client("Alice")
+    w = await make_wallet(ac, balance=1000)
+    await ac.post("/transactions/", json=tx_payload(w["id"], type="INCOME", amount="1000.00", date="2026-08-05"))
+    await ac.post("/transactions/", json=tx_payload(w["id"], amount="200.00", date="2026-08-10"))
+    await ac.post("/transactions/", json=tx_payload(w["id"], amount="50.00", date="2026-09-01"))
+
+    res = await ac.get("/transactions/summary", params={"month": 8, "year": 2026})
+
+    assert res.status_code == 200, res.text
+    assert res.json() == {"count": 2, "income": "1000.00", "expenses": "200.00"}
+
+
+@pytest.mark.asyncio
+async def test_summary_by_wallet_counts_only_that_wallet(make_auth_client):
+    # É o número que o diálogo de excluir carteira mostra: "3 lançamentos
+    # serão excluídos". Contar os da outra carteira assustaria à toa.
+    ac = await make_auth_client("Alice")
+    nubank = await make_wallet(ac, name="Nubank", balance=1000)
+    inter = await make_wallet(ac, name="Inter", balance=1000)
+    await ac.post("/transactions/", json=tx_payload(nubank["id"], amount="10.00"))
+    await ac.post("/transactions/", json=tx_payload(nubank["id"], type="INCOME", amount="40.00"))
+    await ac.post("/transactions/", json=tx_payload(inter["id"], amount="99.00"))
+
+    res = await ac.get("/transactions/summary", params={"wallet_id": nubank["id"]})
+
+    assert res.status_code == 200, res.text
+    assert res.json() == {"count": 2, "income": "40.00", "expenses": "10.00"}
+
+
+@pytest.mark.asyncio
+async def test_summary_never_counts_another_users_wallet(make_auth_client):
+    # wallet_id vem do cliente: com o id da carteira de outra pessoa, o resumo
+    # não pode revelar quantos lançamentos ela tem nem quanto movimentou.
+    alice = await make_auth_client("Alice")
+    carteira_da_alice = await make_wallet(alice, balance=1000)
+    await alice.post("/transactions/", json=tx_payload(carteira_da_alice["id"], amount="500.00"))
+    bob = await make_auth_client("Bob")
+
+    res = await bob.get("/transactions/summary", params={"wallet_id": carteira_da_alice["id"]})
+
+    assert res.status_code == 200, res.text
+    corpo = res.json()
+    assert corpo["count"] == 0
+    assert float(corpo["income"]) == 0 and float(corpo["expenses"]) == 0

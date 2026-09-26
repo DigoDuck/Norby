@@ -1,13 +1,17 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 import { transactionsApi } from "@/api/transactions";
+import { walletsApi } from "@/api/wallets";
 import Transactions from "./Transactions";
 
 vi.mock("@/api/transactions", () => ({
   transactionsApi: {
     list: vi.fn(),
+    // Resposta padrão de /transactions/summary: os testes que não são sobre
+    // os totais não precisam pensar neles.
+    summary: vi.fn(() => Promise.resolve({ data: { count: 0, income: "0.00", expenses: "0.00" } })),
     create: vi.fn(),
     update: vi.fn(),
     delete: vi.fn(),
@@ -358,4 +362,208 @@ describe("Transactions", () => {
       ),
     );
   }, 15000);
+});
+
+// Só o relógio é falso: timers reais, porque o Select abre com animação.
+function hojeE(data) {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(data);
+}
+
+// Como a pessoa faz: abre, passa o mouse, clica. O Base UI só aceita o clique
+// numa opção destacada, e quem destaca é o hover.
+async function escolherMes(nome) {
+  fireEvent.click(screen.getByRole("combobox", { name: "Mês" }));
+  const opcao = await screen.findByRole("option", { name: nome });
+  fireEvent.mouseMove(opcao);
+  fireEvent.click(opcao);
+}
+
+describe("Transactions, filtro por mês", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    transactionsApi.list.mockResolvedValue(pagina(3, 3, "m-"));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("escolher um mês pede só aquele mês, inclusive o do ano anterior", async () => {
+    // Em janeiro, o mês anterior é dezembro do ANO anterior: um cálculo que
+    // só subtrai o mês pediria o mês 0, ou dezembro do ano corrente.
+    hojeE(new Date(2026, 0, 15, 12));
+    render(
+      <MemoryRouter>
+        <Transactions />
+      </MemoryRouter>,
+    );
+    await screen.findAllByText("Item m-0");
+
+    await escolherMes("Dezembro de 2025");
+
+    await waitFor(() =>
+      expect(transactionsApi.list).toHaveBeenLastCalledWith(
+        expect.objectContaining({ month: 12, year: 2025, offset: 0 }),
+      ),
+    );
+  });
+
+  it("a busca que ainda estava esperando não desfaz o mês escolhido nesse meio-tempo", async () => {
+    // A busca espera 300ms. Se o mês muda dentro da espera, a busca atrasada
+    // não pode sair com o mês de antes: a lista voltaria a ser de todos os
+    // meses com o seletor ainda mostrando agosto.
+    hojeE(new Date(2026, 8, 25, 12));
+    render(
+      <MemoryRouter>
+        <Transactions />
+      </MemoryRouter>,
+    );
+    await screen.findAllByText("Item m-0");
+
+    fireEvent.change(screen.getByLabelText(/buscar transações/i), {
+      target: { value: "mercado" },
+    });
+    await escolherMes("Agosto de 2026");
+    await act(() => new Promise((r) => setTimeout(r, 400)));
+
+    expect(transactionsApi.list).toHaveBeenLastCalledWith(
+      expect.objectContaining({ q: "mercado", month: 8, year: 2026 }),
+    );
+  });
+  it("a paginação continua no mês escolhido", async () => {
+    hojeE(new Date(2026, 8, 25, 12));
+    transactionsApi.list.mockResolvedValue(pagina(50, 120, "m-"));
+    render(
+      <MemoryRouter>
+        <Transactions />
+      </MemoryRouter>,
+    );
+    await screen.findAllByText("Item m-0");
+
+    await escolherMes("Agosto de 2026");
+    fireEvent.click(await screen.findByRole("button", { name: /próxima/i }));
+
+    await waitFor(() =>
+      expect(transactionsApi.list).toHaveBeenLastCalledWith(
+        expect.objectContaining({ month: 8, year: 2026, offset: 50 }),
+      ),
+    );
+  });
+
+  it("voltar para 'Todos os meses' pede o histórico inteiro de novo", async () => {
+    hojeE(new Date(2026, 8, 25, 12));
+    render(
+      <MemoryRouter>
+        <Transactions />
+      </MemoryRouter>,
+    );
+    await screen.findAllByText("Item m-0");
+
+    await escolherMes("Agosto de 2026");
+    await escolherMes("Todos os meses");
+
+    await waitFor(() => {
+      const ultima = transactionsApi.list.mock.lastCall[0];
+      expect(ultima).not.toHaveProperty("month");
+      expect(ultima).not.toHaveProperty("year");
+    });
+  });
+});
+
+describe("Transactions, busca vinda da URL", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    transactionsApi.list.mockResolvedValue(pagina(3, 3, "q-"));
+  });
+
+  it("abrir o Extrato com ?q= já pede a primeira página com o termo e mostra o termo no campo", async () => {
+    // É o destino da busca do Dashboard. A primeira requisição já vem
+    // filtrada: pedir a lista inteira antes gastava uma ida ao servidor à toa.
+    render(
+      <MemoryRouter initialEntries={["/transactions?q=mercado"]}>
+        <Transactions />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() =>
+      expect(transactionsApi.list).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ q: "mercado", offset: 0 }),
+      ),
+    );
+    expect(screen.getByLabelText(/buscar transações/i)).toHaveValue("mercado");
+  });
+});
+
+describe("Transactions, totais do período", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    transactionsApi.list.mockResolvedValue(pagina(3, 3, "t-"));
+  });
+
+  it("mostra quanto entrou, quanto saiu e o resultado do que está filtrado", async () => {
+    // 1.000 de entrada e 200 de saída: resultado de 800.
+    transactionsApi.summary.mockResolvedValue({
+      data: { count: 3, income: "1000.00", expenses: "200.00" },
+    });
+
+    render(
+      <MemoryRouter>
+        <Transactions />
+      </MemoryRouter>,
+    );
+
+    const totais = await screen.findByRole("region", { name: "Totais do período" });
+    expect(within(totais).getByText("+R$ 1.000,00")).toBeInTheDocument();
+    expect(within(totais).getByText("−R$ 200,00")).toBeInTheDocument();
+    expect(within(totais).getByText("R$ 800,00")).toBeInTheDocument();
+  });
+  it("cada linha diz de qual carteira é o lançamento", async () => {
+    // Com duas carteiras, "−R$ 10,00 · Food" sem a carteira não diz de onde saiu.
+    walletsApi.list.mockResolvedValueOnce({
+      data: [{ id: "w1", name: "Nubank", balance: "10.00", bank: "nubank", created_at: "2026-06-01T00:00:00Z" }],
+    });
+
+    render(
+      <MemoryRouter>
+        <Transactions />
+      </MemoryRouter>,
+    );
+
+    const tabela = await screen.findByRole("table");
+    expect(within(tabela).getByRole("columnheader", { name: "Carteira" })).toBeInTheDocument();
+    expect((await within(tabela).findAllByText("Nubank")).length).toBe(3);
+  });
+  it("os totais seguem o mês escolhido, não a página nem o histórico inteiro", async () => {
+    hojeE(new Date(2026, 8, 25, 12));
+    render(
+      <MemoryRouter>
+        <Transactions />
+      </MemoryRouter>,
+    );
+    await screen.findAllByText("Item t-0");
+
+    await escolherMes("Agosto de 2026");
+
+    await waitFor(() =>
+      expect(transactionsApi.summary).toHaveBeenLastCalledWith(
+        expect.objectContaining({ month: 8, year: 2026 }),
+      ),
+    );
+  });
+
+  it("se os totais falharem, somem sem esconder a lista", async () => {
+    // Total desconhecido não vira R$ 0,00 (DESIGN.md, No Invented Number).
+    transactionsApi.summary.mockRejectedValueOnce(new Error("500"));
+
+    render(
+      <MemoryRouter>
+        <Transactions />
+      </MemoryRouter>,
+    );
+
+    expect((await screen.findAllByText("Item t-0")).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("region", { name: "Totais do período" })).not.toBeInTheDocument();
+  });
 });

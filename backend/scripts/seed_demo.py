@@ -27,6 +27,7 @@ import os
 import random
 import secrets
 import sys
+import time
 from datetime import date, datetime
 from urllib.parse import urlparse
 
@@ -35,6 +36,21 @@ import httpx
 API = os.getenv("SEED_API_URL", "http://localhost:8000").rstrip("/")
 EMAIL = os.getenv("SEED_EMAIL", "demo@norby.dev")
 NAME = os.getenv("SEED_NAME", "Ana Ribeiro")
+
+
+def _post(c: httpx.Client, path: str, payload: dict) -> httpx.Response:
+    """POST que espera o limite por usuário em vez de abortar no meio.
+
+    POST /transactions aceita 120/min por usuário e o seed cria ~150
+    lançamentos: sem esperar o 429, a conta ficava pela metade e o script se
+    recusava a rodar de novo (já tem carteiras).
+    """
+    while True:
+        r = c.post(path, json=payload)
+        if r.status_code != 429:
+            r.raise_for_status()
+            return r
+        time.sleep(int(r.headers.get("Retry-After", "30")))
 
 
 def _is_local_host(url: str) -> bool:
@@ -182,14 +198,15 @@ def main() -> None:
             )
 
         wallets = {}
-        for name, opening in ((CORRENTE, "0.00"), (POUPANCA, "8000.00")):
-            r = c.post("/wallets/", json={"name": name, "balance": opening})
-            r.raise_for_status()
+        # Com banco: a demo (e o screenshot do README) mostra o logo real,
+        # não a inicial de uma carteira sem banco.
+        for name, opening, bank in ((CORRENTE, "0.00", "nubank"), (POUPANCA, "8000.00", "itau")):
+            r = _post(c, "/wallets/", {"name": name, "balance": opening, "bank": bank})
             wallets[name] = r.json()["id"]
 
         rows = rows_for(today)
         for d, wallet, type_, cat, desc, amount in rows:
-            r = c.post("/transactions/", json={
+            _post(c, "/transactions/", {
                 "wallet_id": wallets[wallet],
                 "type": type_,
                 "amount": f"{amount:.2f}",
@@ -197,7 +214,6 @@ def main() -> None:
                 "description": desc,
                 "date": d.isoformat(),
             })
-            r.raise_for_status()
 
         year_end = datetime(today.year, 12, 31).isoformat()
         for goal in (
@@ -211,7 +227,7 @@ def main() -> None:
             {"name": "Teto de Alimentação", "type": "BUDGET",
              "target_amount": "1800.00", "category": "Alimentação"},
         ):
-            c.post("/goals/", json=goal).raise_for_status()
+            _post(c, "/goals/", goal)
 
         # day_of_month já passou neste mês, então next_run_date cai no mês que
         # vem: o POST /recurring/run do boot não materializa nada agora.
@@ -223,7 +239,7 @@ def main() -> None:
              "category": "Moradia", "description": "Aluguel",
              "frequency": "MONTHLY", "day_of_month": 10},
         ):
-            c.post("/recurring/", json=rec).raise_for_status()
+            _post(c, "/recurring/", rec)
 
         # A senha só volta ao terminal quando foi gerada aqui — se veio de
         # SEED_PASSWORD, quem a definiu já sabe qual é.

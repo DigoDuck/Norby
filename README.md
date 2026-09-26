@@ -4,9 +4,31 @@ Um organizador financeiro pessoal com um analista de IA junto. Você registra ca
 
 **Demo:** [norby.com.br](https://norby.com.br) · **API (Swagger):** [api.norby.com.br/docs](https://api.norby.com.br/docs)
 
-![Dashboard do Norby no tema escuro: saldo consolidado, score financeiro determinístico e a leitura da IA sobre os lançamentos do mês](assets/dashboard.webp)
+![Dashboard do Norby no tema escuro: saldo com os logos dos bancos e o score financeiro, os KPIs do mês com a Sobra em destaque, o Ritmo financeiro em heatmap e as despesas por categoria](assets/dashboard.webp)
 
-*Conta de demonstração, populada por [seed_demo.py](backend/scripts/seed_demo.py) — nenhum dado financeiro real.*
+*Conta de demonstração, populada por [seed_demo.py](backend/scripts/seed_demo.py): nenhum dado financeiro real.*
+
+## Interface
+
+O visual atual, **"A Bússola de Safira"**, é o quarto redesign do projeto (setembro de 2026): superfícies sólidas e quietas, números em tinta e cinza, e um único ponto de azul safira por tela dizendo onde olhar primeiro. Escuro por padrão, claro com paridade total. O sistema inteiro (cores, tipografia, componentes, movimento e regras) está em [DESIGN.md](DESIGN.md).
+
+<p align="center">
+  <img src="assets/dashboard-claro.webp" width="70%" alt="Dashboard no tema claro, com os mesmos dados do tema escuro">
+  <img src="assets/dashboard-celular.webp" width="25%" alt="Dashboard no celular: busca em linha própria e o score ao lado do saldo">
+</p>
+<p align="center">
+  <img src="assets/extrato.webp" width="49%" alt="Extrato com filtro por mês e tipo, totais do período e a coluna de carteira">
+  <img src="assets/carteiras.webp" width="49%" alt="Carteiras com os logos do Itaú e do Nubank e o convite do plano Premium no lugar da terceira">
+</p>
+<p align="center">
+  <img src="assets/login.webp" width="60%" alt="Tela de entrada, com a troca animada entre Entrar e Cadastrar">
+</p>
+
+- **Dashboard:** saldo com os logos dos bancos (19 no catálogo), a Sobra do mês como foco, receitas, despesas e taxa de poupança. O score fica ao lado do saldo para quem tem a IA; o Ritmo financeiro mostra, em heatmap estilo GitHub, os dias dentro da cota diária; e as despesas por categoria fecham com o total do mês.
+- **Extrato:** filtro por mês, tipo e busca, com os totais do período (entradas, saídas e resultado) calculados no servidor com o mesmo filtro da lista.
+- **Busca e tema no topo:** `Ctrl K` / `⌘ K` busca lançamentos de qualquer ponto do Dashboard, e um botão alterna escuro e claro.
+- **Plano gratuito honesto:** o que é do plano Premium aparece como cadeado dizendo o que ele libera, um convite por tela, nunca como tela vazia ou número zerado.
+- **Acessibilidade:** contraste medido na página renderizada, nos dois temas (nenhum texto abaixo de 4,5:1 em oito telas); "Pular para o conteúdo" como primeira parada do Tab; gráfico com nome quando é o único lugar de um dado, e fora do Tab quando o texto ao lado já diz tudo; `prefers-reduced-motion` respeitado, inclusive nos atrasos de animação.
 
 ## O problema
 
@@ -21,7 +43,7 @@ O Norby junta os lançamentos num lugar só (recorrências incluídas), mantém 
 | Backend | FastAPI 0.141 · SQLAlchemy 2.0 (async) + asyncpg · Alembic · Pydantic v2 · PyJWT (JWT) · slowapi (rate limit) · uv |
 | Bancos | PostgreSQL 16 (núcleo relacional) · MongoDB 7 via Motor (insights e chat da IA) |
 | IA | Google Gemini 3.5 Flash-Lite (`google-genai`) |
-| Frontend | React 19 · Vite 8 · TailwindCSS · componentes estilo shadcn/ui · Zustand · React Router v7 · React Hook Form + Zod · axios · Recharts |
+| Frontend | React 19 · Vite 8 · TailwindCSS · Base UI + componentes estilo shadcn/ui · Zustand · React Router v7 · React Hook Form + Zod · axios · Recharts · Lucide |
 | Testes | pytest + pytest-asyncio (backend) · Vitest + Testing Library (frontend) |
 | Infra | Docker Compose (dev) · Railway (backend, Docker) · Neon (Postgres) · MongoDB Atlas · Vercel (frontend) |
 
@@ -60,7 +82,7 @@ flowchart LR
 
   Mas ele se sustenta no problema. A carga aqui é I/O-bound no sentido mais literal: cada request de IA fica segundos parado esperando o Gemini responder, e o app ainda conversa com dois bancos. Como roda **uma** instância (ver o rate limit em memória, nas limitações), um worker síncrono preso esperando o LLM é exatamente o gargalo. Async é o que mantém a API atendendo enquanto o modelo pensa.
 
-  O preço foi real e está no código. Sem `django.contrib.auth`, o JWT com rotação de refresh, o hash de senha e o escopo por usuário são código meu. É parte de por que os 123 testes do backend existem.
+  O preço foi real e está no código. Sem `django.contrib.auth`, o JWT com rotação de refresh, o hash de senha e o escopo por usuário são código meu. É parte de por que os 425 testes do backend existem.
 
 - **Saldo persistido, com lock de linha.** O `Wallet.balance` é atualizado por deltas centralizados ([transaction_service.py](backend/app/services/transaction_service.py)) sob `SELECT ... FOR UPDATE`, cobrindo criar, editar, excluir e recorrência sem corrida.
 
@@ -75,6 +97,8 @@ flowchart LR
   Por que não um worker: o único leitor desses dados é o próprio usuário, e o gatilho é ele abrir o app. O atraso é invisível para o único observador que existe. Em troca, o projeto dispensa um segundo processo na Railway, com cron para monitorar, execuções sobrepostas e drift de horário.
 
   A decisão tem prazo de validade explícito. Ela vale enquanto nada do lado do servidor precisar ler esses dados sem o usuário presente. No dia em que existir notificação do tipo "seu aluguel vence amanhã", o scheduler deixa de ser opcional. Não é coincidência que notificações estejam fora do escopo da v1.
+
+- **Totais que não discordam da lista.** Os totais do Extrato (`GET /transactions/summary`) e a listagem (`GET /transactions/`) recebem os filtros da mesma dependência do FastAPI ([transactions.py](backend/app/routers/transactions.py)). Duas cópias do filtro divergiriam na primeira mudança que esquecesse uma delas, e o total no topo deixaria de somar a lista embaixo dele. Os totais vêm num endpoint, e não em headers, para não repetir a armadilha de CORS que o `X-Total-Count` já tinha armado neste repo.
 
 - **Agregação do dashboard feita no banco.** KPIs, fluxo de caixa dos 6 meses e top categorias saem de SQL sobre todas as transações ([dashboard_service.py](backend/app/services/dashboard_service.py)). A versão anterior agregava no cliente, sobre as 200 transações mais recentes, e por isso errava justamente para quem usa o app com frequência. O motivo está comentado no código.
 
@@ -110,9 +134,9 @@ Só que não era um bug, era uma classe de bug: o mesmo erro tinha vazado para q
 
 ## Validação
 
-- **Backend: 123 testes** (pytest + pytest-asyncio). Cobrem auth (registro com consentimento, login com tempo constante, refresh com rotação e detecção de reuso), CRUD de todos os recursos com checagem de posse entre dois usuários, materialização de recorrências, metas, score determinístico, contrato do insight da IA, limites de validação, constraints do banco, rate limit por usuário e observabilidade (request-id). Vários deles são testes de concorrência que abrem transações simultâneas de verdade no Postgres e falham sem os locks. Rodam contra um Postgres real de teste (`norby_test`), com o schema criado e destruído a cada teste. Comando: `pytest` em `backend/`.
-- **Frontend: 44 testes** (Vitest + Testing Library). Cobrem o store de auth, os schemas Zod, utilitários, tratamento de erro da API e componentes compartilhados. Comando: `npm run test` em `frontend/`.
-- Sem CI configurado: os testes rodam localmente antes do merge.
+- **Backend: 425 testes** (pytest + pytest-asyncio). Cobrem auth (registro com consentimento, login com tempo constante, refresh com rotação e detecção de reuso), CRUD de todos os recursos com checagem de posse entre dois usuários, materialização de recorrências, metas, score determinístico, contrato do insight da IA, limites de validação, constraints do banco, rate limit por usuário e observabilidade (request-id). Vários deles são testes de concorrência que abrem transações simultâneas de verdade no Postgres e falham sem os locks. Rodam contra um Postgres real de teste (`norby_test`), com o schema criado e destruído a cada teste. Comando: `pytest` em `backend/`.
+- **Frontend: 289 testes** (Vitest + Testing Library). Além do store de auth, dos schemas Zod e dos utilitários, cobrem as páginas contra a API mockada: o Dashboard por plano (free e premium), o filtro por mês e os totais do Extrato, a exclusão de carteira, a busca do topo e as regras do plano Premium. Comando: `npm run test` em `frontend/`.
+- **CI no GitHub Actions** em todo PR para a `main`: no backend, confere os locks de dependência, se as migrations batem com os models, roda o pytest e o pip-audit; no frontend, roda ESLint, Vitest e build, com `npm audit`. A `main` faz deploy automático (Vercel e Railway), então o CI é a última parada antes da produção.
 
 ## Conformidade (LGPD)
 
@@ -149,7 +173,7 @@ Limitações conhecidas, aceitas conscientemente na v1:
 
 - Recorrências só materializam quando o usuário abre o app (sem scheduler server-side).
 - Rate limiting em memória. As rotas autenticadas são limitadas por usuário; login e cadastro, por IP — e atrás do proxy do Railway esse IP é o mesmo para todo mundo, então o balde é compartilhado. Não sobrevive a múltiplas instâncias nem a restart.
-- Sem CI e sem linter no backend (o frontend tem ESLint).
+- Sem linter no backend (o frontend tem ESLint).
 - Fora do escopo da v1: multi-moeda, Open Finance, export CSV/PDF, CRUD de categorias, notificações e metas compartilhadas.
 
-Próximos passos: CI e i18n.
+Próximos passos: i18n.

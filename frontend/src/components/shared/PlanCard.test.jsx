@@ -54,6 +54,21 @@ beforeEach(() => vi.clearAllMocks());
 afterEach(() => useAuthStore.getState().logout());
 
 describe("PlanCard", () => {
+  it("free vê o que o plano Premium libera antes de assinar", () => {
+    // Quem chega por "Conhecer o plano Premium" precisa ver o que conhece:
+    // só o botão "Assinar" pedia compromisso sem dizer pelo quê.
+    renderCard({
+      ...LIBERADO,
+      ai_allowed: false,
+      wallet_cap_applies: true,
+    });
+
+    expect(screen.getByText("O plano Premium libera:")).toBeInTheDocument();
+    const lista = screen.getByRole("list");
+    expect(lista).toHaveTextContent(/Norby IA/);
+    expect(lista).toHaveTextContent(/Carteiras sem o limite/);
+  });
+
   it("offers nothing while the paywall is off", () => {
     // Estado de produção hoje: os dois booleanos reportam liberado, então o
     // premium não entrega nada a mais. Oferecer assinatura aqui seria cobrar
@@ -201,7 +216,7 @@ describe("PlanCard", () => {
       "href",
       "/termos",
     );
-    const cartao = screen.getByText("Plano").closest("div.glass");
+    const cartao = screen.getByText("Plano").closest("div.panel");
     expect(cartao.textContent).toContain(PRECO_MENSAL);
     expect(cartao.textContent).toContain("renovação automática");
     expect(cartao.textContent).toContain("7 dias");
@@ -217,7 +232,7 @@ describe("PlanCard", () => {
     });
 
     expect(screen.getByRole("button", { name: "Gerenciar assinatura" })).toBeInTheDocument();
-    const cartao = screen.getByText("Plano").closest("div.glass");
+    const cartao = screen.getByText("Plano").closest("div.panel");
     expect(cartao.textContent).not.toContain(PRECO_MENSAL);
   });
 });
@@ -249,7 +264,7 @@ describe("PlanCard, medidor de uso de IA", () => {
     // chamada, não os tokens.
     expect(barra).toHaveAttribute("aria-valuenow", "3");
 
-    const cartao = screen.getByText("Plano").closest("div.glass");
+    const cartao = screen.getByText("Plano").closest("div.panel");
     expect(cartao.textContent).toContain("3 de 100 conversas");
     expect(cartao.textContent).toContain("2.100 de 120.000 tokens");
   });

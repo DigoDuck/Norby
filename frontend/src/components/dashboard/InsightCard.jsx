@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { AlertTriangle, ArrowRight, Check, Sparkles } from "lucide-react";
 import AiOrb from "@/components/shared/AiOrb";
+import PremiumLock from "@/components/shared/PremiumLock";
 import { Button } from "@/components/ui/button";
 
 // Ícone contextual dos insights da IA (heurística simples em pt-BR).
@@ -14,31 +15,31 @@ function insightIcon(text) {
 }
 
 /**
- * Painel "Leitura da IA" do dashboard.
+ * Painel "Leitura da Norby" do dashboard.
  *
  * @param {{ summary_text?: string, suggested_action?: string|null } | null} insight
+ * @param {boolean} [bloqueada]  plano sem IA: mostra o convite, não um vazio falso
  */
-export default function InsightCard({ insight }) {
+export default function InsightCard({ insight, bloqueada = false }) {
   const navigate = useNavigate();
   const insightItems = insight?.summary_text?.split("|") || [];
 
   return (
-    <div className="lg:col-span-4 relative overflow-hidden glass border-accent/20 p-6 flex flex-col gap-3">
-      {/* Segundo e último glow do dashboard: presença da IA (ver DESIGN.md) */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{ background: "var(--glow-accent)" }}
-      />
+    <div className="xl:col-span-4 panel p-6 flex flex-col gap-3">
       <div className="relative flex items-center gap-3">
         <AiOrb size={34} />
         <div>
-          <h2 className="font-semibold text-content">Leitura da IA</h2>
-          <p className="text-[11px] text-accent tracking-wide">
-            resumo do seu comportamento
-          </p>
+          <h2 className="font-semibold text-content">Leitura da Norby</h2>
+          <p className="text-xs text-content-2">Seu mês, em poucas linhas</p>
         </div>
       </div>
-      {insightItems.length === 0 ? (
+      {bloqueada ? (
+        <PremiumLock
+          className="flex-1 justify-center"
+          title="A leitura da Norby faz parte do plano Premium"
+          text="Assine para receber a análise do seu mês e sugestões práticas."
+        />
+      ) : insightItems.length === 0 ? (
         <div className="flex-1 flex items-center justify-center text-content-3 text-xs text-center">
           Adicione transações para gerar sua análise de IA
         </div>
@@ -51,7 +52,7 @@ export default function InsightCard({ insight }) {
               return (
                 <div
                   key={i}
-                  className="stroke-iris p-3.5 rounded-xl text-[13px] font-semibold text-content leading-relaxed"
+                  className="inset-panel p-3.5 text-[13px] font-semibold text-content leading-relaxed"
                 >
                   {text}
                 </div>
@@ -82,13 +83,15 @@ export default function InsightCard({ insight }) {
         </div>
       )}
 
-      <Button
-        onClick={() => navigate("/ai")}
-        variant="ghost"
-        className="w-full stroke-iris bg-transparent text-accent font-semibold hover:bg-accent/[0.06]"
-      >
-        Conversar com a Norby <ArrowRight size={14} />
-      </Button>
+      {!bloqueada && (
+        <Button
+          onClick={() => navigate("/ai")}
+          variant="outline"
+          className="w-full font-semibold"
+        >
+          Conversar com a Norby <ArrowRight size={14} />
+        </Button>
+      )}
     </div>
   );
 }

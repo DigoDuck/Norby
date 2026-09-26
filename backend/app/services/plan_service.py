@@ -76,13 +76,19 @@ class PlanRefused(Exception):
 # FAZER, não o que a tabela de faixas diz. Se reportassem a faixa real com o
 # paywall apagado, a tela bloquearia IA e carteiras que o backend aceita — um
 # paywall que atrapalha o usuário sem cobrar de ninguém.
+#
+# O admin passa pelos dois portões sem ser premium. A regra mora aqui, e não
+# nas faixas acima nem em `premium_until`: as faixas descrevem a ASSINATURA, e
+# gravar uma data no admin o contaria como assinante nas métricas e fingiria
+# uma assinatura que o Stripe não conhece. A cota diária de IA (ADR 0003)
+# continua valendo para ele: ela protege o limite do projeto, não o plano.
 
 
 def ai_gate_open(user: User, now: datetime | None = None) -> bool:
-    """IA liberada de verdade, considerando o flag de rollout."""
-    return not get_settings().paywall_enabled or ai_allowed(user, now)
+    """IA liberada de verdade, considerando o flag de rollout e o admin."""
+    return not get_settings().paywall_enabled or user.is_admin or ai_allowed(user, now)
 
 
 def wallet_cap_active(user: User, now: datetime | None = None) -> bool:
-    """Teto de carteiras valendo de verdade, considerando o flag de rollout."""
-    return get_settings().paywall_enabled and wallet_cap_applies(user, now)
+    """Teto de carteiras valendo de verdade, considerando o flag e o admin."""
+    return get_settings().paywall_enabled and not user.is_admin and wallet_cap_applies(user, now)

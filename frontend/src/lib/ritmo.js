@@ -50,6 +50,9 @@ export function computeRitmo(transactions, days, today = new Date()) {
     const spent = spentByDay.get(key) ?? 0;
     cells.push({
       key,
+      // Da Date local, nunca de new Date(key): "2026-09-25" seria lido como UTC
+      // e, em UTC-3, viraria quinta.
+      weekday: d.getDay(),
       spent,
       active: activeDays.has(key),
       onPace: hasPace && spent <= dailyPace,
@@ -79,4 +82,60 @@ export function computeRitmo(transactions, days, today = new Date()) {
 export function headroom(cell, dailyPace) {
   if (dailyPace <= 0) return 0;
   return Math.max(0, 1 - cell.spent / dailyPace);
+}
+
+/**
+ * Intensidade da célula. 1 = dia sem lançamento (no ritmo por omissão, como a
+ * frase do painel já conta), 2-4 = dia com gasto por folga, over = estourou.
+ * Sem cota tudo é 0: não dá para estourar um ritmo que não existe.
+ */
+export function heatLevel(cell, dailyPace) {
+  if (dailyPace <= 0) return 0;
+  if (!cell.active) return 1;
+  if (!cell.onPace) return "over";
+  const folga = headroom(cell, dailyPace);
+  if (folga > 0.66) return 4;
+  if (folga > 0.33) return 3;
+  return 2;
+}
+
+const MESES = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
+/**
+ * Grade estilo GitHub: cada coluna é uma semana de domingo a sábado. A primeira
+ * coluna começa com `null` até o dia da semana do primeiro dia da janela; a
+ * última termina em hoje, sem completar.
+ * `months[c]` é o rótulo da coluna c: o mês que começa nela, ou o da janela na
+ * primeira coluna.
+ */
+export function heatGrid(cells) {
+  const slots = [...Array(cells[0]?.weekday ?? 0).fill(null), ...cells];
+  const weeks = [];
+  for (let i = 0; i < slots.length; i += 7) weeks.push(slots.slice(i, i + 7));
+
+  const mes = (key) => MESES[Number(key.slice(5, 7)) - 1];
+  const months = weeks.map((week, c) => {
+    const inicio = week.find((cell) => cell?.key.endsWith("-01"));
+    if (inicio) return mes(inicio.key);
+    return c === 0 ? mes(week.find(Boolean).key) : "";
+  });
+  return { weeks, months };
+}
+
+/**
+ * Dias de uma janela de `weeks` semanas que começa num domingo e termina hoje:
+ * as semanas anteriores inteiras mais domingo..hoje. Assim a primeira coluna
+ * da grade nunca começa com casas vazias.
+ */
+export function windowDays(weeks, today = new Date()) {
+  return (weeks - 1) * 7 + today.getDay() + 1;
+}
+
+/**
+ * Quantas semanas cabem numa largura com células de `cell` px: é a grade que
+ * se ajusta à largura, como no GitHub, e não a célula que estica.
+ */
+export function weeksThatFit(width, { cell, gap, label, min, max }) {
+  const cabem = Math.floor((width - label + gap) / (cell + gap));
+  return Math.min(max, Math.max(min, cabem));
 }

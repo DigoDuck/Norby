@@ -1,17 +1,14 @@
 import NorthStar from "./NorthStar";
 
-// Presença da IA (DESIGN.md › Signature): o tile iridescente da marca, redondo,
-// com a estrela-norte no centro — que é o marcador usado no cabeçalho do card
-// de leitura na referência. O anel em CSS saiu daqui: depois que o herói passou
-// a usar o toro renderizado, um segundo círculo, chapado, brigava com ele.
-export default function AiOrb({ size = 40, pulse = true, className = "" }) {
+// Presença da IA: a estrela-norte em azul num círculo tingido. Era o tile
+// iridescente pulsando, o último resto do tema de vidro; o gradiente ficou só
+// no logo, onde é marca, e a IA fala com a mesma cor de acento do resto.
+export default function AiOrb({ size = 40, className = "" }) {
   return (
     <div
       aria-hidden="true"
       style={{ width: size, height: size }}
-      className={`brand-tile brand-tile-round shrink-0 ${
-        pulse ? "motion-safe:animate-orb-pulse" : ""
-      } ${className}`}
+      className={`grid place-items-center shrink-0 rounded-full bg-accent/[0.12] text-accent ${className}`}
     >
       <NorthStar size={Math.round(size * 0.42)} />
     </div>

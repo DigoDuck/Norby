@@ -220,3 +220,40 @@ async def test_wallet_cap_applies_true_matches_a_real_403_on_the_third_wallet(
     terceira = await alice.post("/wallets/", json={"name": "Terceira", "balance": "0.00"})
     assert terceira.status_code == 403
     assert terceira.json()["detail"]["code"] == "WALLET_LIMIT_REACHED"
+
+
+# ── Admin: passa pelos dois portões sem ser premium ──────────────────────
+# O admin usa o produto inteiro para dar suporte e testar. Ele não vira
+# "premium" (quem paga): premium_until fica intocado, então não entra nas
+# métricas de assinantes nem finge uma assinatura que o Stripe não conhece.
+
+
+@pytest.mark.asyncio
+async def test_an_admin_without_a_subscription_passes_both_gates(
+    make_auth_client, db_session, paywall_ligado
+):
+    diogo = await make_auth_client("Diogo")
+    await _user(
+        diogo,
+        db_session,
+        is_admin=True,
+        ai_trial_ends_at=datetime.now(timezone.utc) - timedelta(days=1),
+    )
+
+    plano = await _plan(diogo)
+
+    assert plano["ai_allowed"] is True
+    assert plano["wallet_cap_applies"] is False
+    assert plano["premium_until"] is None
+
+
+@pytest.mark.asyncio
+async def test_an_admin_creates_a_third_wallet_with_the_paywall_on(
+    make_auth_client, db_session, paywall_ligado
+):
+    diogo = await make_auth_client("Diogo")
+    await _user(diogo, db_session, is_admin=True)
+
+    for nome in ("Primeira", "Segunda", "Terceira"):
+        res = await diogo.post("/wallets/", json={"name": nome, "balance": "0.00"})
+        assert res.status_code == 201, res.text

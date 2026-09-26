@@ -26,9 +26,9 @@ describe.each([
     const article = within(main).getByRole("article");
 
     expect(main).toHaveClass("mx-auto", "max-w-3xl");
-    expect(container.querySelectorAll(".glass")).toHaveLength(1);
-    expect(article).toHaveClass("glass", "p-8");
-    expect(article.querySelector("section.glass")).not.toBeInTheDocument();
+    expect(container.querySelectorAll(".panel")).toHaveLength(1);
+    expect(article).toHaveClass("panel", "p-8");
+    expect(article.querySelector("section.panel")).not.toBeInTheDocument();
     expect(within(article).getByRole("heading", { level: 1, name: title }))
       .toBeInTheDocument();
 

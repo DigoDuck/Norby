@@ -29,7 +29,7 @@ export default class ErrorBoundary extends Component {
 
     return (
       <div className="min-h-screen bg-bg-base flex items-center justify-center p-6">
-        <div className="glass max-w-md w-full p-8 text-center">
+        <div className="panel max-w-md w-full p-8 text-center">
           <div className="mx-auto mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-danger/15">
             <AlertTriangle className="text-danger" size={22} />
           </div>
@@ -42,7 +42,7 @@ export default class ErrorBoundary extends Component {
           </p>
           <Button
             onClick={() => window.location.reload()}
-            className="mt-6 bg-accent-fill text-accent-contrast hover:bg-accent-fill/90"
+            className="mt-6"
           >
             Recarregar
           </Button>

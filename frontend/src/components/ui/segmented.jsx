@@ -13,10 +13,12 @@ export function Segmented({ value, onChange, options, className, ariaLabel }) {
   const n = options.length;
 
   return (
+    // Trilho com pílula, a mesma linguagem do Entrar/Cadastrar do login: as
+    // opções leem como UMA escolha, não como três botões soltos.
     <div
       role="group"
       aria-label={ariaLabel}
-      className={cn("grid gap-2", className)}
+      className={cn("grid gap-1 rounded-full bg-line/[0.06] p-1", className)}
       style={{ gridTemplateColumns: `repeat(${n}, 1fr)` }}
     >
       {options.map((opt) => {
@@ -30,10 +32,10 @@ export function Segmented({ value, onChange, options, className, ariaLabel }) {
             aria-pressed={isActive}
             onClick={() => onChange(opt.value)}
             className={cn(
-              "rounded-xl py-2 text-sm font-medium transition-all",
+              "rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
               isActive
-                ? (opt.activeClass ?? "bg-accent-fill text-accent-contrast")
-                : "bg-line/5 text-content-2 hover:text-content"
+                ? (opt.activeClass ?? "bg-content text-bg-base")
+                : "text-content-2 hover:text-content"
             )}
           >
             {opt.label}
