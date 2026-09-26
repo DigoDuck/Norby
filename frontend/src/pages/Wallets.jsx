@@ -3,7 +3,7 @@ import { Plus, Pencil, Trash2, Wallet } from "lucide-react";
 import { walletsApi } from "@/api/wallets";
 import { transactionsApi } from "@/api/transactions";
 import { apiErrorMessage, formatBRL, shadcnInputCls } from "@/lib/utils";
-import { OPCOES_BANCO } from "@/lib/bancos";
+import { OPCOES_BANCO, bancoDaCarteira } from "@/lib/bancos";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import Money from "@/components/shared/Money";
 import WalletMark from "@/components/shared/WalletMark";
@@ -129,7 +129,9 @@ export default function Wallets() {
   function openEdit(wallet, e) {
     ultimoGatilho.current = e?.currentTarget ?? null;
     setEditing(wallet);
-    setForm({ name: wallet.name, balance: wallet.balance, bank: wallet.bank || "" });
+    // O banco que o card mostra, inclusive o deduzido do nome: o formulário
+    // não pode discordar da tela, e salvar grava o que já se via.
+    setForm({ name: wallet.name, balance: wallet.balance, bank: bancoDaCarteira(wallet)?.slug ?? "" });
     setError(null);
     setOpen(true);
   }

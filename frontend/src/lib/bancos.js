@@ -50,6 +50,23 @@ export function banco(slug) {
   return slug ? POR_SLUG.get(slug) : undefined;
 }
 
+// Nome de carteira é digitado à mão: "itau ", "ITAÚ" e "Itaú" são o mesmo banco.
+const normalizar = (texto) =>
+  texto.normalize("NFD").replace(/\p{Diacritic}/gu, "").trim().toLowerCase();
+
+const POR_NOME = new Map(BANCOS.map((b) => [normalizar(b.label), b]));
+
+/**
+ * O banco que a marca da carteira mostra. Sem banco escolhido, vale o nome
+ * quando ele É o de um banco do catálogo: carteira criada antes do campo
+ * Banco (ou sem mexer nele) se chama "Nubank" e mostrava só a inicial "N".
+ * Nome que não é de banco ("Conta Corrente") segue sem banco.
+ */
+export function bancoDaCarteira(wallet) {
+  if (wallet.bank) return banco(wallet.bank);
+  return POR_NOME.get(normalizar(wallet.name ?? ""));
+}
+
 /** Opções do `<Select>`, com "" para "sem banco". */
 export const OPCOES_BANCO = [
   { value: "", label: "Sem banco" },
