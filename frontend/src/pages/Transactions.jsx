@@ -31,6 +31,30 @@ import {
 
 const PAGE_SIZE = 50;
 
+// "" é "sem filtro de tipo", o mesmo valor que o backend entende.
+const FILTRO_TIPO = [
+  { value: "", label: "Todos" },
+  { value: "INCOME", label: "Receitas" },
+  { value: "EXPENSE", label: "Despesas" },
+];
+
+// "Todos os meses" + os últimos 24 meses, do atual para trás. O dia 1 no
+// construtor deixa a Date virar o ano sozinha (janeiro - 1 = dezembro do ano
+// anterior).
+// ponytail: janela fixa de 24 meses; buscar a data do lançamento mais antigo
+// se alguém precisar filtrar antes disso.
+function opcoesDeMes(hoje = new Date()) {
+  const meses = Array.from({ length: 24 }, (_, i) => {
+    const d = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+    const rotulo = d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+    return {
+      value: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
+      label: rotulo[0].toUpperCase() + rotulo.slice(1),
+    };
+  });
+  return [{ value: "todos", label: "Todos os meses" }, ...meses];
+}
+
 // Valores iniciais do formulário (date sempre fresca → função).
 const emptyForm = () => ({
   wallet_id: "",
@@ -56,6 +80,8 @@ export default function Transactions() {
   // contagem da lista sem filtro nenhum.
   const [buscaAplicada, setBuscaAplicada] = useState("");
   const [filterType, setFilterType] = useState("");
+  // "todos" ou "aaaa-mm". "" não serve: é o valor que o Select trata como vazio.
+  const [mes, setMes] = useState("todos");
   const [offset, setOffset] = useState(0);
   const [total, setTotal] = useState(0);
   // Começa carregando: sem isso o primeiro render já dizia "nenhuma transação".
@@ -114,16 +140,19 @@ export default function Transactions() {
     }
   }
 
-  // Espelha `filterType` numa ref: o efeito de busca abaixo depende só de
-  // `search` (não de `filterType`), então o setTimeout já agendado por uma
-  // digitação precisa enxergar o filtro de tipo MAIS RECENTE quando disparar,
-  // não o que existia no instante em que foi agendado. A escrita mora num
+  // Espelha `filterType` e `mes` em refs: o efeito de busca abaixo depende só
+  // de `search`, então o setTimeout já agendado por uma digitação precisa
+  // enxergar os filtros MAIS RECENTES quando disparar, não os do instante em
+  // que foi agendado. Sem isso, trocar o mês durante a espera da busca fazia a
+  // busca atrasada voltar a lista para todos os meses. A escrita mora num
   // efeito à parte porque refs não podem ser lidas nem escritas durante o
   // render (react-hooks/refs).
   const filterTypeRef = useRef(filterType);
+  const mesRef = useRef(mes);
   useEffect(() => {
     filterTypeRef.current = filterType;
-  }, [filterType]);
+    mesRef.current = mes;
+  }, [filterType, mes]);
 
   // Parâmetros do filtro de tipo + busca ativa, para toda chamada de load()
   // que precisa preservá-los (paginação, reload após criar/editar/excluir,
@@ -131,9 +160,12 @@ export default function Transactions() {
   // porque o clique no botão de tipo passa o valor NOVO antes de setFilterType
   // refletir no state — os demais chamadores usam o filtro atual por padrão.
   // `trim()`: dois espaços não é uma busca válida.
-  function filtroAtivo(tipo = filterType) {
+  function filtroAtivo(tipo = filterType, mesEscolhido = mes) {
     return {
       ...(tipo ? { type: tipo } : {}),
+      ...(mesEscolhido !== "todos"
+        ? { year: Number(mesEscolhido.slice(0, 4)), month: Number(mesEscolhido.slice(5)) }
+        : {}),
       ...(search.trim().length >= 2 ? { q: search.trim() } : {}),
     };
   }
@@ -163,12 +195,12 @@ export default function Transactions() {
       return;
     }
     const id = setTimeout(() => {
-      load(filtroAtivo(filterTypeRef.current), 0);
+      load(filtroAtivo(filterTypeRef.current, mesRef.current), 0);
     }, 300);
     return () => clearTimeout(id);
     // filtroAtivo de propósito fora: é recriada a cada render, e incluí-la
-    // reagendaria a busca a cada render (não só quando `search` muda). O tipo
-    // mais recente já chega pela ref, lida dentro do timeout, não do closure.
+    // reagendaria a busca a cada render (não só quando `search` muda). Tipo e
+    // mês mais recentes chegam pelas refs, lidas dentro do timeout, não do closure.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
 
@@ -496,8 +528,11 @@ export default function Transactions() {
             className="mb-4 border-0 shadow-none"
           />
         )}
-        <div className="inset-panel mb-4 flex flex-col gap-3 p-4 sm:flex-row">
-          <div className="relative flex-1 sm:max-w-xs">
+        {/* Barra de filtros solta no card, sem caixa própria: uma caixa aqui
+            era um card dentro do card. Busca à esquerda; mês e tipo, que
+            recortam a lista, juntos à direita. */}
+        <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center">
+          <div className="relative flex-1 md:max-w-sm">
             <Search size={16} className="absolute left-3 top-2.5 text-content-3" />
             <Input
               aria-label="Buscar transações"
@@ -505,28 +540,33 @@ export default function Transactions() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               maxLength={100}
-              className="pl-9 bg-surface border-line/10 text-content placeholder:text-content-3"
+              className="pl-9 bg-surface-inset border-line/10 text-content placeholder:text-content-3"
             />
           </div>
-          <div className="grid grid-cols-3 gap-2 sm:flex">
-            {["", "INCOME", "EXPENSE"].map((t) => (
-              <button
-                key={t}
-                type="button"
-                aria-pressed={filterType === t}
-                onClick={() => {
-                  setFilterType(t);
-                  load(filtroAtivo(t), 0);
-                }}
-                className={`rounded-xl px-3 py-2 text-sm transition-colors ${
-                  filterType === t
-                    ? "bg-accent-fill text-accent-contrast font-medium"
-                    : "bg-line/5 text-content-2 hover:text-content"
-                }`}
-              >
-                {t === "" ? "Todos" : t === "INCOME" ? "Receitas" : "Despesas"}
-              </button>
-            ))}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center md:ml-auto">
+          <div className="sm:w-52">
+            <Select
+              id="filtro-mes"
+              ariaLabel="Mês"
+              value={mes}
+              options={opcoesDeMes()}
+              onChange={(v) => {
+                const escolhido = v || "todos";
+                setMes(escolhido);
+                load(filtroAtivo(filterType, escolhido), 0);
+              }}
+            />
+          </div>
+          <Segmented
+            ariaLabel="Tipo"
+            value={filterType}
+            onChange={(tipo) => {
+              setFilterType(tipo);
+              load(filtroAtivo(tipo), 0);
+            }}
+            options={FILTRO_TIPO}
+            className="sm:w-72"
+          />
           </div>
         </div>
 
