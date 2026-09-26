@@ -1,5 +1,7 @@
 import nubankLogo from "@/assets/banks/nubank.svg";
 import itauLogo from "@/assets/banks/itau.svg";
+import neonLogo from "@/assets/banks/neon.svg";
+import btgLogo from "@/assets/banks/btg.svg";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 
@@ -75,6 +77,69 @@ describe("Wallets", () => {
     expect(logos[0].getAttribute("src")).toBe(nubankLogo);
     // Sem banco, nada muda em relação ao que já existia.
     expect(screen.getByText("P")).toBeInTheDocument();
+  });
+
+  it("carteira sem banco escolhido, mas com o nome de um banco, mostra o logo dele", async () => {
+    // Carteira criada antes do campo Banco: o nome já diz o banco, e mostrar
+    // a inicial "N" escondia o logo sem a pessoa saber que tinha de editar.
+    walletsApi.list.mockResolvedValue({
+      data: [{ id: "1", name: "Nubank", balance: "102.69", bank: null }],
+    });
+    const { container } = render(<Wallets />);
+
+    await screen.findAllByText("Nubank");
+    const logos = [...container.querySelectorAll("img")];
+    expect(logos).toHaveLength(1);
+    expect(logos[0].getAttribute("src")).toBe(nubankLogo);
+  });
+
+  it("o nome vale mesmo digitado sem acento, em minúsculas ou com espaço sobrando", async () => {
+    walletsApi.list.mockResolvedValue({
+      data: [{ id: "1", name: "itau ", balance: "5.00", bank: null }],
+    });
+    const { container } = render(<Wallets />);
+
+    await screen.findAllByText(/itau/);
+    const logos = [...container.querySelectorAll("img")];
+    expect(logos).toHaveLength(1);
+    expect(logos[0].getAttribute("src")).toBe(itauLogo);
+  });
+
+  it("editar essa carteira já traz o banco que ela mostra, e salvar grava", async () => {
+    // O card mostra o logo do Nubank; o campo Banco dizendo "Sem banco" seria
+    // o formulário discordando da tela. Salvar sem mexer passa a gravar.
+    walletsApi.list.mockResolvedValue({
+      data: [{ id: "w9", name: "Nubank", balance: "102.69", bank: null }],
+    });
+    walletsApi.update.mockResolvedValue({ data: {} });
+    render(<Wallets />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Editar carteira" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Salvar alterações" }));
+
+    await waitFor(() =>
+      expect(walletsApi.update).toHaveBeenCalledWith("w9", expect.objectContaining({ bank: "nubank" })),
+    );
+  });
+
+  it("os bancos digitais novos do catálogo também têm logo (Neon)", async () => {
+    walletsApi.list.mockResolvedValue({
+      data: [{ id: "1", name: "Conta do dia a dia", balance: "1.00", bank: "neon" }],
+    });
+    const { container } = render(<Wallets />);
+
+    await screen.findByText("Conta do dia a dia");
+    expect(container.querySelector("img")?.getAttribute("src")).toBe(neonLogo);
+  });
+
+  it("o nome curto do banco também vale ('BTG' para BTG Pactual)", async () => {
+    walletsApi.list.mockResolvedValue({
+      data: [{ id: "1", name: "BTG", balance: "1.00", bank: null }],
+    });
+    const { container } = render(<Wallets />);
+
+    await screen.findAllByText("BTG");
+    expect(container.querySelector("img")?.getAttribute("src")).toBe(btgLogo);
   });
 
   it("carteiras do mesmo banco mostram o mesmo logo, com nomes diferentes", async () => {

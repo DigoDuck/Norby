@@ -1,5 +1,5 @@
 import { Banknote } from "lucide-react";
-import { banco } from "@/lib/bancos";
+import { bancoDaCarteira } from "@/lib/bancos";
 import { CHART_SERIES, hashIndex } from "@/lib/palette";
 
 // Cor do chip, determinística e só apresentação. Chaveada pelo BANCO quando
@@ -19,7 +19,7 @@ const chipColor = (chave) => CHART_SERIES[hashIndex(chave, CHART_SERIES.length)]
  * @param {string} [className]  tamanho, canto e fonte
  */
 export default function WalletMark({ wallet, className = "w-12 h-12 rounded-2xl text-lg" }) {
-  const b = banco(wallet.bank);
+  const b = bancoDaCarteira(wallet);
 
   if (b?.logo) {
     // Branco fixo nos dois temas, de propósito: os logos são desenhados para
