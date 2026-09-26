@@ -121,6 +121,17 @@ components:
   chip:
     rounded: "{rounded.pill}"
     padding: "2px 8px"
+  segmented-active:
+    backgroundColor: "{colors.content}"
+    textColor: "{colors.bg-base}"
+    rounded: "{rounded.pill}"
+    height: "32px"
+    padding: "0 12px"
+  search-input:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.content}"
+    rounded: "{rounded.pill}"
+    height: "40px"
 ---
 
 # Design System: Norby
@@ -140,17 +151,23 @@ O sistema **rejeita** o que o Norby já foi: o vidro com blur, o brilho em volta
 coisas, o gradiente iridescente, o anel 3D e o neon (cor clara e saturada ao mesmo
 tempo). Também rejeita o dashboard-template de SaaS, o arco-íris de categorias e o
 emoji como ícone. A referência vigente é o dashboard **Finexy** (enviada pelo dono em
-2026-09-25): saudação solta como cabeçalho, KPIs em blocos com um só preenchido na
-cor de destaque, ação principal em tinta, três degraus de superfície. O laranja dela
-**não** veio junto: o destaque do Norby é safira.
+2026-09-25): saudação como cabeçalho, KPIs em blocos com um só preenchido na cor de
+destaque, ação principal em tinta, três degraus de superfície. O laranja dela **não**
+veio junto: o destaque do Norby é safira. O vão do cabeçalho do Dashboard leva
+ferramentas (busca de lançamentos, troca de tema), nunca um número que já mora num KPI.
 
 Mecânica de tema, inalterada: `data-theme="dark" | "light"` no `<html>` é a única
 fonte de verdade; um script inline no `index.html` evita o flash; a escolha vive em
 `localStorage` (`norby-theme`, falha cai em `dark`); `lib/theme.js` é o único ponto
-de leitura e escrita; o tema do sistema não é consultado. Os tokens de cor são canais
+de leitura e escrita; o tema do sistema não é consultado. A troca rápida é o botão de
+sol e lua no topo do Dashboard (`ThemeButton`); a escolha com prévia fica em
+Configurações > Aparência (`ThemeToggle`). Os tokens de cor são canais
 RGB em `src/index.css`, expostos ao Tailwind como `rgb(var(--x) / <alpha-value>)`,
 então `bg-surface/70` funciona. Layout: shell com sidebar de 16rem que vira gaveta
-abaixo de `lg`; dashboard em grade de 12 colunas com `gap` de 16px.
+abaixo de `lg`; o dashboard só divide em 12 colunas a partir de `xl` (1280px), com `gap`
+de 16px. Abaixo disso cada card ocupa a largura toda: entre 1024 e 1279px a divisão
+4/5/3 quebrava o saldo e cortava o nome das carteiras. Card que muda de arranjo pela
+própria largura usa container query, não breakpoint de tela (a pizza).
 
 **Key Characteristics:**
 - Superfície opaca em três degraus: página, painel, bloco interno.
@@ -158,6 +175,8 @@ abaixo de `lg`; dashboard em grade de 12 colunas com `gap` de 16px.
 - Números em Geist com algarismos tabulares, centavos um degrau menores.
 - Ícones Lucide de traço, nunca emoji.
 - Nenhum número inventado: carregando é esqueleto, falha é aviso com "Tentar de novo".
+- Movimento curto e com função: fade a cada rota, KPIs entrando em sequência, campos
+  do login abrindo e fechando. `prefers-reduced-motion` zera tudo.
 
 ## 2. Colors: Tinta, Cinza e um Ponto de Safira
 
@@ -275,7 +294,17 @@ Se um elemento "brilha", ele está errado.
 - **Painel (`.panel`):** 20px de canto, superfície opaca, borda `--panel-border`,
   padding 24px. Hover de card clicável (`.panel-hover`) só clareia a borda.
 - **Tile de KPI:** 16px de canto, bloco interno, padding 16px, rótulo + ícone Lucide
-  num círculo + número + chip de variação. O tile focal é safira com texto branco.
+  num círculo + número + chip de variação; é um `role="group"` com o nome do KPI. O
+  tile focal é safira com texto branco. Os quatro do mês são gratuitos: Sobra (focal),
+  Receitas, Despesas e Taxa de poupança (sobra ÷ receita, "—" sem receita, sinal de
+  menos tipográfico quando negativa, sem "−0%").
+- **Score financeiro:** só no premium, num bloco à direita do saldo ("72/100"). Com a
+  IA fora do ar (score nulo) o bloco some; o free não vê Score em lugar nenhum.
+- **Pizza ("Onde vai seu dinheiro"):** 144px; legenda com barra de participação e o
+  valor numa coluna de largura fixa, para as barras terem o mesmo trilho; legenda ao
+  lado da pizza só quando o card tem 18rem de conteúdo (container query); rodapé
+  centralizado com média por dia, maior despesa do mês e variação contra o mês
+  anterior (alta de despesa em vermelho, queda em verde).
 - **Estados:** carregando é esqueleto no formato final (`LoadingCards`); falha é
   `LoadError` com "Tentar de novo"; recurso do plano Premium é `PremiumLock` (cadeado + uma
   frase + "Conhecer o plano Premium"), nunca um vazio falso.
@@ -284,16 +313,32 @@ Se um elemento "brilha", ele está errado.
 - **Estilo:** 12px de canto, 40px de altura, fundo `line/5`, borda `line/15`.
 - **Foco:** anel de `--focus`. **Erro:** borda e mensagem em `--danger`, específica
   ("Informe um valor maior que zero").
+- **Busca do topo:** pílula de 40px sobre `surface`, lupa à esquerda e a dica
+  `Ctrl K` / `⌘ K` à direita (some ao digitar, onde fica o "x" nativo), com
+  `aria-keyshortcuts`. Procura lançamentos: Enter leva ao Extrato com `?q=`; abaixo
+  de 2 caracteres não navega. No celular ganha linha própria.
+
+### Segmented
+- **Estilo:** trilho em pílula (`line/6%`, padding 4px) com as opções dentro; a ativa
+  vira uma pílula de tinta, ou tingida do tipo no formulário (receita verde, despesa
+  vermelha). Mesma linguagem do Entrar/Cadastrar do login.
+- **Semântica:** grupo nomeado com `aria-pressed` em cada opção: a seleção nunca é só
+  cor. Usado no filtro de tipo do Extrato e nos formulários.
 
 ### Dialogs
 - **Anatomia única:** título + subtítulo de uma linha; rodapé com "Cancelar"
   (secundário) à esquerda e a ação principal à direita. Confirmação de exclusão diz
   o que sai ("Almoço · −R$ 40,00 · 25/09/2026"). Fundo escurecido, sem blur.
+- **Verbo:** apagar registro é **Excluir**, do botão que abre à confirmação ("Excluir
+  esta transação?"). "Remover" só onde nada é apagado (a foto de perfil).
 
 ### Navigation
 - **Sidebar:** item ativo com fundo neutro (`state/7%`), ícone em safira e a
   estrela-norte à direita; hover em `state/4%`. Rótulos em caixa de frase, sem
   cabeçalhos de seção. Abaixo de `lg` vira gaveta, com todas as rotas.
+- **Subabas das Configurações:** coluna lateral fixa a partir de `lg`, fileira
+  rolável no celular; a aba vive em `?aba=`, então o voltar funciona e o convite do
+  Premium abre direto em `?aba=plano`.
 
 ### Assinaturas
 - **Logo da marca:** o monograma N sobre o gradiente iridescente (`--iris-brand`), o
@@ -304,8 +349,9 @@ Se um elemento "brilha", ele está errado.
   (os logos são desenhados para fundo claro); "Dinheiro" usa cédula; sem banco, a
   sigla ou a inicial no chip tingido.
 - **Ritmo financeiro:** grade estilo GitHub, 7 linhas (Dom a Sáb), quadrados de ~30px
-  com canto de 4px; o número de semanas se ajusta à largura (até 26); a célula nunca
-  estica. Rodapé com a cota diária em reais.
+  com canto de 4px; o número de semanas se ajusta à largura (até 26), medida antes da
+  pintura; a célula nunca estica. Cota, sequência e status de cada dia saem sempre das
+  26 semanas: a largura só decide quantas aparecem. Rodapé com a cota diária em reais.
 - **Ícone de categoria (`CategoryIcon`):** um mapa Lucide em `lib/categories.js`,
   igual em todas as telas.
 
@@ -321,8 +367,11 @@ Se um elemento "brilha", ele está errado.
 - **Do** dizer o plano antes da ação: recurso do plano Premium aparece como `PremiumLock`,
   limite de carteiras como "2 de 2 no plano gratuito".
 - **Do** fazer a pizza fechar com o total do tile de Despesas ("Demais categorias").
-- **Do** respeitar `prefers-reduced-motion`; transições de 150–250ms com ease-out,
-  sem bounce.
+- **Do** usar os movimentos do sistema, em ease-out-quint e sem bounce: `motion-page`
+  (220ms, fade e 4px a cada rota), `motion-rise` (420ms, 8px, em sequência de 60ms via
+  `--i`) e blocos que abrem e fecham animando a linha do grid (0fr ↔ 1fr, 300ms),
+  nunca `height`, `inert` quando fechados. Estados de controle em 150–250ms.
+  `prefers-reduced-motion` zera tudo.
 
 ### Don't:
 - **Don't** reintroduzir vidro: `backdrop-filter`, glassmorphism, glow, mesh de fundo,
@@ -339,3 +388,4 @@ Se um elemento "brilha", ele está errado.
 - **Don't** usar `#000` puro, nem hex solto em componente.
 - **Don't** mostrar R$ 0,00 ou "nenhuma ainda" para valor que não carregou.
 - **Don't** usar badge, confete ou banner de upsell: o Norby organiza, não vende.
+- **Don't** repetir no topo do Dashboard um número que já está num KPI.

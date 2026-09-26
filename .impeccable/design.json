@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-25T23:30:00-03:00",
+  "generatedAt": "2026-09-26T01:30:00-03:00",
   "title": "Design System: Norby",
   "extensions": {
     "colorMeta": {
@@ -53,13 +53,18 @@
       { "name": "control-raised", "value": "0 1px 2px rgb(0 0 0 / 0.4)", "purpose": "Chip de data e controles elevados no escuro (claro: rgb(9 9 11 / 0.06))." }
     ],
     "motion": [
-      { "name": "ease-out-quint", "value": "cubic-bezier(0.22, 1, 0.36, 1)", "purpose": "Hover de borda de card; 150ms." },
-      { "name": "state-change", "value": "150-250ms ease-out", "purpose": "Toda transição de estado. Sem bounce; prefers-reduced-motion zera tudo." }
+      { "name": "ease-out-quint", "value": "cubic-bezier(0.22, 1, 0.36, 1)", "purpose": "Curva de todo movimento do sistema." },
+      { "name": "page-in", "value": "220ms ease-out-quint, opacity 0 e translateY(4px) para 0", "purpose": "motion-page: a cada troca de rota e de subaba." },
+      { "name": "rise-in", "value": "420ms ease-out-quint, translateY(8px), atraso de 60ms × --i", "purpose": "motion-rise: KPIs do Dashboard entrando em sequência." },
+      { "name": "reveal", "value": "300ms ease-out-quint em grid-template-rows 0fr ↔ 1fr e opacity", "purpose": "Campos do login que abrem e fecham com o modo; fechado fica inert." },
+      { "name": "state-change", "value": "150-250ms ease-out", "purpose": "Hover, foco e seleção. Sem bounce; prefers-reduced-motion zera tudo." }
     ],
     "breakpoints": [
       { "name": "sm", "value": "640px" },
-      { "name": "md", "value": "768px" },
-      { "name": "lg", "value": "1024px" }
+      { "name": "md", "value": "768px", "purpose": "Busca do topo sai da linha própria; tabela do Extrato." },
+      { "name": "lg", "value": "1024px", "purpose": "Sidebar fixa; subabas das Configurações em coluna." },
+      { "name": "xl", "value": "1280px", "purpose": "Dashboard divide em 12 colunas; abaixo, um card por linha." },
+      { "name": "pie-card (container)", "value": "18rem de conteúdo", "purpose": "Legenda da pizza ao lado do gráfico." }
     ]
   },
   "components": [
@@ -118,6 +123,22 @@
       "description": "Fundo neutro, ícone em safira e a estrela-norte marcando a posição.",
       "html": "<a class=\"ds-nav-active\" href=\"#\"><span class=\"ds-nav-icon\">▦</span>Dashboard<span class=\"ds-nav-star\">✦</span></a>",
       "css": ".ds-nav-active { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 16px; background: rgb(var(--state-hover) / 0.07); color: rgb(var(--content)); font: 500 14px 'Geist Variable', system-ui, sans-serif; text-decoration: none; } .ds-nav-icon, .ds-nav-star { color: rgb(var(--accent)); } .ds-nav-star { margin-left: auto; font-size: 12px; } .ds-nav-active:focus-visible { outline: 2px solid rgb(var(--focus)); outline-offset: 2px; }"
+    },
+    {
+      "name": "Seletor segmentado",
+      "kind": "segmented",
+      "refersTo": "segmented-active",
+      "description": "Uma escolha entre 2 ou 3 opções: trilho em pílula, opção ativa em tinta, aria-pressed.",
+      "html": "<div class=\"ds-seg\" role=\"group\" aria-label=\"Tipo\"><button aria-pressed=\"true\">Todos</button><button aria-pressed=\"false\">Receitas</button><button aria-pressed=\"false\">Despesas</button></div>",
+      "css": ".ds-seg { display: inline-grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; border-radius: 9999px; background: rgb(var(--line) / 0.06); } .ds-seg button { height: 32px; padding: 0 12px; border: 0; border-radius: 9999px; background: transparent; color: rgb(var(--content-2)); font: 500 14px 'Geist Variable', system-ui, sans-serif; cursor: pointer; transition: color 150ms ease-out, background-color 150ms ease-out; } .ds-seg button:hover { color: rgb(var(--content)); } .ds-seg button[aria-pressed=\"true\"] { background: rgb(var(--content)); color: rgb(var(--bg-base)); } .ds-seg button:focus-visible { outline: 2px solid rgb(var(--focus)); outline-offset: 2px; }"
+    },
+    {
+      "name": "Busca do topo",
+      "kind": "input",
+      "refersTo": "search-input",
+      "description": "Busca de lançamentos no cabeçalho do Dashboard; Enter leva ao Extrato com ?q=.",
+      "html": "<form class=\"ds-search\" role=\"search\"><input type=\"search\" aria-label=\"Buscar lançamentos\" placeholder=\"Buscar lançamentos\" aria-keyshortcuts=\"Control+K Meta+K\" /><kbd aria-hidden=\"true\">Ctrl K</kbd></form>",
+      "css": ".ds-search { position: relative; max-width: 448px; } .ds-search input { height: 40px; width: 100%; padding: 0 64px 0 40px; border-radius: 9999px; border: 1px solid rgb(var(--line) / 0.1); background: rgb(var(--surface)); color: rgb(var(--content)); font: 400 14px 'Geist Variable', system-ui, sans-serif; outline: none; } .ds-search input::placeholder { color: rgb(var(--content-3)); } .ds-search input:focus-visible { border-color: rgb(var(--focus)); box-shadow: 0 0 0 3px rgb(var(--focus) / 0.4); } .ds-search kbd { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); padding: 2px 6px; border-radius: 6px; border: 1px solid rgb(var(--line) / 0.15); color: rgb(var(--content-3)); font: 400 11px 'Geist Variable', system-ui, sans-serif; }"
     }
   ],
   "narrative": {
@@ -128,7 +149,8 @@
       "Um único preenchimento safira por tela; ação principal em tinta.",
       "Números em Geist com algarismos tabulares, centavos um degrau menores.",
       "Ícones Lucide de traço, nunca emoji.",
-      "Nenhum número inventado: carregando é esqueleto, falha é aviso com Tentar de novo."
+      "Nenhum número inventado: carregando é esqueleto, falha é aviso com Tentar de novo.",
+      "Movimento curto e com função: fade a cada rota, KPIs em sequência, campos do login abrindo e fechando; prefers-reduced-motion zera tudo."
     ],
     "rules": [
       { "name": "The One Sapphire Rule", "body": "O preenchimento safira aparece em um lugar por tela. Se dois elementos disputam o azul cheio, um deles está errado.", "section": "colors" },
@@ -144,7 +166,8 @@
       "Do manter um só preenchimento safira por tela.",
       "Do dizer o plano antes da ação: PremiumLock e o contador de carteiras.",
       "Do fazer a pizza fechar com o total do tile de Despesas.",
-      "Do respeitar prefers-reduced-motion; transições de 150 a 250ms, sem bounce."
+      "Do usar os movimentos do sistema (motion-page 220ms, motion-rise 420ms em sequência de 60ms, reveal pela linha do grid), em ease-out-quint; prefers-reduced-motion zera tudo.",
+      "Do usar Excluir para apagar registro, do botão à confirmação; Remover só onde nada é apagado."
     ],
     "donts": [
       "Don't reintroduzir vidro: backdrop-filter, glassmorphism, glow, mesh, gradiente iridescente fora do logo, anel 3D.",
@@ -156,7 +179,8 @@
       "Don't pintar botão principal de azul nem forçar cor por cima do Button.",
       "Don't usar #000 puro nem hex solto em componente.",
       "Don't mostrar R$ 0,00 ou nenhuma ainda para valor que não carregou.",
-      "Don't usar badge, confete ou banner de upsell."
+      "Don't usar badge, confete ou banner de upsell.",
+      "Don't repetir no topo do Dashboard um número que já está num KPI."
     ]
   }
 }
