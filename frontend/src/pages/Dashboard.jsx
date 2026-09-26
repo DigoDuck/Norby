@@ -455,8 +455,10 @@ export default function Dashboard() {
               </div>
             )}
           </div>
+          {/* ml-auto: quando não cabe ao lado do saldo (card de ~340px em
+              1440), desce para a linha de baixo mas fica à direita. */}
           {iaLiberada && insight?.score != null && (
-            <div className="text-right">
+            <div className="ml-auto text-right">
               <p className="text-xs text-content-3">Score financeiro</p>
               <p className="mt-1 tnum tracking-tight">
                 <span className="text-2xl font-semibold text-content">{Math.round(insight.score)}</span>
