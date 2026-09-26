@@ -152,7 +152,9 @@ export default function Dashboard() {
           walletsApi.list(),
           transactionsApi.list({ limit: 5 }),
           dashboardApi.summary(),
-          aiApi.getInsight(),
+          // Sem IA no plano o backend recusa (AI_REQUIRES_PREMIUM): pedir só
+          // gerava um 403 por visita. O card da Leitura mostra o cadeado.
+          iaLiberada ? aiApi.getInsight() : Promise.resolve({ data: null }),
           goalsApi.list(),
           ...streakMonths.map((m) =>
             transactionsApi.list({ month: m.month, year: m.year, limit: 500 }),
@@ -177,7 +179,7 @@ export default function Dashboard() {
         ritmo: streakRes.some(falhou),
       });
       setLoading(false);
-  }, []);
+  }, [iaLiberada]);
 
   useEffect(() => {
     // Falso positivo: loadData só chama setState depois do await.
