@@ -8,6 +8,15 @@ import inter from "@/assets/banks/inter.svg";
 import c6 from "@/assets/banks/c6.svg";
 import picpay from "@/assets/banks/picpay.svg";
 import mercadopago from "@/assets/banks/mercadopago.svg";
+import neon from "@/assets/banks/neon.svg";
+import xp from "@/assets/banks/xp.svg";
+import btg from "@/assets/banks/btg.svg";
+import pan from "@/assets/banks/pan.svg";
+import original from "@/assets/banks/original.svg";
+import pagbank from "@/assets/banks/pagbank.svg";
+import stone from "@/assets/banks/stone.svg";
+import infinitepay from "@/assets/banks/infinitepay.svg";
+import cora from "@/assets/banks/cora.svg";
 
 /**
  * Catálogo de bancos para a marca da carteira (issue #34).
@@ -37,6 +46,18 @@ export const BANCOS = [
   { slug: "c6", label: "C6 Bank", marca: "C6", logo: c6 },
   { slug: "picpay", label: "PicPay", marca: "Pp", logo: picpay },
   { slug: "mercadopago", label: "Mercado Pago", marca: "MP", logo: mercadopago },
+  // Segundo lote (2026-09-26), bancos digitais pedidos pelo dono. Mesma fonte
+  // e mesma auditoria dos dez primeiros; um arquivo por banco, a versão só com
+  // o símbolo e sem a variante branca, porque o logo fica sobre fundo branco.
+  { slug: "neon", label: "Neon", marca: "Ne", logo: neon },
+  { slug: "xp", label: "XP", marca: "XP", logo: xp },
+  { slug: "btg", label: "BTG Pactual", marca: "BT", logo: btg },
+  { slug: "pan", label: "Pan", marca: "Pa", logo: pan },
+  { slug: "original", label: "Original", marca: "Or", logo: original },
+  { slug: "pagbank", label: "PagBank", marca: "PB", logo: pagbank },
+  { slug: "stone", label: "Stone", marca: "So", logo: stone },
+  { slug: "infinitepay", label: "InfinitePay", marca: "IP", logo: infinitepay },
+  { slug: "cora", label: "Cora", marca: "Co", logo: cora },
   // "Dinheiro" fica porque diz algo que nenhum banco diz: a carteira é física.
   // "Outro" NÃO entra: a opção vazia do seletor já é ela, e oferecer as duas
   // seria pedir ao usuário para escolher entre dois nomes da mesma coisa.
@@ -54,7 +75,8 @@ export function banco(slug) {
 const normalizar = (texto) =>
   texto.normalize("NFD").replace(/\p{Diacritic}/gu, "").trim().toLowerCase();
 
-const POR_NOME = new Map(BANCOS.map((b) => [normalizar(b.label), b]));
+// O rótulo ("BTG Pactual") e o nome curto, que é o slug ("btg", "c6", "bb").
+const POR_NOME = new Map(BANCOS.flatMap((b) => [[normalizar(b.label), b], [b.slug, b]]));
 
 /**
  * O banco que a marca da carteira mostra. Sem banco escolhido, vale o nome

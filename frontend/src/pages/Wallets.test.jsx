@@ -1,5 +1,7 @@
 import nubankLogo from "@/assets/banks/nubank.svg";
 import itauLogo from "@/assets/banks/itau.svg";
+import neonLogo from "@/assets/banks/neon.svg";
+import btgLogo from "@/assets/banks/btg.svg";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 
@@ -118,6 +120,26 @@ describe("Wallets", () => {
     await waitFor(() =>
       expect(walletsApi.update).toHaveBeenCalledWith("w9", expect.objectContaining({ bank: "nubank" })),
     );
+  });
+
+  it("os bancos digitais novos do catálogo também têm logo (Neon)", async () => {
+    walletsApi.list.mockResolvedValue({
+      data: [{ id: "1", name: "Conta do dia a dia", balance: "1.00", bank: "neon" }],
+    });
+    const { container } = render(<Wallets />);
+
+    await screen.findByText("Conta do dia a dia");
+    expect(container.querySelector("img")?.getAttribute("src")).toBe(neonLogo);
+  });
+
+  it("o nome curto do banco também vale ('BTG' para BTG Pactual)", async () => {
+    walletsApi.list.mockResolvedValue({
+      data: [{ id: "1", name: "BTG", balance: "1.00", bank: null }],
+    });
+    const { container } = render(<Wallets />);
+
+    await screen.findAllByText("BTG");
+    expect(container.querySelector("img")?.getAttribute("src")).toBe(btgLogo);
   });
 
   it("carteiras do mesmo banco mostram o mesmo logo, com nomes diferentes", async () => {

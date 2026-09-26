@@ -353,8 +353,9 @@ Se um elemento "brilha", ele está errado.
 - **Estrela-norte:** marca posição (item ativo), presença da IA (`AiOrb`: estrela em
   safira num círculo tingido) e carregamento (pulso). Em nenhum outro lugar.
 - **Marca da carteira (`WalletMark`):** logo real do banco num quadrado branco fixo
-  (os logos são desenhados para fundo claro); "Dinheiro" usa cédula; sem banco, a
-  sigla ou a inicial no chip tingido.
+  (os logos são desenhados para fundo claro); "Dinheiro" usa cédula; sem banco escolhido, vale o
+  nome quando ele é o de um banco do catálogo ("Nubank", "BTG", "itau"); fora isso, a
+  sigla ou a inicial no chip tingido. O catálogo tem 19 bancos e Dinheiro.
 - **Ritmo financeiro:** grade estilo GitHub, 7 linhas (Dom a Sáb), quadrados de ~30px
   com canto de 4px; o número de semanas se ajusta à largura (até 26), medida antes da
   pintura; a célula nunca estica. Cota, sequência e status de cada dia saem sempre das
