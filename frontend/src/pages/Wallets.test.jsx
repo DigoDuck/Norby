@@ -1,10 +1,13 @@
 import nubankLogo from "@/assets/banks/nubank.svg";
 import itauLogo from "@/assets/banks/itau.svg";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 
 import { walletsApi } from "@/api/wallets";
+import { transactionsApi } from "@/api/transactions";
 import Wallets from "./Wallets";
+
+vi.mock("@/api/transactions", () => ({ transactionsApi: { summary: vi.fn() } }));
 
 vi.mock("@/api/wallets", () => ({
   walletsApi: {
@@ -106,5 +109,49 @@ describe("Wallets", () => {
 
     await waitFor(() => expect(walletsApi.create).toHaveBeenCalled());
     expect(walletsApi.create.mock.calls[0][0]).not.toHaveProperty("bank");
+  });
+});
+
+describe("Wallets, excluir carteira", () => {
+  const NUBANK = {
+    id: "w1",
+    name: "Nubank",
+    balance: "1840.50",
+    bank: "nubank",
+    created_at: "2026-06-01T00:00:00Z",
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    walletsApi.list.mockResolvedValue({ data: [NUBANK] });
+  });
+
+  it("antes de excluir, diz quantos lançamentos e qual saldo vão junto", async () => {
+    // "Todas as transações dela serão excluídas" não dizia quanto: 3 ou 300.
+    transactionsApi.summary.mockResolvedValue({
+      data: { count: 12, income: "3000.00", expenses: "1159.50" },
+    });
+    render(<Wallets />);
+
+    // O gatilho do Base UI só responde depois dos efeitos passivos.
+    fireEvent.click(await screen.findByRole("button", { name: "Excluir carteira", expanded: false }));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(await within(dialog).findByText(/12 lançamentos/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/R\$ 1\.840,50/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/não dá para desfazer/i)).toBeInTheDocument();
+    expect(transactionsApi.summary).toHaveBeenCalledWith({ wallet_id: "w1" });
+  });
+  it("sem a contagem, o aviso continua, sem inventar número", async () => {
+    transactionsApi.summary.mockRejectedValue(new Error("500"));
+    render(<Wallets />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Excluir carteira", expanded: false }));
+
+    const dialog = await screen.findByRole("dialog");
+    await waitFor(() => expect(transactionsApi.summary).toHaveBeenCalled());
+    expect(within(dialog).getByText(/os lançamentos dela/)).toBeInTheDocument();
+    expect(within(dialog).queryByText(/\d+ lançamentos?/)).not.toBeInTheDocument();
+    expect(within(dialog).getByText(/não dá para desfazer/i)).toBeInTheDocument();
   });
 });

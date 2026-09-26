@@ -181,7 +181,7 @@ export default function Admin() {
 
   if (loading) {
     return (
-      <div className="max-w-5xl mx-auto space-y-5">
+      <div className="space-y-5">
         <div className="h-9 w-32 rounded-lg bg-line/10 animate-pulse" />
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
           {Array.from({ length: 6 }).map((_, i) => (
@@ -195,7 +195,7 @@ export default function Admin() {
 
   if (loadError) {
     return (
-      <div className="max-w-5xl mx-auto space-y-4">
+      <div className="space-y-4">
         <p role="alert" className="text-danger text-sm">
           {loadError}
         </p>
@@ -213,7 +213,7 @@ export default function Admin() {
   const iaTone = iaProporcao >= 1 ? "danger" : iaProporcao >= 0.8 ? "warning" : undefined;
 
   return (
-    <div className="max-w-5xl mx-auto space-y-5">
+    <div className="space-y-5">
       <div>
         <h1 className="text-3xl font-bold text-content tracking-tight">Admin</h1>
         <p className="text-content-2 text-sm mt-1">

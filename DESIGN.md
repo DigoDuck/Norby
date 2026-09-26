@@ -305,7 +305,11 @@ Se um elemento "brilha", ele está errado.
   lado da pizza só quando o card tem 18rem de conteúdo (container query); rodapé
   centralizado com média por dia, maior despesa do mês e variação contra o mês
   anterior (alta de despesa em vermelho, queda em verde).
-- **Estados:** carregando é esqueleto no formato final (`LoadingCards`); falha é
+- **Totais do Extrato:** entradas, saídas e resultado do que está filtrado (mês,
+  tipo, busca), de `/transactions/summary`, que usa o mesmo filtro da lista. Se o
+  resumo falhar, os totais somem e a lista fica.
+- **Estados:** carregando é esqueleto no formato final (`LoadingCards`, o grid do
+  Dashboard, linhas no Extrato); a estrela pulsando é só o boot do app inteiro. Falha é
   `LoadError` com "Tentar de novo"; recurso do plano Premium é `PremiumLock` (cadeado + uma
   frase + "Conhecer o plano Premium"), nunca um vazio falso.
 
@@ -331,6 +335,9 @@ Se um elemento "brilha", ele está errado.
   o que sai ("Almoço · −R$ 40,00 · 25/09/2026"). Fundo escurecido, sem blur.
 - **Verbo:** apagar registro é **Excluir**, do botão que abre à confirmação ("Excluir
   esta transação?"). "Remover" só onde nada é apagado (a foto de perfil).
+- **O que vai junto, em número:** excluir carteira diz "leva junto 81 lançamentos e
+  o saldo de R$ 25.256,00. Não dá para desfazer." Sem a contagem, "os lançamentos
+  dela", nunca um número inventado.
 
 ### Navigation
 - **Sidebar:** item ativo com fundo neutro (`state/7%`), ícone em safira e a
@@ -365,7 +372,12 @@ Se um elemento "brilha", ele está errado.
   para elementos gráficos. O valor do token sozinho não prova nada.
 - **Do** manter um só preenchimento safira por tela (The One Sapphire Rule).
 - **Do** dizer o plano antes da ação: recurso do plano Premium aparece como `PremiumLock`,
-  limite de carteiras como "2 de 2 no plano gratuito".
+  limite de carteiras como "2 de 2 no plano gratuito". Um convite por tela, onde o
+  recurso mora (no Dashboard do free, só o cadeado do card da Leitura).
+- **Do** dar nome ao gráfico que é o único lugar de um dado (o Fluxo de caixa, com
+  `title` e navegação por setas) e tirar do Tab o que já está em texto ao lado (a
+  pizza, `aria-hidden`). Toda página tem um `h1`, nem que seja `sr-only`; o
+  primeiro Tab é "Pular para o conteúdo".
 - **Do** fazer a pizza fechar com o total do tile de Despesas ("Demais categorias").
 - **Do** usar os movimentos do sistema, em ease-out-quint e sem bounce: `motion-page`
   (220ms, fade e 4px a cada rota), `motion-rise` (420ms, 8px, em sequência de 60ms via

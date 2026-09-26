@@ -167,7 +167,10 @@
       "Do dizer o plano antes da ação: PremiumLock e o contador de carteiras.",
       "Do fazer a pizza fechar com o total do tile de Despesas.",
       "Do usar os movimentos do sistema (motion-page 220ms, motion-rise 420ms em sequência de 60ms, reveal pela linha do grid), em ease-out-quint; prefers-reduced-motion zera tudo.",
-      "Do usar Excluir para apagar registro, do botão à confirmação; Remover só onde nada é apagado."
+      "Do usar Excluir para apagar registro, do botão à confirmação; Remover só onde nada é apagado.",
+      "Do fazer um convite do Premium por tela, onde o recurso mora.",
+      "Do nomear o gráfico que é o único lugar de um dado e tirar do Tab o gráfico que a legenda já diz em texto.",
+      "Do carregar conteúdo de página como esqueleto no formato final; a estrela pulsando é só o boot do app."
     ],
     "donts": [
       "Don't reintroduzir vidro: backdrop-filter, glassmorphism, glow, mesh, gradiente iridescente fora do logo, anel 3D.",

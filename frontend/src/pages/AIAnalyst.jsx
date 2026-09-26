@@ -168,6 +168,7 @@ export default function AIAnalyst() {
     return (
       <div className="panel p-10 flex items-center justify-center min-h-[420px]">
         <PremiumLock
+          titleAs="h1"
           title="A Norby IA faz parte do plano Premium"
           text="Converse sobre seus gastos, peça sugestões de economia e receba a leitura do seu mês."
         />
@@ -177,6 +178,9 @@ export default function AIAnalyst() {
 
   return (
     <div className="flex h-[calc(100dvh-5rem)] flex-col gap-4 lg:h-[calc(100dvh-4.75rem)] lg:flex-row">
+      {/* Toda página tem um h1: o leitor de tela navega por ele. Aqui ele não
+          aparece, porque o chat ocupa a altura inteira. */}
+      <h1 className="sr-only">Norby IA</h1>
       {/* Painel de sessões (interno à página — não é a sidebar do app) */}
       <aside className="panel hidden w-72 shrink-0 flex-col gap-3 overflow-hidden p-4 lg:flex">
         {sessionsContent}
