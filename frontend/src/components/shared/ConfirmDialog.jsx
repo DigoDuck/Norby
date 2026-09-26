@@ -24,6 +24,9 @@ import { apiErrorMessage, shadcnInputCls } from "@/lib/utils";
  * está confirmando, num campo entre a descrição e o erro, e passa como
  * argumento de `onConfirm`. Sem a prop, o comportamento é idêntico ao anterior
  * (chama `onConfirm()` sem argumento).
+ *
+ * `onOpenChange` (opcional): avisa quem usa quando o diálogo abre ou fecha,
+ * para buscar o que a descrição precisa só na hora em que ela aparece.
  */
 export function ConfirmDialog({
   trigger,
@@ -34,6 +37,7 @@ export function ConfirmDialog({
   errorFallback = "Não foi possível concluir a ação.",
   requirePassword = false,
   onConfirm,
+  onOpenChange,
 }) {
   const [open, setOpen] = useState(false);
   const [password, setPassword] = useState("");
@@ -42,6 +46,7 @@ export function ConfirmDialog({
 
   function handleOpenChange(v) {
     setOpen(v);
+    onOpenChange?.(v);
     if (!v) {
       setError(null); // limpa o erro ao fechar
       setPassword("");

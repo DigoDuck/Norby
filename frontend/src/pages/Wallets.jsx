@@ -1,6 +1,7 @@
 import { useCallback, useId, useRef, useState } from "react";
 import { Plus, Pencil, Trash2, Wallet } from "lucide-react";
 import { walletsApi } from "@/api/wallets";
+import { transactionsApi } from "@/api/transactions";
 import { apiErrorMessage, formatBRL, shadcnInputCls } from "@/lib/utils";
 import { OPCOES_BANCO } from "@/lib/bancos";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
@@ -20,6 +21,43 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+
+// O que sai junto com a carteira, dito em número. Sem o resumo (contando ou
+// falhou) fica "os lançamentos dela": melhor vago do que um zero inventado.
+function oQueVaiJunto(resumo, saldo) {
+  const valor = `o saldo de ${formatBRL(saldo)}`;
+  if (!resumo) return `os lançamentos dela e ${valor}`;
+  if (resumo.count === 0) return `${valor} (ela não tem lançamentos)`;
+  return `${resumo.count} ${resumo.count === 1 ? "lançamento" : "lançamentos"} e ${valor}`;
+}
+
+// Excluir carteira apaga o histórico dela. O diálogo busca o resumo ao abrir,
+// e não na carga da página, que custaria uma requisição por carteira.
+function ExcluirCarteira({ wallet, onConfirm, trigger }) {
+  const [resumo, setResumo] = useState(null);
+
+  async function aoAbrir(aberto) {
+    if (!aberto) return;
+    setResumo(null);
+    try {
+      setResumo((await transactionsApi.summary({ wallet_id: wallet.id })).data);
+    } catch {
+      setResumo(null);
+    }
+  }
+
+  return (
+    <ConfirmDialog
+      title="Excluir esta carteira?"
+      description={`Excluir "${wallet.name}" leva junto ${oQueVaiJunto(resumo, wallet.balance)}. Não dá para desfazer.`}
+      confirmLabel="Excluir"
+      errorFallback="Não foi possível excluir a carteira."
+      onConfirm={onConfirm}
+      onOpenChange={aoAbrir}
+      trigger={trigger}
+    />
+  );
+}
 
 export default function Wallets() {
   const [wallets, setWallets] = useState([]);
@@ -276,11 +314,8 @@ export default function Wallets() {
                     <Pencil size={14} />
                     <span className="sr-only">Editar carteira</span>
                   </button>
-                  <ConfirmDialog
-                    title="Excluir esta carteira?"
-                    description={`"${w.name}" e todas as transações dela serão excluídas.`}
-                    confirmLabel="Excluir"
-                    errorFallback="Não foi possível excluir a carteira."
+                  <ExcluirCarteira
+                    wallet={w}
                     onConfirm={() => deleteWallet(w.id)}
                     trigger={
                       <button
