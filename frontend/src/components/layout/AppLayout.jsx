@@ -84,11 +84,23 @@ export default function AppLayout() {
 
   return (
     <div className="relative min-h-screen w-full overflow-hidden bg-bg-base">
+      {/* Primeira parada do Tab: pula a barra lateral inteira. Invisível até
+          receber foco. */}
+      <a
+        href="#conteudo"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-full focus:bg-content focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-bg-base"
+      >
+        Pular para o conteúdo
+      </a>
       <div className="relative z-10 flex h-screen p-0 lg:p-[18px]">
         <Sidebar />
         <MobileNav />
 
-        <main className="flex-1 overflow-y-auto px-4 pt-16 pb-4 lg:px-6 lg:pt-5 lg:pb-5">
+        <main
+          id="conteudo"
+          tabIndex={-1}
+          className="flex-1 overflow-y-auto px-4 pt-16 pb-4 focus:outline-none lg:px-6 lg:pt-5 lg:pb-5"
+        >
           {/* key pela rota: cada troca de página entra com o fade curto. */}
           <div key={pathname} className="motion-page">
             <Outlet />

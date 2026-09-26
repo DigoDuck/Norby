@@ -71,8 +71,8 @@ const benefits = [
   },
   {
     icon: ShieldCheck,
-    title: "Segurança e privacidade",
-    desc: "Conexão criptografada; sua senha nunca é guardada em texto.",
+    title: "Seus dados são seus",
+    desc: "Exporte tudo ou exclua a conta quando quiser.",
   },
 ];
 

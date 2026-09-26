@@ -9,7 +9,6 @@ import {
   ArrowDownLeft,
   PiggyBank,
   Percent,
-  Lock,
   Target,
   Search,
 } from "lucide-react";
@@ -294,10 +293,28 @@ export default function Dashboard() {
     .toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "long" })
     .replace(".", "");
 
+  // Esqueleto no formato do painel: nada pula quando os dados chegam. A
+  // estrela pulsando fica para o boot do app inteiro (App.jsx).
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <NorthStar size={32} className="text-accent star-loading" />
+      <div className="space-y-4">
+        <p role="status" className="sr-only">Carregando o painel</p>
+        <div aria-hidden="true" className="motion-safe:animate-pulse">
+          <div className="h-3 w-32 rounded-full bg-line/[0.07]" />
+          <div className="mt-3 h-8 w-64 rounded-full bg-line/[0.07]" />
+          <div className="mt-3 h-3 w-72 rounded-full bg-line/[0.07]" />
+        </div>
+        <div aria-hidden="true" className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+          {[
+            "xl:col-span-4 min-h-[320px]",
+            "xl:col-span-5 min-h-[320px]",
+            "xl:col-span-3 min-h-[320px]",
+            "xl:col-span-7 min-h-[380px]",
+            "xl:col-span-5 min-h-[380px]",
+          ].map((forma) => (
+            <div key={forma} className={`panel motion-safe:animate-pulse ${forma}`} />
+          ))}
+        </div>
       </div>
     );
   }
@@ -378,15 +395,13 @@ export default function Dashboard() {
         </form>
         <div className="flex items-center gap-2">
           <ThemeButton />
-          {/* Sem IA no plano, o convite não pode ser a ação principal da tela. */}
-          <Button
-            onClick={() => navigate(iaLiberada ? "/ai" : "/settings?aba=plano")}
-            size="lg"
-            variant={iaLiberada ? "default" : "secondary"}
-          >
-            {iaLiberada ? "Falar com a Norby" : "IA no plano Premium"}
-            {iaLiberada ? <NorthStar size={14} /> : <Lock size={14} aria-hidden="true" />}
-          </Button>
+          {/* Só para quem tem a IA. No free o convite mora no card da Leitura,
+              onde o recurso fica: três convites na mesma tela era insistência. */}
+          {iaLiberada && (
+            <Button onClick={() => navigate("/ai")} size="lg">
+              Falar com a Norby <NorthStar size={14} />
+            </Button>
+          )}
         </div>
       </header>
 
@@ -650,7 +665,10 @@ export default function Dashboard() {
             </div>
           ) : (
             <ResponsiveContainer width="100%" height={230}>
+              {/* Fica na ordem do Tab: é o único lugar com os valores de cada
+                  mês, e as setas percorrem os meses. O title dá o nome. */}
               <AreaChart
+                title="Fluxo de caixa: entradas e saídas por mês"
                 data={cashFlowData}
                 margin={{ top: 12, right: 12, left: 12, bottom: 0 }}
               >

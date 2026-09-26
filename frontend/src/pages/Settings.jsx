@@ -421,8 +421,8 @@ export default function Settings() {
                 <div>
                   <p className="text-sm font-medium text-content">Senha</p>
                   <p className="text-xs text-content-2 mt-1 max-w-prose leading-relaxed">
-                    Sua senha nunca é guardada em texto. Para trocá-la, use a
-                    redefinição: você recebe um link no seu e-mail.
+                    Para trocá-la, use a redefinição: você recebe um link no
+                    seu e-mail.
                   </p>
                 </div>
                 <Button variant="secondary" onClick={() => navigate("/esqueci-senha")} className="shrink-0">

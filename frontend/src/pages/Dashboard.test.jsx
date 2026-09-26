@@ -296,3 +296,24 @@ describe("Dashboard, busca no topo", () => {
     expect(busca).toHaveFocus();
   });
 });
+
+describe("Dashboard, convites do Premium", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    walletsApi.list.mockResolvedValue({ data: [] });
+    transactionsApi.list.mockResolvedValue({ data: [], headers: {} });
+    goalsApi.list.mockResolvedValue({ data: [] });
+    dashboardApi.summary.mockResolvedValue(resumo("0.00", "0.00"));
+    aiApi.getInsight.mockImplementation(recusaIa);
+  });
+
+  it("free vê um convite só, o do card da Leitura, onde o recurso mora", async () => {
+    // Eram três na mesma tela (botão do topo, card da Leitura e o cartão da
+    // barra lateral): insistência, não informação.
+    renderDashboard({ plan: FREE });
+
+    await screen.findByRole("region", { name: "Saldo total" });
+    expect(screen.queryByRole("button", { name: /IA no plano Premium/ })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Conhecer o plano Premium" })).toHaveLength(1);
+  });
+});
