@@ -260,7 +260,9 @@ describe("Dashboard, busca no topo", () => {
     const busca = await screen.findByRole("searchbox", { name: "Buscar lançamentos" });
 
     fireEvent.change(busca, { target: { value: "mercado" } });
-    fireEvent.submit(busca);
+    // O submit sai do <form>, como no navegador: disparado no <input>, o
+    // React 19 tenta montar FormData(input) e o Vitest acusa erro não tratado.
+    fireEvent.submit(screen.getByRole("search"));
 
     expect(await screen.findByText("destino: /transactions?q=mercado")).toBeInTheDocument();
   });
@@ -273,7 +275,9 @@ describe("Dashboard, busca no topo", () => {
     const busca = await screen.findByRole("searchbox", { name: "Buscar lançamentos" });
 
     fireEvent.change(busca, { target: { value: termo } });
-    fireEvent.submit(busca);
+    // O submit sai do <form>, como no navegador: disparado no <input>, o
+    // React 19 tenta montar FormData(input) e o Vitest acusa erro não tratado.
+    fireEvent.submit(screen.getByRole("search"));
 
     expect(screen.queryByText(/^destino:/)).not.toBeInTheDocument();
     expect(screen.getByRole("searchbox", { name: "Buscar lançamentos" })).toBeInTheDocument();
