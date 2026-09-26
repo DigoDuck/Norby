@@ -776,6 +776,16 @@ export default function Transactions() {
           ))}
         </div>
 
+        {/* Primeira carga: linhas-esqueleto no lugar da tabela vazia. Nas
+            cargas seguintes a lista anterior fica na tela até a nova chegar. */}
+        {loading && transactions.length === 0 && !serverError && (
+          <div aria-hidden="true" className="space-y-2 motion-safe:animate-pulse">
+            {Array.from({ length: 6 }, (_, i) => (
+              <div key={i} className="h-11 rounded-xl bg-line/[0.05]" />
+            ))}
+          </div>
+        )}
+
         {/* Texto genérico de propósito: a frase específica de busca ("...para
             essa busca.") já mora no role="status" logo acima — repeti-la aqui
             faria um leitor de tela ouvir a mesma sentença duas vezes. */}

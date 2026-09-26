@@ -172,10 +172,10 @@ export default function Goals() {
   return (
     <div className="space-y-6">
       {/* Header com estatística viva */}
-      <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:gap-6">
+      <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-3xl font-bold text-content tracking-tight">
-            Suas metas
+            Metas
           </h1>
           <p className="text-content-2 text-sm mt-1">
             {status !== "ok" && <span aria-hidden="true" className="inline-block h-3.5 w-48 rounded-full bg-line/[0.07] motion-safe:animate-pulse align-middle" />}

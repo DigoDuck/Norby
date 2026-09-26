@@ -148,7 +148,7 @@ export default function Wallets() {
   return (
     <div className="space-y-6">
       {/* Header com estatística viva */}
-      <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:gap-6">
+      <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-3xl font-bold text-content tracking-tight">
             Carteiras

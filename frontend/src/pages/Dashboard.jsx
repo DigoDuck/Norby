@@ -293,10 +293,28 @@ export default function Dashboard() {
     .toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "long" })
     .replace(".", "");
 
+  // Esqueleto no formato do painel: nada pula quando os dados chegam. A
+  // estrela pulsando fica para o boot do app inteiro (App.jsx).
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <NorthStar size={32} className="text-accent star-loading" />
+      <div className="space-y-4">
+        <p role="status" className="sr-only">Carregando o painel</p>
+        <div aria-hidden="true" className="motion-safe:animate-pulse">
+          <div className="h-3 w-32 rounded-full bg-line/[0.07]" />
+          <div className="mt-3 h-8 w-64 rounded-full bg-line/[0.07]" />
+          <div className="mt-3 h-3 w-72 rounded-full bg-line/[0.07]" />
+        </div>
+        <div aria-hidden="true" className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+          {[
+            "xl:col-span-4 min-h-[320px]",
+            "xl:col-span-5 min-h-[320px]",
+            "xl:col-span-3 min-h-[320px]",
+            "xl:col-span-7 min-h-[380px]",
+            "xl:col-span-5 min-h-[380px]",
+          ].map((forma) => (
+            <div key={forma} className={`panel motion-safe:animate-pulse ${forma}`} />
+          ))}
+        </div>
       </div>
     );
   }
