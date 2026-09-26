@@ -157,6 +157,12 @@ export default function RitmoCard({ transactions, erro = false }) {
           title="Dia no ritmo é o dia em que você gastou até a cota. A cota é a sua receita dos últimos seis meses dividida pelos dias."
         >
           {ritmo.hasPace ? `Cota de ${formatBRL(ritmo.dailyPace)} por dia` : `Últimos ${dias} dias`}
+          {/* O title só existe para quem usa mouse: a regra vai também em texto. */}
+          {ritmo.hasPace && (
+            <span className="sr-only">
+              . Dia no ritmo é o dia em que você gastou até a cota; a cota é a sua receita dos últimos seis meses dividida pelos dias.
+            </span>
+          )}
         </span>
         {/* Cada cor dita pelo que é: sem lançamento, folga crescente, estouro. */}
         <span className="flex flex-wrap items-center gap-x-3 gap-y-1">

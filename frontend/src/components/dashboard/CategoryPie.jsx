@@ -39,9 +39,12 @@ export default function CategoryPie({ data, total, destaques }) {
       ) : (
         <>
           <div className="pie-body flex flex-1 flex-col gap-5 mt-5">
-            <div className="size-36 shrink-0 self-center">
+            {/* Fora do Tab e do leitor de tela: a legenda ao lado diz cada
+                categoria com valor e porcentagem em texto. A pizza focável e
+                sem nome era parada vazia para quem navega por teclado. */}
+            <div aria-hidden="true" className="size-36 shrink-0 self-center">
               <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
+                <PieChart accessibilityLayer={false}>
                   {/* Pizza cheia, começando às 12h no sentido horário. O traço
                       da cor do card separa fatias vizinhas sem depender da cor. */}
                   <Pie
@@ -53,6 +56,7 @@ export default function CategoryPie({ data, total, destaques }) {
                     outerRadius="100%"
                     startAngle={90}
                     endAngle={-270}
+                    rootTabIndex={-1}
                     stroke="rgb(var(--surface))"
                     strokeWidth={data.length > 1 ? 2 : 0}
                     isAnimationActive={false}

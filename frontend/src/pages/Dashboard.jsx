@@ -647,7 +647,10 @@ export default function Dashboard() {
             </div>
           ) : (
             <ResponsiveContainer width="100%" height={230}>
+              {/* Fica na ordem do Tab: é o único lugar com os valores de cada
+                  mês, e as setas percorrem os meses. O title dá o nome. */}
               <AreaChart
+                title="Fluxo de caixa: entradas e saídas por mês"
                 data={cashFlowData}
                 margin={{ top: 12, right: 12, left: 12, bottom: 0 }}
               >
