@@ -9,8 +9,9 @@ import { transactionsApi } from "@/api/transactions";
 import { walletsApi } from "@/api/wallets";
 import { categoriesFor, reconcileCategory, TRANSACTION_TYPE_OPTIONS } from "@/lib/categories";
 import CategoryIcon from "@/components/shared/CategoryIcon";
+import WalletMark from "@/components/shared/WalletMark";
 import { transactionSchema } from "@/lib/schemas";
-import { apiErrorMessage, formatDateBR, inputCls, toDateInput, todayInput, formatSinal } from "@/lib/utils";
+import { apiErrorMessage, formatBRL, formatDateBR, inputCls, toDateInput, todayInput, formatSinal } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 
 import { Button } from "@/components/ui/button";
@@ -87,6 +88,9 @@ export default function Transactions() {
   const [mes, setMes] = useState("todos");
   const [offset, setOffset] = useState(0);
   const [total, setTotal] = useState(0);
+  // Totais do que está filtrado (/transactions/summary). null = sem totais
+  // para mostrar (carregando ou falhou), nunca zero inventado.
+  const [resumo, setResumo] = useState(null);
   // Começa carregando: sem isso o primeiro render já dizia "nenhuma transação".
   const [loading, setLoading] = useState(true);
   // false quando o header X-Total-Count não chegou (backend antigo, proxy,
@@ -121,13 +125,19 @@ export default function Transactions() {
     const seq = ++requisicaoAtual.current;
     setLoading(true);
     try {
-      const res = await transactionsApi.list({
-        ...params,
-        limit: PAGE_SIZE,
-        offset: novoOffset,
-      });
+      const [res, resumoRes] = await Promise.all([
+        transactionsApi.list({
+          ...params,
+          limit: PAGE_SIZE,
+          offset: novoOffset,
+        }),
+        // Mesmos filtros, sem paginação. Se o resumo falhar, os totais somem e
+        // a lista segue: ela não depende deles.
+        transactionsApi.summary(params).catch(() => null),
+      ]);
       if (seq !== requisicaoAtual.current) return; // resposta obsoleta
       setTransactions(res.data);
+      setResumo(resumoRes?.data ?? null);
       // O header só chega ao JS porque o backend o declara em expose_headers.
       const headerTotal = res.headers?.["x-total-count"];
       setTotal(headerTotal != null ? Number(headerTotal) : res.data.length);
@@ -137,6 +147,7 @@ export default function Transactions() {
       setServerError(null);
     } catch (err) {
       if (seq !== requisicaoAtual.current) return; // resposta obsoleta
+      setResumo(null);
       setServerError(apiErrorMessage(err, "Não foi possível carregar as transações."));
     } finally {
       if (seq === requisicaoAtual.current) setLoading(false);
@@ -244,6 +255,7 @@ export default function Transactions() {
   const reload = () => load(filtroAtivo(), 0);
 
   const walletOptions = wallets.map((w) => ({ value: w.id, label: w.name }));
+  const carteiraPorId = Object.fromEntries(wallets.map((w) => [w.id, w]));
 
   const watchedType = useWatch({ control, name: "type" });
   const categoryOptions = categoriesFor(watchedType).map((c) => ({
@@ -576,6 +588,35 @@ export default function Transactions() {
           </div>
         </div>
 
+        {resumo && (
+          <section
+            aria-label="Totais do período"
+            className="mb-4 grid grid-cols-[repeat(auto-fit,minmax(8rem,1fr))] gap-4 border-y border-line/[0.08] py-4"
+          >
+            <div>
+              <p className="text-xs text-content-3">Entradas</p>
+              <p className="mt-1 text-lg font-semibold tnum text-income">
+                {formatSinal(resumo.income, true)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-content-3">Saídas</p>
+              <p className="mt-1 text-lg font-semibold tnum text-content">
+                {formatSinal(resumo.expenses, false)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-content-3">Resultado</p>
+              <p className="mt-1 text-lg font-semibold tnum text-content">
+                {formatBRL(parseFloat(resumo.income) - parseFloat(resumo.expenses))}
+              </p>
+              <p className="text-[11px] text-content-3 tnum">
+                em {resumo.count} {resumo.count === 1 ? "lançamento" : "lançamentos"}
+              </p>
+            </div>
+          </section>
+        )}
+
         {/* Duas responsabilidades, dois elementos.
 
             A linha VISÍVEL só mostra o carregamento, e é sempre montada: sem
@@ -599,10 +640,12 @@ export default function Transactions() {
         <table className="hidden w-full md:table">
           <thead>
             <tr className="border-b border-line/10">
-              {["Categoria", "Descrição", "Valor", "Data", ""].map((h) => (
+              {/* Valor por último e à direita, como num extrato de banco: os
+                  centavos ficam alinhados e a coluna se lê de cima a baixo. */}
+              {["Categoria", "Descrição", "Carteira", "Data", "Valor", ""].map((h) => (
                 <th
                   key={h}
-                  className="microlabel px-4 py-3 text-left"
+                  className={`microlabel px-4 py-3 ${h === "Valor" ? "text-right" : "text-left"}`}
                 >
                   {h}
                 </th>
@@ -621,18 +664,31 @@ export default function Transactions() {
                 <td className="px-4 py-3 text-sm text-content-2">
                   {t.description || "-"}
                 </td>
+                <td className="px-4 py-3 text-sm text-content-2">
+                  {carteiraPorId[t.wallet_id] ? (
+                    <span className="flex items-center gap-2">
+                      <WalletMark
+                        wallet={carteiraPorId[t.wallet_id]}
+                        className="size-5 shrink-0 rounded-md text-[9px]"
+                      />
+                      <span className="truncate">{carteiraPorId[t.wallet_id].name}</span>
+                    </span>
+                  ) : (
+                    "-"
+                  )}
+                </td>
+                <td className="px-4 py-3 text-sm text-content-2 tnum">
+                  {formatDateBR(t.date)}
+                </td>
                 {/* O sinal já diz entrada ou saída; o vermelho em toda linha de
                     despesa pintava a tabela inteira. Verde só para entrada,
                     como nas movimentações do dashboard. */}
                 <td
-                  className={`px-4 py-3 text-sm font-semibold tnum ${
+                  className={`px-4 py-3 text-right text-sm font-semibold tnum ${
                     t.type === "INCOME" ? "text-income" : "text-content"
                   }`}
                 >
                   {formatSinal(t.amount, t.type === "INCOME")}
-                </td>
-                <td className="px-4 py-3 text-sm text-content-2 tnum">
-                  {formatDateBR(t.date)}
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex gap-2">
@@ -686,6 +742,7 @@ export default function Transactions() {
               <div className="mt-1 flex items-center justify-between gap-3">
                 <p className="min-w-0 truncate text-xs text-content-2">
                   {t.description || "Sem descrição"} ·{" "}
+                  {carteiraPorId[t.wallet_id] && `${carteiraPorId[t.wallet_id].name} · `}
                   <time className="tnum">{formatDateBR(t.date)}</time>
                 </p>
                 <div className="-my-1 flex shrink-0 items-center gap-1">

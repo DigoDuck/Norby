@@ -1,13 +1,17 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 import { transactionsApi } from "@/api/transactions";
+import { walletsApi } from "@/api/wallets";
 import Transactions from "./Transactions";
 
 vi.mock("@/api/transactions", () => ({
   transactionsApi: {
     list: vi.fn(),
+    // Resposta padrão de /transactions/summary: os testes que não são sobre
+    // os totais não precisam pensar neles.
+    summary: vi.fn(() => Promise.resolve({ data: { count: 0, income: "0.00", expenses: "0.00" } })),
     create: vi.fn(),
     update: vi.fn(),
     delete: vi.fn(),
@@ -489,5 +493,77 @@ describe("Transactions, busca vinda da URL", () => {
       ),
     );
     expect(screen.getByLabelText(/buscar transações/i)).toHaveValue("mercado");
+  });
+});
+
+describe("Transactions, totais do período", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    transactionsApi.list.mockResolvedValue(pagina(3, 3, "t-"));
+  });
+
+  it("mostra quanto entrou, quanto saiu e o resultado do que está filtrado", async () => {
+    // 1.000 de entrada e 200 de saída: resultado de 800.
+    transactionsApi.summary.mockResolvedValue({
+      data: { count: 3, income: "1000.00", expenses: "200.00" },
+    });
+
+    render(
+      <MemoryRouter>
+        <Transactions />
+      </MemoryRouter>,
+    );
+
+    const totais = await screen.findByRole("region", { name: "Totais do período" });
+    expect(within(totais).getByText("+R$ 1.000,00")).toBeInTheDocument();
+    expect(within(totais).getByText("−R$ 200,00")).toBeInTheDocument();
+    expect(within(totais).getByText("R$ 800,00")).toBeInTheDocument();
+  });
+  it("cada linha diz de qual carteira é o lançamento", async () => {
+    // Com duas carteiras, "−R$ 10,00 · Food" sem a carteira não diz de onde saiu.
+    walletsApi.list.mockResolvedValueOnce({
+      data: [{ id: "w1", name: "Nubank", balance: "10.00", bank: "nubank", created_at: "2026-06-01T00:00:00Z" }],
+    });
+
+    render(
+      <MemoryRouter>
+        <Transactions />
+      </MemoryRouter>,
+    );
+
+    const tabela = await screen.findByRole("table");
+    expect(within(tabela).getByRole("columnheader", { name: "Carteira" })).toBeInTheDocument();
+    expect((await within(tabela).findAllByText("Nubank")).length).toBe(3);
+  });
+  it("os totais seguem o mês escolhido, não a página nem o histórico inteiro", async () => {
+    hojeE(new Date(2026, 8, 25, 12));
+    render(
+      <MemoryRouter>
+        <Transactions />
+      </MemoryRouter>,
+    );
+    await screen.findAllByText("Item t-0");
+
+    await escolherMes("Agosto de 2026");
+
+    await waitFor(() =>
+      expect(transactionsApi.summary).toHaveBeenLastCalledWith(
+        expect.objectContaining({ month: 8, year: 2026 }),
+      ),
+    );
+  });
+
+  it("se os totais falharem, somem sem esconder a lista", async () => {
+    // Total desconhecido não vira R$ 0,00 (DESIGN.md, No Invented Number).
+    transactionsApi.summary.mockRejectedValueOnce(new Error("500"));
+
+    render(
+      <MemoryRouter>
+        <Transactions />
+      </MemoryRouter>,
+    );
+
+    expect((await screen.findAllByText("Item t-0")).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("region", { name: "Totais do período" })).not.toBeInTheDocument();
   });
 });
