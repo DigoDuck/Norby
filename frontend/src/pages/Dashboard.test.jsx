@@ -316,4 +316,12 @@ describe("Dashboard, convites do Premium", () => {
     expect(screen.queryByRole("button", { name: /IA no plano Premium/ })).not.toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Conhecer o plano Premium" })).toHaveLength(1);
   });
+  it("free não pede a leitura da IA: a resposta seria sempre uma recusa", async () => {
+    // O backend recusa /ai/insight para quem não tem IA (AI_REQUIRES_PREMIUM).
+    // Pedir mesmo assim só gerava um 403 por visita ao Dashboard.
+    renderDashboard({ plan: FREE });
+
+    await screen.findByRole("region", { name: "Saldo total" });
+    expect(aiApi.getInsight).not.toHaveBeenCalled();
+  });
 });
