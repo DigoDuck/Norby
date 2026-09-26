@@ -114,7 +114,7 @@
       "refersTo": "chip",
       "description": "Variação contra o mês passado, sempre com seta.",
       "html": "<span class=\"ds-chip-pos\">↗ 13,8%</span> <span class=\"ds-chip-neg\">↗ 191%</span>",
-      "css": ".ds-chip-pos, .ds-chip-neg { display: inline-flex; align-items: center; gap: 4px; border-radius: 9999px; padding: 2px 8px; font: 600 12px 'Geist Variable', system-ui, sans-serif; font-variant-numeric: tabular-nums; } .ds-chip-pos { background: rgb(var(--income) / 0.2); color: rgb(var(--income)); } .ds-chip-neg { background: rgb(var(--expense) / 0.2); color: rgb(var(--expense)); }"
+      "css": ".ds-chip-pos, .ds-chip-neg { display: inline-flex; align-items: center; gap: 4px; border-radius: 9999px; padding: 2px 8px; font: 600 12px 'Geist Variable', system-ui, sans-serif; font-variant-numeric: tabular-nums; } .ds-chip-pos { background: rgb(var(--income) / 0.12); color: rgb(var(--income)); } .ds-chip-neg { background: rgb(var(--expense) / 0.12); color: rgb(var(--expense)); }"
     },
     {
       "name": "Item de navegação ativo",

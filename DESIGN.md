@@ -287,7 +287,7 @@ Se um elemento "brilha", ele está errado.
 
 ### Chips
 - **Estilo:** pílula, 12px semibold; `chip-pos` e `chip-neg` com fundo do próprio
-  sinal a 20%, `chip-neutral` em cinza. Sempre com seta ou ícone: cor nunca é o
+  sinal a 12% (a 20% o vermelho media 4,3:1), `chip-neutral` em cinza. Sempre com seta ou ícone: cor nunca é o
   único canal.
 
 ### Cards / Containers
