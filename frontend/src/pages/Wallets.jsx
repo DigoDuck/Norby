@@ -277,10 +277,10 @@ export default function Wallets() {
                     <span className="sr-only">Editar carteira</span>
                   </button>
                   <ConfirmDialog
-                    title="Remover esta carteira?"
-                    description={`"${w.name}" e todas as transações dela serão removidas.`}
-                    confirmLabel="Remover"
-                    errorFallback="Não foi possível remover a carteira."
+                    title="Excluir esta carteira?"
+                    description={`"${w.name}" e todas as transações dela serão excluídas.`}
+                    confirmLabel="Excluir"
+                    errorFallback="Não foi possível excluir a carteira."
                     onConfirm={() => deleteWallet(w.id)}
                     trigger={
                       <button

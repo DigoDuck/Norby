@@ -506,10 +506,10 @@ export default function Goals() {
                   <Pencil size={14} />
                 </button>
                 <ConfirmDialog
-                  title="Remover esta meta?"
+                  title="Excluir esta meta?"
                   description={`"${g.name}" sai da sua lista de metas.`}
-                  confirmLabel="Remover"
-                  errorFallback="Não foi possível remover a meta."
+                  confirmLabel="Excluir"
+                  errorFallback="Não foi possível excluir a meta."
                   onConfirm={() => deleteGoal(g.id)}
                   trigger={
                     <button

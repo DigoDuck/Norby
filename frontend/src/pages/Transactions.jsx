@@ -645,10 +645,10 @@ export default function Transactions() {
                       <span className="sr-only">Editar transação</span>
                     </button>
                     <ConfirmDialog
-                      title="Remover esta transação?"
+                      title="Excluir esta transação?"
                       description={`${t.description || t.category} · ${formatSinal(t.amount, t.type === "INCOME")} · ${formatDateBR(t.date)}`}
-                      confirmLabel="Remover"
-                      errorFallback="Não foi possível remover a transação."
+                      confirmLabel="Excluir"
+                      errorFallback="Não foi possível excluir a transação."
                       onConfirm={() => deleteTransaction(t.id)}
                       trigger={
                         <button
@@ -698,10 +698,10 @@ export default function Transactions() {
                     <span className="sr-only">Editar transação</span>
                   </button>
                     <ConfirmDialog
-                      title="Remover esta transação?"
+                      title="Excluir esta transação?"
                         description={`${t.description || t.category} · ${formatSinal(t.amount, t.type === "INCOME")} · ${formatDateBR(t.date)}`}
-                      confirmLabel="Remover"
-                      errorFallback="Não foi possível remover a transação."
+                      confirmLabel="Excluir"
+                      errorFallback="Não foi possível excluir a transação."
                       onConfirm={() => deleteTransaction(t.id)}
                       trigger={
                         <button

@@ -109,6 +109,17 @@ describe("Dashboard, KPIs do mês", () => {
     const tile = await screen.findByRole("group", { name: "Taxa de poupança" });
     expect(within(tile).getByText("−20%")).toBeInTheDocument();
   });
+
+  it("um déficit que arredonda para zero não mostra '−0%'", async () => {
+    // 1.000 de receita, 1.003 de despesa: faltaram 3, −0,3%. Na tela vira
+    // 0%, e zero não tem sinal.
+    dashboardApi.summary.mockResolvedValue(resumo("1000.00", "1003.00"));
+
+    renderDashboard();
+
+    const tile = await screen.findByRole("group", { name: "Taxa de poupança" });
+    expect(within(tile).getByText("0%")).toBeInTheDocument();
+  });
 });
 
 describe("Dashboard, Score financeiro", () => {

@@ -420,10 +420,10 @@ export default function Recurring() {
                 </span>
               </button>
               <ConfirmDialog
-                title="Remover esta recorrência?"
+                title="Excluir esta recorrência?"
                 description={`${it.description || it.category} · ${formatSinal(it.amount, it.type === "INCOME")}. Os lançamentos já feitos continuam.`}
-                confirmLabel="Remover"
-                errorFallback="Não foi possível remover a recorrência."
+                confirmLabel="Excluir"
+                errorFallback="Não foi possível excluir a recorrência."
                 onConfirm={() => deleteRecurring(it.id)}
                 trigger={
                   <button

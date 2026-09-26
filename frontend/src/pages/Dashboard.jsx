@@ -207,9 +207,10 @@ export default function Dashboard() {
   const monthIncome = parseFloat(s.month_income);
   const monthExpenses = parseFloat(s.month_expenses);
   const monthNet = monthIncome - monthExpenses;
-  // Quanto da receita sobrou. Sem receita não existe proporção: fica undefined
-  // e o tile diz isso, em vez de mostrar Infinity%.
-  const taxaPoupanca = monthIncome > 0 ? (monthNet / monthIncome) * 100 : undefined;
+  // Quanto da receita sobrou, já no inteiro que vai para a tela. Sem receita
+  // não existe proporção: fica undefined e o tile diz isso, em vez de mostrar
+  // Infinity%. Arredondar antes do sinal evita o "−0%" de um déficit mínimo.
+  const taxaPoupanca = monthIncome > 0 ? Math.round((monthNet / monthIncome) * 100) : undefined;
 
   // Variação do saldo total vs. fim do mês anterior (derivável do resultado do
   // mês corrente). Só faz sentido na visão "todas as carteiras".
@@ -419,14 +420,12 @@ export default function Dashboard() {
               ao Premium já tem o botão do cabeçalho. */}
           <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
           <div>
-            <div className="flex items-baseline gap-2">
-              <Money
-                value={shownBalance}
-                className="tracking-tight text-4xl font-semibold text-content"
-                centsClassName="text-2xl font-semibold text-content-2"
-              />
-              <span className="text-xs font-medium text-content-3">BRL</span>
-            </div>
+            {/* Sem o "BRL" ao lado: o R$ já diz a moeda. */}
+            <Money
+              value={shownBalance}
+              className="block tracking-tight text-4xl font-semibold text-content"
+              centsClassName="text-2xl font-semibold text-content-2"
+            />
             {balanceChange !== undefined && (
               <div className="flex items-center gap-2 mt-2">
                 <span className={balanceChange >= 0 ? "chip-pos" : "chip-neg"}>
