@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Moon, Sun } from "lucide-react";
 import { getTheme, setTheme } from "@/lib/theme";
 
 const OPTIONS = [
@@ -68,5 +69,27 @@ export default function ThemeToggle() {
         );
       })}
     </div>
+  );
+}
+
+/**
+ * Versão compacta, para o topo do Dashboard: um clique alterna escuro e claro.
+ * O ícone e o nome acessível dizem para onde o clique leva, não onde se está.
+ */
+export function ThemeButton() {
+  const [theme, setLocal] = useState(getTheme);
+  const paraClaro = theme === "dark";
+  const nome = paraClaro ? "Usar tema claro" : "Usar tema escuro";
+
+  return (
+    <button
+      type="button"
+      aria-label={nome}
+      title={nome}
+      onClick={() => setLocal(setTheme(paraClaro ? "light" : "dark"))}
+      className="grid size-10 shrink-0 place-items-center rounded-full border border-line/15 text-content-2 transition-colors hover:bg-state/[0.08] hover:text-content"
+    >
+      {paraClaro ? <Sun size={16} aria-hidden="true" /> : <Moon size={16} aria-hidden="true" />}
+    </button>
   );
 }

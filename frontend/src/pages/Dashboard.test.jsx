@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 
 import { aiApi } from "@/api/ai";
 import { dashboardApi } from "@/api/dashboard";
@@ -217,5 +217,67 @@ describe("Dashboard, onde vai seu dinheiro", () => {
     const maior = (await screen.findByText("Maior lançamento")).parentElement;
     expect(within(maior).getByText("R$ 980,00")).toBeInTheDocument();
     expect(within(maior).getByText("Aluguel")).toBeInTheDocument();
+  });
+});
+
+// Mostra para onde a página navegou: rota e query string.
+function Destino() {
+  const { pathname, search } = useLocation();
+  return <p>{`destino: ${pathname}${search}`}</p>;
+}
+
+describe("Dashboard, busca no topo", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useAuthStore.getState().login("access", { name: "Alice", email: "alice@test.com", plan: FREE });
+    walletsApi.list.mockResolvedValue({ data: [] });
+    transactionsApi.list.mockResolvedValue({ data: [], headers: {} });
+    goalsApi.list.mockResolvedValue({ data: [] });
+    aiApi.getInsight.mockImplementation(recusaIa);
+    dashboardApi.summary.mockResolvedValue(resumo("0.00", "0.00"));
+    render(
+      <MemoryRouter initialEntries={["/dashboard"]}>
+        <Routes>
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/transactions" element={<Destino />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+  });
+
+  it("Enter na busca abre o Extrato filtrado pelo termo", async () => {
+    const busca = await screen.findByRole("searchbox", { name: "Buscar lançamentos" });
+
+    fireEvent.change(busca, { target: { value: "mercado" } });
+    fireEvent.submit(busca);
+
+    expect(await screen.findByText("destino: /transactions?q=mercado")).toBeInTheDocument();
+  });
+  it.each([
+    ["vazia", "   "],
+    ["de uma letra", "m"],
+  ])("busca %s não sai do Dashboard", async (_, termo) => {
+    // O Extrato só busca a partir de 2 caracteres: levar a pessoa para lá
+    // mostraria a lista inteira com o termo no campo, como se nada achasse.
+    const busca = await screen.findByRole("searchbox", { name: "Buscar lançamentos" });
+
+    fireEvent.change(busca, { target: { value: termo } });
+    fireEvent.submit(busca);
+
+    expect(screen.queryByText(/^destino:/)).not.toBeInTheDocument();
+    expect(screen.getByRole("searchbox", { name: "Buscar lançamentos" })).toBeInTheDocument();
+  });
+  it.each([
+    ["Ctrl K", { ctrlKey: true }],
+    ["Cmd K", { metaKey: true }],
+  ])("%s põe o foco na busca no lugar do atalho do navegador", async (_, tecla) => {
+    const busca = await screen.findByRole("searchbox", { name: "Buscar lançamentos" });
+
+    // fireEvent devolve false quando alguém chamou preventDefault: sem isso o
+    // Chrome e o Firefox mandam o foco para a barra de endereço.
+    const naoCancelado = fireEvent.keyDown(window, { key: "k", ...tecla });
+
+    expect(naoCancelado).toBe(false);
+    expect(busca).toHaveFocus();
   });
 });

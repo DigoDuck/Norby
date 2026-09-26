@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, Search, Trash2, Pencil } from "lucide-react";
@@ -72,7 +72,10 @@ export default function Transactions() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [serverError, setServerError] = useState(null);
-  const [search, setSearch] = useState("");
+  // ?q= é a porta de entrada da busca do Dashboard: o campo já nasce com o
+  // termo, e a primeira carga já vem filtrada.
+  const [params] = useSearchParams();
+  const [search, setSearch] = useState(() => params.get("q") ?? "");
   // Termo cuja RESPOSTA está na tela, que não é o mesmo que o digitado: entre
   // a tecla e o fim do debounce a lista ainda é a anterior. Anunciar a partir
   // do texto digitado faz o leitor de tela ouvir uma contagem que não é da
@@ -178,7 +181,10 @@ export default function Transactions() {
     // mount é o padrão do React sem biblioteca de data fetching, e este
     // projeto não tem uma.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    load();
+    load(filtroAtivo());
+    // Só no mount: filtroAtivo lê a busca que veio da URL. Depois disso, quem
+    // recarrega é o efeito da busca, com espera.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Busca no servidor, com espera de 300ms. Antes disto a busca era no

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Plus,
@@ -11,6 +11,7 @@ import {
   Percent,
   Lock,
   Target,
+  Search,
 } from "lucide-react";
 import {
   AreaChart,
@@ -27,8 +28,10 @@ import { aiApi } from "@/api/ai";
 import { goalsApi } from "@/api/goals";
 import { dashboardApi } from "@/api/dashboard";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import NorthStar from "@/components/shared/NorthStar";
+import { ThemeButton } from "@/components/shared/ThemeToggle";
 import InsightCard from "@/components/dashboard/InsightCard";
 import CategoryPie from "@/components/dashboard/CategoryPie";
 import ChartTooltip from "@/components/dashboard/ChartTooltip";
@@ -56,6 +59,9 @@ const monthLabel = (ym) => {
   const [y, m] = ym.split("-").map(Number);
   return new Date(y, m - 1, 1).toLocaleString("pt-BR", { month: "short" });
 };
+
+// Dica visual do atalho da busca, na grafia de cada sistema.
+const TECLA_BUSCA = /Mac|iPhone|iPad/.test(navigator.userAgent) ? "⌘ K" : "Ctrl K";
 
 const EMPTY_SUMMARY = {
   month_income: 0,
@@ -116,6 +122,20 @@ export default function Dashboard() {
   const [goals, setGoals] = useState([]);
   const [streakTx, setStreakTx] = useState([]);
   const [selectedWallet, setSelectedWallet] = useState("all");
+  const [busca, setBusca] = useState("");
+  const buscaRef = useRef(null);
+
+  // Ctrl K / Cmd K: o atalho de busca de quase todo app. O preventDefault tira
+  // o do navegador, que manda o foco para a barra de endereço.
+  useEffect(() => {
+    function atalho(e) {
+      if (e.key.toLowerCase() !== "k" || !(e.ctrlKey || e.metaKey)) return;
+      e.preventDefault();
+      buscaRef.current?.focus();
+    }
+    window.addEventListener("keydown", atalho);
+    return () => window.removeEventListener("keydown", atalho);
+  }, []);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
@@ -295,14 +315,26 @@ export default function Dashboard() {
     ...wallets.map((w) => ({ value: w.id, label: w.name })),
   ];
 
+  // A busca do topo procura lançamentos, a mesma busca do Extrato: Enter leva
+  // para lá com o termo na URL. Abaixo de 2 caracteres fica aqui, porque o
+  // Extrato não busca termo tão curto e mostraria a lista inteira.
+  function buscar(e) {
+    e.preventDefault();
+    const termo = busca.trim();
+    if (termo.length < 2) return;
+    navigate(`/transactions?q=${encodeURIComponent(termo)}`);
+  }
+
   // Atalho: abre o form do Extrato já com o tipo pré-selecionado
   const newTransaction = (type) =>
     navigate("/transactions", { state: { newType: type } });
 
   return (
     <div className="space-y-4">
-      {/* ── Cabeçalho: saudação solta na página, sem card nem ilustração ── */}
-      <header className="flex flex-wrap items-end justify-between gap-4">
+      {/* ── Cabeçalho: saudação, busca de lançamentos e ações ─────────────
+          Ferramentas no vão, não números: tudo o que é dado já está nos KPIs.
+          No celular a busca desce para uma linha própria. */}
+      <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
         <div className="min-w-0">
           <p className="text-xs text-content-3 first-letter:uppercase">{todayLabel}</p>
           <h1 className="text-3xl font-bold text-content tracking-tight mt-1">
@@ -312,15 +344,49 @@ export default function Dashboard() {
             Seu saldo, seus gastos e seu ritmo neste mês.
           </p>
         </div>
-        {/* Sem IA no plano, o convite não pode ser a ação principal da tela. */}
-        <Button
-          onClick={() => navigate(iaLiberada ? "/ai" : "/settings?aba=plano")}
-          size="lg"
-          variant={iaLiberada ? "default" : "secondary"}
+        <form
+          role="search"
+          onSubmit={buscar}
+          className="relative order-last w-full md:order-none md:w-auto md:max-w-md md:flex-1"
         >
-          {iaLiberada ? "Falar com a Norby" : "IA no plano Premium"}
-          {iaLiberada ? <NorthStar size={14} /> : <Lock size={14} aria-hidden="true" />}
-        </Button>
+          <Search
+            size={16}
+            aria-hidden="true"
+            className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-content-3"
+          />
+          <Input
+            ref={buscaRef}
+            type="search"
+            aria-label="Buscar lançamentos"
+            placeholder="Buscar lançamentos"
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            maxLength={100}
+            aria-keyshortcuts="Control+K Meta+K"
+            className="h-10 rounded-full border-line/10 bg-surface pl-10 pr-16 text-content placeholder:text-content-3"
+          />
+          {/* Some quando há texto: ali fica o "x" nativo do campo de busca. */}
+          {!busca && (
+            <kbd
+              aria-hidden="true"
+              className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded-md border border-line/15 px-1.5 py-0.5 font-sans text-[11px] leading-none text-content-3 md:block"
+            >
+              {TECLA_BUSCA}
+            </kbd>
+          )}
+        </form>
+        <div className="flex items-center gap-2">
+          <ThemeButton />
+          {/* Sem IA no plano, o convite não pode ser a ação principal da tela. */}
+          <Button
+            onClick={() => navigate(iaLiberada ? "/ai" : "/settings?aba=plano")}
+            size="lg"
+            variant={iaLiberada ? "default" : "secondary"}
+          >
+            {iaLiberada ? "Falar com a Norby" : "IA no plano Premium"}
+            {iaLiberada ? <NorthStar size={14} /> : <Lock size={14} aria-hidden="true" />}
+          </Button>
+        </div>
       </header>
 
       {/* ── Linha 1: saldo (4) + KPIs do mês (5) + meta (3) ───────────── */}

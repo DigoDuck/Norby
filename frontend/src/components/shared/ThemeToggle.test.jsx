@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
-import ThemeToggle from "./ThemeToggle";
+import ThemeToggle, { ThemeButton } from "./ThemeToggle";
 
 describe("ThemeToggle", () => {
   beforeEach(() => {
@@ -28,5 +28,23 @@ describe("ThemeToggle", () => {
     fireEvent.click(screen.getByRole("radio", { name: /escuro/i }));
     expect(document.documentElement.dataset.theme).toBe("dark");
     expect(localStorage.getItem("norby-theme")).toBe("dark");
+  });
+});
+
+describe("ThemeButton", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    document.documentElement.dataset.theme = "dark";
+  });
+
+  it("troca o tema, grava a escolha e o nome passa a dizer a próxima troca", () => {
+    // Botão só de ícone: o nome acessível é a única pista do que o clique faz.
+    render(<ThemeButton />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Usar tema claro" }));
+
+    expect(document.documentElement.dataset.theme).toBe("light");
+    expect(localStorage.getItem("norby-theme")).toBe("light");
+    expect(screen.getByRole("button", { name: "Usar tema escuro" })).toBeInTheDocument();
   });
 });

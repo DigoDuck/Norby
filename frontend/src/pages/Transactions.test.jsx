@@ -466,3 +466,28 @@ describe("Transactions, filtro por mês", () => {
     });
   });
 });
+
+describe("Transactions, busca vinda da URL", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    transactionsApi.list.mockResolvedValue(pagina(3, 3, "q-"));
+  });
+
+  it("abrir o Extrato com ?q= já pede a primeira página com o termo e mostra o termo no campo", async () => {
+    // É o destino da busca do Dashboard. A primeira requisição já vem
+    // filtrada: pedir a lista inteira antes gastava uma ida ao servidor à toa.
+    render(
+      <MemoryRouter initialEntries={["/transactions?q=mercado"]}>
+        <Transactions />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() =>
+      expect(transactionsApi.list).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ q: "mercado", offset: 0 }),
+      ),
+    );
+    expect(screen.getByLabelText(/buscar transações/i)).toHaveValue("mercado");
+  });
+});
