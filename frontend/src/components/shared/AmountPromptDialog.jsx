@@ -133,7 +133,7 @@ export function AmountPromptDialog({
             <Button
               type="submit"
               disabled={loading}
-              className="bg-accent-fill hover:bg-accent-fill/90 text-accent-contrast font-medium disabled:opacity-40"
+              className="font-medium disabled:opacity-40"
             >
               {loading ? "..." : submitLabel}
             </Button>

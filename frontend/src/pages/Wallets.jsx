@@ -1,11 +1,15 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useCallback, useId, useRef, useState } from "react";
 import { Plus, Pencil, Trash2, Wallet } from "lucide-react";
 import { walletsApi } from "@/api/wallets";
 import { apiErrorMessage, formatBRL, shadcnInputCls } from "@/lib/utils";
-import { CHART_SERIES, hashIndex } from "@/lib/palette";
-import { banco, OPCOES_BANCO } from "@/lib/bancos";
+import { OPCOES_BANCO } from "@/lib/bancos";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import Money from "@/components/shared/Money";
+import WalletMark from "@/components/shared/WalletMark";
+import { LoadError, LoadingCards } from "@/components/shared/LoadState";
+import { useLoad } from "@/lib/useLoad";
+import { usePlano } from "@/lib/plan";
+import PremiumLock from "@/components/shared/PremiumLock";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MoneyInput } from "@/components/ui/money-input";
@@ -16,13 +20,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-
-// Cor do chip, determinística e só apresentação. Chaveada pelo BANCO quando
-// existe um, para que todas as carteiras do mesmo banco fiquem iguais entre si;
-// sem banco, cai no nome, que é como sempre foi. A paleta continua sendo a do
-// app: cor de marca seria hex fixo, e o DESIGN.md mede contraste sobre o vidro
-// nos DOIS temas — um hex passa num e reprova no outro.
-const chipColor = (chave) => CHART_SERIES[hashIndex(chave, CHART_SERIES.length)];
 
 export default function Wallets() {
   const [wallets, setWallets] = useState([]);
@@ -39,18 +36,13 @@ export default function Wallets() {
   // e o usuário de teclado caía no body.
   const ultimoGatilho = useRef(null);
 
-  async function load() {
-    const res = await walletsApi.list();
-    setWallets(res.data);
-  }
-
-  useEffect(() => {
-    // Falso positivo: `load` só chama setState DEPOIS do await, então nada
-    // é síncrono aqui. Buscar dados no mount é o padrão do React quando não
-    // há biblioteca de data fetching, e este projeto não tem uma.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    load();
+  const load = useCallback(async () => {
+    setWallets((await walletsApi.list()).data);
   }, []);
+  const { status, reload } = useLoad(load);
+  const { limiteCarteiras } = usePlano();
+  // No limite do gratuito, "nova carteira" daria 403 depois do form preenchido.
+  const noLimite = limiteCarteiras !== null && wallets.length >= limiteCarteiras;
 
   async function handleSave() {
     if (!form.name.trim()) return setError("Informe um nome.");
@@ -124,16 +116,24 @@ export default function Wallets() {
             Carteiras
           </h1>
           <p className="text-content-2 text-sm mt-1">
-            {wallets.length}{" "}
-            {wallets.length === 1 ? "carteira" : "carteiras"} · saldo total{" "}
-            <span className="text-accent font-medium tnum">
-              {formatBRL(totalBalance)}
-            </span>
+            {status === "ok" ? (
+              <>
+                {wallets.length}{" "}
+                {wallets.length === 1 ? "carteira" : "carteiras"} · saldo total{" "}
+                <span className="text-accent font-medium tnum">
+                  {formatBRL(totalBalance)}
+                </span>
+                {noLimite && ` · ${wallets.length} de ${limiteCarteiras} no plano gratuito`}
+              </>
+            ) : (
+              <span aria-hidden="true" className="inline-block h-3.5 w-48 rounded-full bg-line/[0.07] motion-safe:animate-pulse align-middle" />
+            )}
           </p>
         </div>
         <Button
           onClick={openNew}
-          className="bg-accent-fill text-accent-contrast hover:bg-accent-fill/90 font-medium"
+          disabled={noLimite}
+          className="font-medium"
         >
           <Plus size={16} /> Nova carteira
         </Button>
@@ -146,21 +146,12 @@ export default function Wallets() {
           className="bg-surface border-line/10 text-content"
         >
           <DialogHeader>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-accent-fill flex items-center justify-center shrink-0">
-                <Wallet size={20} className="text-accent-contrast" />
-              </div>
-              <div>
-                <DialogTitle>
-                  {editing ? "Editar carteira" : "Nova carteira"}
-                </DialogTitle>
-                <p className="text-xs text-content-2 mt-0.5">
-                  {editing
-                    ? "Atualize o nome desta carteira"
-                    : "Adicione uma conta para acompanhar"}
-                </p>
-              </div>
-            </div>
+            <DialogTitle>{editing ? "Editar carteira" : "Nova carteira"}</DialogTitle>
+            <p className="text-xs text-content-2 mt-0.5">
+              {editing
+                ? "Atualize o nome desta carteira"
+                : "Adicione uma conta para acompanhar"}
+            </p>
           </DialogHeader>
 
           <div className="space-y-4 mt-1">
@@ -209,16 +200,16 @@ export default function Wallets() {
             {error && <p className="text-danger text-xs">{error}</p>}
             <div className="flex gap-2.5 pt-1">
               <Button
-                variant="outline"
+                variant="secondary"
                 onClick={() => handleOpenChange(false)}
-                className="flex-1 border-line/10 bg-transparent text-content-2 hover:bg-state/5"
+                className="flex-1"
               >
                 Cancelar
               </Button>
               <Button
                 onClick={handleSave}
                 disabled={saving}
-                className="flex-[1.4] bg-accent-fill text-accent-contrast hover:bg-accent-fill/90 font-medium"
+                className="flex-[1.4] font-medium"
               >
                 {saving
                   ? "Salvando…"
@@ -233,8 +224,13 @@ export default function Wallets() {
 
       {/* Grid de carteiras */}
       <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-        {wallets.length === 0 && (
-          <div className="col-span-full glass p-10 flex flex-col items-center text-center">
+        {status === "loading" && <LoadingCards count={3} className="min-h-[196px]" />}
+        {status === "error" && (
+          <LoadError what="suas carteiras" onRetry={reload} className="col-span-full" />
+        )}
+
+        {status === "ok" && wallets.length === 0 && (
+          <div className="col-span-full panel p-10 flex flex-col items-center text-center">
             <div className="w-11 h-11 rounded-xl bg-accent/[0.15] flex items-center justify-center mb-3">
               <Wallet size={20} className="text-accent" />
             </div>
@@ -249,24 +245,13 @@ export default function Wallets() {
         )}
 
         {wallets.map((w) => {
-          const b = banco(w.bank);
-          const color = chipColor(w.bank || w.name);
           return (
             <div
               key={w.id}
-              className="group relative overflow-hidden glass-hover p-6 flex min-h-[196px] flex-col"
+              className="group relative overflow-hidden panel-hover p-6 flex min-h-[196px] flex-col"
             >
               <div className="relative flex items-start justify-between mb-5">
-                <div
-                  className="w-12 h-12 rounded-2xl flex items-center justify-center text-lg font-semibold"
-                  style={{
-                    background: `color-mix(in srgb, ${color} 13%, transparent)`,
-                    border: `1px solid color-mix(in srgb, ${color} 24%, transparent)`,
-                    color,
-                  }}
-                >
-                  {b ? b.marca : w.name?.[0]?.toUpperCase() || "?"}
-                </div>
+                <WalletMark wallet={w} />
               </div>
 
               <p className="relative text-sm text-content-2 mb-1">
@@ -292,10 +277,10 @@ export default function Wallets() {
                     <span className="sr-only">Editar carteira</span>
                   </button>
                   <ConfirmDialog
-                    title="Remover esta carteira?"
-                    description="A carteira e todas as suas transações serão removidas."
-                    confirmLabel="Remover"
-                    errorFallback="Não foi possível remover a carteira."
+                    title="Excluir esta carteira?"
+                    description={`"${w.name}" e todas as transações dela serão excluídas.`}
+                    confirmLabel="Excluir"
+                    errorFallback="Não foi possível excluir a carteira."
                     onConfirm={() => deleteWallet(w.id)}
                     trigger={
                       <button
@@ -314,8 +299,17 @@ export default function Wallets() {
           );
         })}
 
+        {status === "ok" && noLimite && (
+          <div className="inset-panel min-h-[196px] border-dashed border-line/20 flex items-center justify-center p-6">
+            <PremiumLock
+              title="Mais carteiras no plano Premium"
+              text={`O plano gratuito tem ${limiteCarteiras} carteiras.`}
+            />
+          </div>
+        )}
+
         {/* Card tracejado "adicionar" */}
-        {wallets.length > 0 && (
+        {status === "ok" && wallets.length > 0 && !noLimite && (
           <button
             type="button"
             onClick={openNew}

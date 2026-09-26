@@ -17,7 +17,7 @@ export default function ChartTooltip({ active, payload, label }) {
             style={{ background: p.color || p.payload?.fill }}
           />
           <span className="text-content-2">{p.name}</span>
-          <span className="ml-auto font-semibold text-content tnum">
+          <span className="ml-auto font-semibold text-content tnum whitespace-nowrap">
             {formatBRL(p.value)}
           </span>
         </div>

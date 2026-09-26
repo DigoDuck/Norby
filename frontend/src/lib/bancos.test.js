@@ -32,6 +32,11 @@ describe("catálogo de bancos", () => {
     expect(banco("nubank")?.marca).toBe("Nu");
   });
 
+  it("todo banco tem logo; só Dinheiro, que não é banco, fica sem", () => {
+    const semLogo = BANCOS.filter((b) => !b.logo).map((b) => b.slug);
+    expect(semLogo).toEqual(["dinheiro"]);
+  });
+
   it("oferece 'sem banco' como primeira opção do seletor", () => {
     // O valor vazio é o que faz o front OMITIR `bank` no envio.
     expect(OPCOES_BANCO[0].value).toBe("");

@@ -30,6 +30,7 @@ export default {
           income: c("--income"),
           expense: c("--expense"),
           danger: c("--danger"),
+          "danger-fill": c("--danger-fill"),
           warning: c("--warning"),
 
           "chart-1": c("--chart-1"),
@@ -62,21 +63,6 @@ export default {
           heading: ["'Geist Variable'", "system-ui", "sans-serif"],
         },
         ringWidth: { 3: "3px" },
-        keyframes: {
-          // Pulso do orbe da IA: sutil (assinatura), nunca em conteúdo de dado
-          "orb-pulse": {
-            "0%, 100%": { opacity: "0.85", transform: "scale(1)" },
-            "50%": { opacity: "1", transform: "scale(1.03)" },
-          },
-          "fade-up": {
-            from: { opacity: "0", transform: "translateY(6px)" },
-            to: { opacity: "1", transform: "translateY(0)" },
-          },
-        },
-        animation: {
-          "orb-pulse": "orb-pulse 4s ease-in-out infinite",
-          "fade-up": "fade-up 0.25s ease-out both",
-        },
     },
   },
   plugins: [],

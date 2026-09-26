@@ -7,6 +7,7 @@ import NorthStar from "../shared/NorthStar";
 import AiOrb from "../shared/AiOrb";
 import { mainItems, prefItems, adminItems } from "./navItems";
 import Avatar from "@/components/shared/Avatar";
+import { usePlano } from "@/lib/plan";
 
 // Item de navegação: ativo = moldura iridescente + acento no ícone, no label e
 // na estrela. O acento chapado segue reservado ao CTA primário (ver DESIGN.md);
@@ -19,9 +20,8 @@ function NavItem({ to, icon, label }) {
       className={({ isActive }) =>
         `group relative flex items-center gap-3 px-3.5 py-3 rounded-2xl text-sm font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-focus-offset ${
           isActive
-            ? // No escuro a referência mantém o label branco e deixa o azure só
-              // no ícone e na estrela; no claro o label é que carrega o acento.
-              "nav-active text-accent dark:text-content"
+            ? // Fundo neutro: o azure fica só no ícone e na estrela.
+              "bg-state/[0.07] text-content"
             : "text-content-2 hover:text-content hover:bg-state/[0.04]"
         }`
       }
@@ -38,6 +38,7 @@ function NavItem({ to, icon, label }) {
 }
 
 export default function Sidebar() {
+  const { iaLiberada } = usePlano();
   const user = useAuthStore((s) => s.user);
   const isAdmin = Boolean(user?.is_admin);
   const navigate = useNavigate();
@@ -48,7 +49,7 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="hidden lg:flex w-64 h-full glass flex-col px-4 py-6 shrink-0 mr-[18px]">
+    <aside className="hidden lg:flex w-64 h-full panel flex-col px-4 py-6 shrink-0 mr-[18px]">
       {/* Logo */}
       <div className="flex items-center gap-3 mb-8 px-2">
         <div className="brand-tile w-9 h-9">
@@ -82,16 +83,18 @@ export default function Sidebar() {
           adminItems.map((item) => <NavItem key={item.to} {...item} />)}
       </nav>
 
-      {/* IA do Mês — atalho para o analista */}
+      {/* Norby IA: atalho para a analista */}
       <NavLink
         to="/ai"
         className="group flex items-center gap-3 p-3.5 mb-4 bg-accent/[0.08] border border-accent/20 rounded-2xl transition-colors hover:bg-accent/[0.14] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-focus-offset"
       >
-        <AiOrb size={34} pulse={false} />
+        <AiOrb size={34} />
         <div className="min-w-0">
-          <p className="text-xs font-semibold text-accent">IA do Mês</p>
+          <p className="text-xs font-semibold text-accent">Norby IA</p>
           <p className="text-[11px] text-content-2 leading-snug mt-0.5">
-            Análises personalizadas do seu perfil financeiro
+            {iaLiberada
+              ? "Análises personalizadas do seu perfil financeiro"
+              : "Disponível no plano Premium"}
           </p>
         </div>
       </NavLink>

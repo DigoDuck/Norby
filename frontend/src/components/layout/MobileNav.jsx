@@ -26,7 +26,7 @@ export default function MobileNav() {
 
   return (
     <>
-      <header className="lg:hidden fixed top-0 inset-x-0 z-30 glass rounded-none flex items-center gap-3 px-4 h-14">
+      <header className="lg:hidden fixed top-0 inset-x-0 z-30 panel rounded-none flex items-center gap-3 px-4 h-14">
         <button
           ref={hamburguer}
           type="button"
@@ -54,7 +54,7 @@ export default function MobileNav() {
           aria-label="Menu de navegação"
           className="lg:hidden inset-y-0 left-0 top-0 w-72 max-w-[85vw] translate-x-0 translate-y-0 gap-0 rounded-none bg-transparent p-0 ring-0"
         >
-          <nav className="relative h-full w-full glass rounded-none flex flex-col px-4 py-6 gap-1">
+          <nav className="relative h-full w-full panel rounded-none flex flex-col px-4 py-6 gap-1">
             <button
               type="button"
               onClick={() => setOpen(false)}
@@ -74,7 +74,7 @@ export default function MobileNav() {
                   className={({ isActive }) =>
                     `relative flex items-center gap-3 px-3.5 py-3 rounded-2xl text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
                       isActive
-                        ? "nav-active text-accent dark:text-content"
+                        ? "bg-state/[0.07] text-content"
                         : "text-content-2"
                     }`
                   }

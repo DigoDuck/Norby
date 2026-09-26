@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Plus,
@@ -6,12 +6,18 @@ import {
   ArrowRight,
   ArrowUpRight,
   ArrowDownRight,
-  CalendarDays,
+  ArrowDownLeft,
+  PiggyBank,
+  Percent,
+  Lock,
+  Target,
+  Search,
 } from "lucide-react";
 import {
   AreaChart,
   Area,
   XAxis,
+  YAxis,
   Tooltip,
   ResponsiveContainer,
   CartesianGrid,
@@ -22,24 +28,40 @@ import { aiApi } from "@/api/ai";
 import { goalsApi } from "@/api/goals";
 import { dashboardApi } from "@/api/dashboard";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import NorthStar from "@/components/shared/NorthStar";
+import { ThemeButton } from "@/components/shared/ThemeToggle";
 import InsightCard from "@/components/dashboard/InsightCard";
-import CategoryDonut from "@/components/dashboard/CategoryDonut";
+import CategoryPie from "@/components/dashboard/CategoryPie";
 import ChartTooltip from "@/components/dashboard/ChartTooltip";
-import RitmoCard from "@/components/dashboard/RitmoCard";
+import RitmoCard, { RITMO_MAX_WEEKS } from "@/components/dashboard/RitmoCard";
+import StatTile from "@/components/dashboard/StatTile";
 import Money from "@/components/shared/Money";
-import HeroRing from "@/components/shared/HeroRing";
+import WalletMark from "@/components/shared/WalletMark";
+import { LoadError } from "@/components/shared/LoadState";
+import { usePlano } from "@/lib/plan";
 import { useAuthStore } from "@/store/authStore";
-import { formatDateBR, formatBRL, parseDateOnly } from "@/lib/utils";
-import { emojiForCategory } from "@/lib/categories";
-import { computeRitmo } from "@/lib/ritmo";
+import { formatDateBR, formatBRL, parseDateOnly, formatSinal, formatPct, MENOS } from "@/lib/utils";
+import CategoryIcon from "@/components/shared/CategoryIcon";
+
+// "Boa noite, Diogo": a saudação acompanha o horário, sem emoji no título
+// (o leitor de tela lia "Olá, Diogo, mão acenando").
+function saudacao(agora = new Date()) {
+  const h = agora.getHours();
+  if (h >= 5 && h < 12) return "Bom dia";
+  if (h >= 12 && h < 18) return "Boa tarde";
+  return "Boa noite";
+}
 
 // Rótulo curto pt-BR de uma chave ano-mês ("2026-07" → "jul"), em horário local.
 const monthLabel = (ym) => {
   const [y, m] = ym.split("-").map(Number);
   return new Date(y, m - 1, 1).toLocaleString("pt-BR", { month: "short" });
 };
+
+// Dica visual do atalho da busca, na grafia de cada sistema.
+const TECLA_BUSCA = /Mac|iPhone|iPad/.test(navigator.userAgent) ? "⌘ K" : "Ctrl K";
 
 const EMPTY_SUMMARY = {
   month_income: 0,
@@ -48,10 +70,20 @@ const EMPTY_SUMMARY = {
   top_categories: [],
 };
 
+// Centavos dos tiles: um degrau menor, como no saldo. No tile safira o branco
+// fica a 85% (4,8:1): a 75% media 4,05:1, abaixo do mínimo para 18px.
+const TILE_CENTS = "text-base sm:text-lg text-content-2";
+const TILE_CENTS_ON_ACCENT = "text-base sm:text-lg text-accent-contrast/[0.85]";
+
 const INCOME_COLOR = "rgb(var(--income))";
 const EXPENSE_COLOR = "rgb(var(--expense))";
 
 const axisTick = { fill: "rgb(var(--axis))", fontSize: 11 };
+
+// Eixo Y do fluxo em valor compacto ("R$ 6 mil"): sem ele a curva mostrava a
+// forma, mas não a escala.
+const reaisCompacto = (v) =>
+  `R$ ${Number(v).toLocaleString("pt-BR", { notation: "compact", maximumFractionDigits: 1 })}`;
 
 // "Hoje" / "Ontem" / "N dias atrás" / dd/mm/aaaa — para as movimentações.
 function relativeDay(value) {
@@ -66,8 +98,6 @@ function relativeDay(value) {
   return formatDateBR(value);
 }
 
-// Janela do heatmap "Ritmo financeiro" (dias, terminando hoje)
-const STREAK_DAYS = 42;
 
 // Meses (1-12/ano) que a janela de N dias terminando hoje atravessa.
 function monthsForWindow(days) {
@@ -92,13 +122,31 @@ export default function Dashboard() {
   const [goals, setGoals] = useState([]);
   const [streakTx, setStreakTx] = useState([]);
   const [selectedWallet, setSelectedWallet] = useState("all");
+  const [busca, setBusca] = useState("");
+  const buscaRef = useRef(null);
+
+  // Ctrl K / Cmd K: o atalho de busca de quase todo app. O preventDefault tira
+  // o do navegador, que manda o foco para a barra de endereço.
+  useEffect(() => {
+    function atalho(e) {
+      if (e.key.toLowerCase() !== "k" || !(e.ctrlKey || e.metaKey)) return;
+      e.preventDefault();
+      buscaRef.current?.focus();
+    }
+    window.addEventListener("keydown", atalho);
+    return () => window.removeEventListener("keydown", atalho);
+  }, []);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
+  const { iaLiberada } = usePlano();
 
-  useEffect(() => {
-    async function loadData() {
-      const streakMonths = monthsForWindow(STREAK_DAYS);
+  // Falha nunca vira zero. Saldo e resumo são o coração da tela: sem eles, a
+  // tela troca os números por um aviso. Os outros painéis falham sozinhos.
+  const [falhas, setFalhas] = useState({});
+
+  const loadData = useCallback(async () => {
+      const streakMonths = monthsForWindow(RITMO_MAX_WEEKS * 7);
       // allSettled: falha de um painel (ex.: IA) não derruba os demais
       const [wRes, tRes, sRes, iRes, gRes, ...streakRes] =
         await Promise.allSettled([
@@ -121,10 +169,27 @@ export default function Dashboard() {
           .filter((r) => r.status === "fulfilled")
           .flatMap((r) => r.value.data),
       );
+      const falhou = (r) => r.status === "rejected";
+      setFalhas({
+        core: falhou(wRes) || falhou(sRes),
+        tx: falhou(tRes),
+        goals: falhou(gRes),
+        // Um mês faltando pintaria dias com gasto como dias sem lançamento.
+        ritmo: streakRes.some(falhou),
+      });
       setLoading(false);
-    }
-    loadData();
   }, []);
+
+  useEffect(() => {
+    // Falso positivo: loadData só chama setState depois do await.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadData();
+  }, [loadData]);
+
+  function tentarDeNovo() {
+    setLoading(true);
+    loadData();
+  }
 
   const pctChange = (curr, prev) =>
     prev > 0 ? ((curr - prev) / prev) * 100 : undefined;
@@ -142,10 +207,26 @@ export default function Dashboard() {
   const monthIncome = parseFloat(s.month_income);
   const monthExpenses = parseFloat(s.month_expenses);
   const monthNet = monthIncome - monthExpenses;
+  // Quanto da receita sobrou, já no inteiro que vai para a tela. Sem receita
+  // não existe proporção: fica undefined e o tile diz isso, em vez de mostrar
+  // Infinity%. Arredondar antes do sinal evita o "−0%" de um déficit mínimo.
+  const taxaPoupanca = monthIncome > 0 ? Math.round((monthNet / monthIncome) * 100) : undefined;
 
   // Variação do saldo total vs. fim do mês anterior (derivável do resultado do
   // mês corrente). Só faz sentido na visão "todas as carteiras".
   const prevBalance = totalBalance - monthNet;
+
+  // Variação de cada KPI contra o mês anterior, lida do próprio fluxo de caixa
+  // (que já vem por mês do backend). Sem o mês anterior, o tile não mostra %.
+  const hoje = new Date();
+  const anterior = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
+  const prevKey = `${anterior.getFullYear()}-${String(anterior.getMonth() + 1).padStart(2, "0")}`;
+  const prevMonth = s.cash_flow.find((p) => p.month === prevKey);
+  const prevIncome = prevMonth ? parseFloat(prevMonth.income) : 0;
+  const prevExpenses = prevMonth ? parseFloat(prevMonth.expenses) : 0;
+  const incomeChange = pctChange(monthIncome, prevIncome);
+  const expenseChange = pctChange(monthExpenses, prevExpenses);
+  const netChange = pctChange(monthNet, prevIncome - prevExpenses);
   const balanceChange =
     selectedWallet === "all" ? pctChange(totalBalance, prevBalance) : undefined;
 
@@ -156,12 +237,32 @@ export default function Dashboard() {
     Saídas: parseFloat(p.expenses),
   }));
 
-  const categoryData = s.top_categories.map((c) => ({
+  // O backend manda o top-5; o que sobra vira "Demais categorias" para a
+  // pizza fechar com o tile de Despesas. Antes ela somava só o top-5 e dizia
+  // um total menor que o do tile ao lado.
+  const topCategorias = s.top_categories.map((c) => ({
     name: c.category,
     value: parseFloat(c.total),
   }));
-  const categoryTotal = categoryData.reduce((sum, c) => sum + c.value, 0);
-  const categoryMax = Math.max(1, ...categoryData.map((c) => c.value));
+  const resto = monthExpenses - topCategorias.reduce((sum, c) => sum + c.value, 0);
+  const categoryData =
+    resto >= 0.01
+      ? [...topCategorias, { name: "Demais categorias", value: resto, resto: true }]
+      : topCategorias;
+  const categoryTotal = monthExpenses;
+
+  // Rodapé da pizza: três números do mês, do que já foi buscado (os
+  // lançamentos do Ritmo cobrem o mês corrente inteiro).
+  const mesAtual = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}`;
+  const maiorGasto = streakTx
+    .filter((t) => t.type === "EXPENSE" && String(t.date).startsWith(mesAtual))
+    .reduce((maior, t) => (!maior || parseFloat(t.amount) > parseFloat(maior.amount) ? t : maior), null);
+  const destaquesPizza = {
+    mediaDiaria: monthExpenses / hoje.getDate(),
+    diasDecorridos: hoje.getDate(),
+    maiorGasto,
+    variacao: expenseChange,
+  };
 
   // Ponto de fim de linha do fluxo de caixa (detalhe do rascunho aprovado)
   const endDot = (color) =>
@@ -180,14 +281,6 @@ export default function Dashboard() {
       );
     };
 
-  // ── Ritmo financeiro: 42 dias, "no ritmo" = gasto do dia abaixo da cota ──
-  // Regra e testes em lib/ritmo.js.
-  const ritmo = useMemo(
-    () => computeRitmo(streakTx, STREAK_DAYS, new Date()),
-    [streakTx],
-  );
-
-
   // ── Meta em destaque: a SAVINGS mais próxima de concluir ──
   const featuredGoal = goals
     .filter((g) => g.type === "SAVINGS")
@@ -200,13 +293,6 @@ export default function Dashboard() {
   const todayLabel = new Date()
     .toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "long" })
     .replace(".", "");
-  // "julho de 2026" → "Julho de 2026" (capitalize do CSS pegaria o "De" também)
-  const rawMonthYear = new Date().toLocaleDateString("pt-BR", {
-    month: "long",
-    year: "numeric",
-  });
-  const monthYearLabel =
-    rawMonthYear.charAt(0).toUpperCase() + rawMonthYear.slice(1);
 
   if (loading) {
     return (
@@ -216,56 +302,109 @@ export default function Dashboard() {
     );
   }
 
+  if (falhas.core) {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-3xl font-bold text-content tracking-tight">{saudacao()}, {firstName}</h1>
+        <LoadError what="seu saldo e o resumo do mês" onRetry={tentarDeNovo} />
+      </div>
+    );
+  }
+
   const walletOptions = [
     { value: "all", label: "Todas as carteiras" },
     ...wallets.map((w) => ({ value: w.id, label: w.name })),
   ];
 
-  // Atalho: abre o form de Relatórios já com o tipo pré-selecionado
+  // A busca do topo procura lançamentos, a mesma busca do Extrato: Enter leva
+  // para lá com o termo na URL. Abaixo de 2 caracteres fica aqui, porque o
+  // Extrato não busca termo tão curto e mostraria a lista inteira.
+  function buscar(e) {
+    e.preventDefault();
+    const termo = busca.trim();
+    if (termo.length < 2) return;
+    navigate(`/transactions?q=${encodeURIComponent(termo)}`);
+  }
+
+  // Atalho: abre o form do Extrato já com o tipo pré-selecionado
   const newTransaction = (type) =>
     navigate("/transactions", { state: { newType: type } });
 
   return (
     <div className="space-y-4">
-      {/* ── Linha contextual: a data, sozinha, à esquerda ────────────── */}
-      <div className="flex items-center">
-        <span className="control-raised inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[11px] font-semibold text-content-2 uppercase tracking-widest">
-          <CalendarDays size={13} className="text-accent" />
-          {todayLabel}
-        </span>
-      </div>
-
-      {/* ── Linha 1: hero (7 col) + saldo total (5 col) ──────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        {/* Hero: saudação + convite à IA + anel da marca */}
-        <section className="hero-card lg:col-span-7 relative overflow-hidden glass p-6 md:pr-[250px] flex items-center min-h-[228px] animate-fade-up">
-          <div className="hero-card__content min-w-0">
-            <h1 className="text-3xl font-bold text-content tracking-tight">
-              Olá, {firstName} 👋
-            </h1>
-            <p className="text-sm text-content-2 mt-2 max-w-sm leading-relaxed">
-              Pergunte qualquer coisa sobre suas finanças — a Norby está pronta
-              para te ajudar hoje.
-            </p>
-            <Button
-              onClick={() => navigate("/ai")}
-              className="hero-cta mt-5 h-11 min-w-[208px] justify-between px-6 font-medium"
+      {/* ── Cabeçalho: saudação, busca de lançamentos e ações ─────────────
+          Ferramentas no vão, não números: tudo o que é dado já está nos KPIs.
+          No celular a busca desce para uma linha própria. */}
+      <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
+        <div className="min-w-0">
+          <p className="text-xs text-content-3 first-letter:uppercase">{todayLabel}</p>
+          <h1 className="text-3xl font-bold text-content tracking-tight mt-1">
+            {saudacao()}, {firstName}
+          </h1>
+          <p className="text-sm text-content-2 mt-1">
+            Seu saldo, seus gastos e seu ritmo neste mês.
+          </p>
+        </div>
+        <form
+          role="search"
+          onSubmit={buscar}
+          className="relative order-last w-full md:order-none md:w-auto md:max-w-md md:flex-1"
+        >
+          <Search
+            size={16}
+            aria-hidden="true"
+            className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-content-3"
+          />
+          <Input
+            ref={buscaRef}
+            type="search"
+            aria-label="Buscar lançamentos"
+            placeholder="Buscar lançamentos"
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            maxLength={100}
+            aria-keyshortcuts="Control+K Meta+K"
+            className="h-10 rounded-full border-line/10 bg-surface pl-10 pr-16 text-content placeholder:text-content-3"
+          />
+          {/* Some quando há texto: ali fica o "x" nativo do campo de busca. */}
+          {!busca && (
+            <kbd
+              aria-hidden="true"
+              className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded-md border border-line/15 px-1.5 py-0.5 font-sans text-[11px] leading-none text-content-3 md:block"
             >
-              Falar com a Norby
-              <span className="hero-cta__sep" aria-hidden="true" />
-              <NorthStar size={14} />
-            </Button>
-          </div>
+              {TECLA_BUSCA}
+            </kbd>
+          )}
+        </form>
+        <div className="flex items-center gap-2">
+          <ThemeButton />
+          {/* Sem IA no plano, o convite não pode ser a ação principal da tela. */}
+          <Button
+            onClick={() => navigate(iaLiberada ? "/ai" : "/settings?aba=plano")}
+            size="lg"
+            variant={iaLiberada ? "default" : "secondary"}
+          >
+            {iaLiberada ? "Falar com a Norby" : "IA no plano Premium"}
+            {iaLiberada ? <NorthStar size={14} /> : <Lock size={14} aria-hidden="true" />}
+          </Button>
+        </div>
+      </header>
 
-          <HeroRing className="hidden md:block" />
-        </section>
-
-        {/* Saldo total */}
-        <section className="lg:col-span-5 glass p-6 flex flex-col gap-4 animate-fade-up">
-          <div className="relative flex items-center justify-between gap-3">
-            <span className="microlabel">Saldo total</span>
+      {/* ── Linha 1: saldo (4) + KPIs do mês (5) + meta (3) ───────────── */}
+      {/* As linhas só dividem em colunas a partir de xl (1280). Entre 1024 e
+          1279 a área útil tem ~650px: o 4/5/3 quebrava o saldo em duas linhas
+          e cortava o nome das carteiras. Abaixo de xl cada card ocupa a
+          largura toda, como no tablet. */}
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
+        <section
+          aria-labelledby="saldo-titulo"
+          className="xl:col-span-4 panel p-6 flex flex-col gap-5 motion-rise"
+          style={{ "--i": 0 }}
+        >
+          <div className="flex items-center justify-between gap-3">
+            <h2 id="saldo-titulo" className="text-sm font-medium text-content-2">Saldo total</h2>
             {wallets.length > 1 && (
-              <div className="w-48 shrink-0">
+              <div className="w-44 shrink-0">
                 <Select
                   id="wallet-filter"
                   value={selectedWallet}
@@ -276,15 +415,17 @@ export default function Dashboard() {
             )}
           </div>
 
-          <div className="relative">
-            <div className="flex items-baseline gap-2">
-              <Money
-                value={shownBalance}
-                className="tracking-tight text-4xl font-semibold text-content"
-                centsClassName="text-2xl font-semibold text-content-2"
-              />
-              <span className="text-xs font-medium text-content-3">BRL</span>
-            </div>
+          {/* O Score é do premium e mora junto do saldo: os dois respondem
+              "como estou?". No free ele não aparece em lugar nenhum; o convite
+              ao Premium já tem o botão do cabeçalho. */}
+          <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
+          <div>
+            {/* Sem o "BRL" ao lado: o R$ já diz a moeda. */}
+            <Money
+              value={shownBalance}
+              className="block tracking-tight text-4xl font-semibold text-content"
+              centsClassName="text-2xl font-semibold text-content-2"
+            />
             {balanceChange !== undefined && (
               <div className="flex items-center gap-2 mt-2">
                 <span className={balanceChange >= 0 ? "chip-pos" : "chip-neg"}>
@@ -293,76 +434,112 @@ export default function Dashboard() {
                   ) : (
                     <ArrowDownRight size={12} />
                   )}
-                  {Math.abs(balanceChange).toFixed(1)}%
+                  {formatPct(balanceChange)}
                 </span>
                 <span className="text-xs text-content-3">vs. mês passado</span>
               </div>
             )}
           </div>
+          {iaLiberada && insight?.score != null && (
+            <div className="text-right">
+              <p className="text-xs text-content-3">Score financeiro</p>
+              <p className="mt-1 tnum tracking-tight">
+                <span className="text-2xl font-semibold text-content">{Math.round(insight.score)}</span>
+                <span className="text-sm font-medium text-content-3">/100</span>
+              </p>
+            </div>
+          )}
+          </div>
 
-          {/* Duas pílulas tingidas, não um CTA sólido: na referência os dois
-              atalhos têm o mesmo peso e carregam a cor do próprio fluxo. O
-              sólido do painel é só o "Falar com a Norby". */}
-          <div className="relative flex gap-2">
-            <Button
-              onClick={() => newTransaction("INCOME")}
-              variant="ghost"
-              className="flex-1 border-income/25 bg-income/[0.12] text-income hover:bg-income/[0.18] hover:text-income"
-            >
+          {/* Tinta para a ação principal, cinza para a segunda: os dois
+              atalhos continuam lado a lado, mas não disputam atenção. */}
+          <div className="flex gap-2">
+            <Button onClick={() => newTransaction("INCOME")} className="flex-1">
               <Plus size={15} /> Receita
             </Button>
             <Button
               onClick={() => newTransaction("EXPENSE")}
-              variant="ghost"
-              className="flex-1 border-expense/25 bg-expense/[0.10] text-expense hover:bg-expense/[0.16] hover:text-expense"
+              variant="secondary"
+              className="flex-1"
             >
               <Minus size={15} /> Despesa
             </Button>
           </div>
 
-          <div className="relative grid grid-cols-3 divide-x divide-line/[0.08] border-t border-dashed border-line/10 pt-4 mt-auto">
-            <div className="pr-3">
-              <p className="microlabel">Receitas</p>
-              <p className="text-sm font-semibold text-income tnum mt-1">
-                {formatBRL(monthIncome)}
+          {wallets.length > 0 && (
+            <div className="mt-auto pt-4 border-t border-line/[0.08]">
+              <p className="text-xs text-content-3 mb-2.5">
+                Carteiras · {wallets.length}
               </p>
+              <ul className="flex flex-col gap-2">
+                {wallets.slice(0, 3).map((w) => (
+                  <li key={w.id} className="flex items-center gap-2.5 min-w-0">
+                    <WalletMark wallet={w} className="size-7 rounded-lg text-[11px]" />
+                    <span className="flex-1 truncate text-sm text-content-2">{w.name}</span>
+                    <span className="text-sm font-medium text-content tnum">
+                      {formatBRL(w.balance)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             </div>
-            <div className="px-3">
-              <p className="microlabel">Despesas</p>
-              <p className="text-sm font-semibold text-expense tnum mt-1">
-                {formatBRL(monthExpenses)}
-              </p>
-            </div>
-            <div className="pl-3">
-              <p className="microlabel">Score IA</p>
-              <p className="text-sm font-semibold text-accent tnum mt-1">
-                {insight?.score != null ? `${insight.score}/100` : "—"}
-              </p>
-            </div>
-          </div>
+          )}
         </section>
-      </div>
 
-      {/* ── Linha 2: categorias + ritmo + meta ──────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        <CategoryDonut data={categoryData} total={categoryTotal} />
-
-        <RitmoCard ritmo={ritmo} dias={STREAK_DAYS} />
+        {/* KPIs do mês: um tile só leva o acento, é o ponto focal da tela */}
+        <section className="xl:col-span-5 panel p-4 grid grid-cols-2 gap-3 content-start">
+          <h2 className="sr-only">Resumo do mês</h2>
+          {/* A Sobra é o foco: responde "como estou este mês?" de relance. */}
+          <StatTile
+            highlight
+            label="Sobra do mês"
+            className="motion-rise"
+            style={{ "--i": 1 }}
+            value={<Money value={monthNet} centsClassName={TILE_CENTS_ON_ACCENT} />}
+            icon={PiggyBank}
+            delta={netChange}
+          />
+          <StatTile
+            label="Receitas"
+            className="motion-rise"
+            style={{ "--i": 2 }}
+            value={<Money value={monthIncome} centsClassName={TILE_CENTS} />}
+            icon={ArrowDownLeft}
+            delta={incomeChange}
+          />
+          <StatTile
+            label="Despesas"
+            className="motion-rise"
+            style={{ "--i": 3 }}
+            value={<Money value={monthExpenses} centsClassName={TILE_CENTS} />}
+            icon={ArrowUpRight}
+            delta={expenseChange}
+            upIsGood={false}
+          />
+          {/* Gratuito para todos: a Sobra dita em proporção da receita. */}
+          <StatTile
+            label="Taxa de poupança"
+            className="motion-rise"
+            style={{ "--i": 4 }}
+            value={
+              taxaPoupanca === undefined
+                ? "—"
+                : `${taxaPoupanca < 0 ? MENOS : ""}${formatPct(taxaPoupanca, 0)}`
+            }
+            icon={Percent}
+            note={taxaPoupanca === undefined ? "sem receita no mês" : "da receita do mês"}
+          />
+        </section>
 
         {/* Meta em destaque */}
-        <div className="lg:col-span-3 relative overflow-hidden glass border-income/25 p-6 flex flex-col">
-          <div
-            className="absolute inset-0 pointer-events-none"
-            style={{
-              background:
-                "radial-gradient(circle at 15% 90%, rgb(var(--income) / 0.13), transparent 55%)",
-            }}
-          />
-          {featuredGoal ? (
+        <div className="xl:col-span-3 panel p-6 flex flex-col motion-rise" style={{ "--i": 5 }}>
+          {falhas.goals ? (
+            <p className="m-auto py-6 text-xs text-content-3 text-center">Não conseguimos carregar suas metas agora.</p>
+          ) : featuredGoal ? (
             <>
               <div className="relative flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-income/15 flex items-center justify-center shrink-0 text-base">
-                  🎯
+                <div className="w-9 h-9 rounded-xl bg-income/15 flex items-center justify-center shrink-0 text-income">
+                  <Target size={17} aria-hidden="true" />
                 </div>
                 <div className="min-w-0">
                   <h2 className="font-semibold text-content truncate">
@@ -413,8 +590,8 @@ export default function Dashboard() {
           ) : (
             <>
               <div className="relative flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-income/15 flex items-center justify-center shrink-0 text-base">
-                  🎯
+                <div className="w-9 h-9 rounded-xl bg-income/15 flex items-center justify-center shrink-0 text-income">
+                  <Target size={17} aria-hidden="true" />
                 </div>
                 <h2 className="font-semibold text-content">Metas</h2>
               </div>
@@ -424,8 +601,8 @@ export default function Dashboard() {
               </p>
               <Button
                 onClick={() => navigate("/goals")}
-                variant="ghost"
-                className="w-full stroke-iris bg-transparent text-accent font-semibold hover:bg-accent/[0.06]"
+                variant="outline"
+                className="w-full font-semibold"
               >
                 Criar uma meta <ArrowRight size={14} />
               </Button>
@@ -434,9 +611,15 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* ── Linha 2: ritmo (7, largo para caber semanas) + categorias (5) ── */}
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
+        <RitmoCard transactions={streakTx} erro={falhas.ritmo} />
+        <CategoryPie data={categoryData} total={categoryTotal} destaques={destaquesPizza} />
+      </div>
+
       {/* ── Linha 3: fluxo de caixa + leitura da IA ─────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        <div className="lg:col-span-8 glass p-6">
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
+        <div className="xl:col-span-8 panel p-6">
           <div className="flex items-start justify-between mb-4">
             <div>
               <h2 className="font-semibold text-content">Fluxo de caixa</h2>
@@ -485,6 +668,13 @@ export default function Dashboard() {
                   stroke="rgb(var(--grid-line) / 0.08)"
                   vertical={false}
                 />
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  tick={axisTick}
+                  tickFormatter={reaisCompacto}
+                  width={64}
+                />
                 <XAxis
                   dataKey="month"
                   axisLine={false}
@@ -520,65 +710,13 @@ export default function Dashboard() {
           )}
         </div>
 
-        <InsightCard insight={insight} />
+        <InsightCard insight={insight} bloqueada={!iaLiberada} />
       </div>
 
-      {/* ── Linha 4: gastos por categoria + movimentações recentes ──── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        {/* Gastos por categoria (barras) */}
-        <div className="lg:col-span-6 glass p-6">
-          <div className="flex items-center justify-between mb-5">
-            <h2 className="font-semibold text-content">
-              Gastos por categoria
-            </h2>
-            <span className="text-xs text-content-3">
-              {monthYearLabel}
-            </span>
-          </div>
-
-          {categoryData.length === 0 ? (
-            <div className="flex items-center justify-center h-[150px] text-content-3 text-xs text-center px-4">
-              Registre despesas para ver o ranking de categorias
-            </div>
-          ) : (
-            <div className="flex flex-col gap-4">
-              {categoryData.map((c, i) => {
-                const width = Math.max(6, (c.value / categoryMax) * 92);
-                const barOpacity = [1, 0.55, 0.45, 0.4, 0.35][i] ?? 0.3;
-                return (
-                  <div key={c.name}>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-[13px] text-content-2">
-                        {c.name}
-                      </span>
-                      <span
-                        className={`text-[13px] tnum ${
-                          i === 0
-                            ? "font-semibold text-accent"
-                            : "font-medium text-content-2"
-                        }`}
-                      >
-                        {formatBRL(c.value)}
-                      </span>
-                    </div>
-                    <div className="h-2 rounded-full bg-line/[0.06] overflow-hidden">
-                      <div
-                        className="h-full rounded-full"
-                        style={{
-                          width: `${width}%`,
-                          background: `rgb(var(--accent) / ${barOpacity})`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
+      {/* ── Linha 4: movimentações recentes ──────────────────────────── */}
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
         {/* Movimentações recentes */}
-        <div className="lg:col-span-6 glass p-6 flex flex-col">
+        <div className="xl:col-span-12 panel p-6 flex flex-col">
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-semibold text-content">
               Movimentações recentes
@@ -594,7 +732,11 @@ export default function Dashboard() {
           </div>
 
           <div className="flex flex-col flex-1">
-            {transactions.length === 0 ? (
+            {falhas.tx ? (
+              <p className="m-auto py-6 text-xs text-content-3 text-center">
+                Não conseguimos carregar as movimentações agora.
+              </p>
+            ) : transactions.length === 0 ? (
               <div className="flex-1 flex items-center justify-center text-content-3 text-xs text-center py-8">
                 Nenhuma movimentação ainda — use “+ Receita” ou “− Despesa”
                 para começar
@@ -608,8 +750,8 @@ export default function Dashboard() {
                     className="flex items-center justify-between py-2.5 border-b border-line/5 last:border-0"
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-9 h-9 rounded-[10px] bg-surface-inset flex items-center justify-center shrink-0 text-base">
-                        {emojiForCategory(t.category, t.type)}
+                      <div className="w-9 h-9 rounded-[10px] bg-surface-inset flex items-center justify-center shrink-0 text-content-2">
+                        <CategoryIcon category={t.category} type={t.type} />
                       </div>
                       <div className="min-w-0">
                         <p className="text-[13px] font-medium text-content truncate">
@@ -628,7 +770,7 @@ export default function Dashboard() {
                           : "font-medium text-content-2"
                       }`}
                     >
-                      {isIncome ? "+" : "−"} {formatBRL(parseFloat(t.amount))}
+                      {formatSinal(t.amount, isIncome)}
                     </p>
                   </div>
                 );

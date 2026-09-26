@@ -1,37 +1,64 @@
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Flame } from "lucide-react";
 import { formatBRL, formatDateBR } from "@/lib/utils";
-import { headroom } from "@/lib/ritmo";
+import { computeRitmo, heatGrid, heatLevel, weeksThatFit, windowDays } from "@/lib/ritmo";
 
 // Intensidade do heatmap: escala sequencial própria (--heat-*), nunca a paleta
-// categórica do donut — reusá-la aqui faria o painel parecer que codifica
-// categoria, quando codifica intensidade. 4 = folga total, 2 = raspou a cota,
-// over = estourou, 0 = dia sem lançamento. Nota: o nível 1 nunca é produzido,
-// por isso a legenda pinta [0, 2, 3, 4].
-function heatLevel(cell, dailyPace) {
-  if (!cell.active) return 0;
-  if (!cell.onPace) return "over";
-  const folga = headroom(cell, dailyPace);
-  if (folga > 0.66) return 4;
-  if (folga > 0.33) return 3;
-  return 2;
-}
-
+// categórica da pizza — reusá-la aqui faria o painel parecer que codifica
+// categoria, quando codifica intensidade. Regra dos níveis em lib/ritmo.js.
 const heatColor = (level) =>
   level === "over" ? "rgb(var(--heat-over))" : `rgb(var(--heat-${level}))`;
 
-const heatGlow = (level) =>
-  level === "over" || level >= 3
-    ? { boxShadow: `0 0 12px -2px ${heatColor(level)}` }
-    : undefined;
+// Rótulo só em seg/qua/sex, como no GitHub: sete rótulos empilhados viram ruído.
+const DIAS = ["", "Seg", "", "Qua", "", "Sex", ""];
+
+// Quantos lançamentos o dashboard busca para o painel: meio ano.
+export const RITMO_MAX_WEEKS = 26;
+
+// Quadrado de ~30px, o tamanho dos 14x3 de antes. A grade cresce em semanas até
+// preencher a largura; a célula nunca estica.
+const FIT = { cell: 30, gap: 4, label: 30, min: 4, max: RITMO_MAX_WEEKS };
 
 /**
  * Painel "Ritmo financeiro": dias dentro da cota diária, com streak como bônus.
  *
- * @param {ReturnType<import("@/lib/ritmo").computeRitmo>} ritmo
- * @param {number} dias  tamanho da janela (só para os rótulos)
+ * A cota, a sequência e o status de cada dia saem SEMPRE da janela inteira
+ * (RITMO_MAX_WEEKS). A largura só decide quantas semanas aparecem. Antes a
+ * largura entrava no cálculo, e o mesmo dia estourava no desktop e ficava no
+ * ritmo no celular: número que muda com a tela não é número em que se confia.
+ *
+ * @param {Array} transactions  lançamentos das últimas RITMO_MAX_WEEKS semanas
  */
-export default function RitmoCard({ ritmo, dias }) {
+export default function RitmoCard({ transactions, erro = false }) {
+  const gridRef = useRef(null);
+  const [semanas, setSemanas] = useState(6);
+
+  // Layout effect: mede ANTES da pintura. Com useEffect o primeiro quadro saía
+  // com 6 colunas esticadas no card largo, e os quadrados piscavam gigantes.
+  useLayoutEffect(() => {
+    const el = gridRef.current;
+    if (!el) return undefined;
+    setSemanas(weeksThatFit(el.clientWidth, FIT));
+    if (typeof ResizeObserver === "undefined") return undefined;
+    const ro = new ResizeObserver(([entry]) =>
+      setSemanas(weeksThatFit(entry.contentRect.width, FIT)),
+    );
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [erro]);
+
+  const ritmo = useMemo(
+    () => computeRitmo(transactions, windowDays(RITMO_MAX_WEEKS), new Date()),
+    [transactions],
+  );
+  const dias = Math.min(windowDays(semanas), ritmo.cells.length);
+  const visiveis = ritmo.cells.slice(-dias);
+  const noRitmo = visiveis.filter((c) => c.onPace).length;
+  const { weeks, months } = heatGrid(visiveis);
+  const hoje = ritmo.cells.at(-1)?.key;
+
   return (
-    <div className="lg:col-span-5 glass p-6 flex flex-col">
+    <div className="xl:col-span-7 panel p-6 flex flex-col">
       <div className="flex items-start justify-between gap-2">
         <div>
           <h2 className="font-semibold text-content">Ritmo financeiro</h2>
@@ -40,61 +67,118 @@ export default function RitmoCard({ ritmo, dias }) {
               ? "Registre lançamentos para acompanhar seu ritmo"
               : !ritmo.hasPace
                 ? "Registre uma receita para calcular seu ritmo"
-                : `${ritmo.onPaceCount} dos últimos ${dias} dias no seu ritmo`}
+                : `${noRitmo} dos últimos ${dias} dias no seu ritmo`}
           </p>
         </div>
         {/* Só a partir de 3 dias: sequência curta vira cobrança, não prêmio */}
         {ritmo.hasPace && ritmo.streak >= 3 && (
-          <span className="chip bg-accent/15 text-accent">🔥 {ritmo.streak}</span>
+          <span className="chip bg-accent/15 text-accent">
+            <Flame size={12} aria-hidden="true" /> {ritmo.streak} dias seguidos
+          </span>
         )}
       </div>
 
-      {/* role=img + resumo: o `title` de cada célula é invisível para teclado e
-          ignorado por boa parte dos leitores de tela, então o painel inteiro só
-          existia para quem usa mouse e enxerga. */}
-      <div
-        role="img"
-        aria-label={
-          ritmo.hasPace
-            ? `${ritmo.onPaceCount} dos últimos ${dias} dias dentro do seu ritmo de gasto diário`
-            : `Sem ritmo calculado nos últimos ${dias} dias`
-        }
-        className="grid gap-1 mt-4"
-        style={{ gridTemplateColumns: "repeat(14, minmax(0, 1fr))" }}
-      >
-        {ritmo.cells.map((cell, i) => {
-          const level = heatLevel(cell, ritmo.dailyPace);
-          return (
-            <div
-              key={cell.key}
-              title={`${formatDateBR(cell.key)} · ${
-                cell.active
-                  ? `${formatBRL(cell.spent)} de ${formatBRL(ritmo.dailyPace)}`
-                  : "sem lançamentos"
-              }`}
-              style={{ backgroundColor: heatColor(level), ...heatGlow(level) }}
-              className={`heat-cell ${
-                i === ritmo.cells.length - 1
-                  ? "ring-1 ring-accent ring-offset-1 ring-offset-surface"
-                  : ""
-              }`}
-            />
-          );
-        })}
-      </div>
-
-      <div className="flex items-center justify-between mt-auto pt-4">
-        <span className="text-[11px] text-content-3">Últimos {dias} dias</span>
-        <span className="flex items-center gap-1 text-[11px] text-content-3">
-          Menos
-          {[0, 2, 3, 4].map((level) => (
+      {erro ? (
+        <p className="m-auto py-10 text-xs text-content-3 text-center">
+          Não conseguimos carregar todos os seus lançamentos, então o ritmo
+          ficaria errado. Recarregue a página para tentar de novo.
+        </p>
+      ) : (
+        <>
+        {/* role=img + resumo: o `title` de cada célula é invisível para teclado e
+            ignorado por boa parte dos leitores de tela, então o painel inteiro só
+            existia para quem usa mouse e enxerga. */}
+        <div
+          ref={gridRef}
+          role="img"
+          aria-label={
+            ritmo.hasPace
+              ? `${noRitmo} dos últimos ${dias} dias dentro do seu ritmo de gasto diário`
+              : `Sem ritmo calculado nos últimos ${dias} dias`
+          }
+          // Uma grade só, coluna a coluna: rótulo dos dias + uma coluna por
+          // semana. Como o número de semanas vem da largura, o 1fr de cada
+          // coluna fica perto dos 30px e a célula sai quadrada.
+          className="grid grid-flow-col gap-1 mt-4"
+          style={{
+            gridTemplateRows: "auto repeat(7, auto)",
+            gridTemplateColumns: `auto repeat(${weeks.length}, minmax(0, 1fr))`,
+          }}
+        >
+          <span />
+          {DIAS.map((dia, i) => (
             <span
-              key={level}
-              className="heat-cell w-2.5 h-2.5 shrink-0"
-              style={{ backgroundColor: heatColor(level) }}
-            />
+              key={i}
+              className="self-center pr-1.5 text-[11px] leading-none text-content-3"
+            >
+              {dia}
+            </span>
           ))}
-          Mais
+
+          {weeks.map((week, c) => [
+            <span
+              key={`mes-${c}`}
+              className="pb-0.5 text-[11px] leading-4 text-content-3 whitespace-nowrap"
+            >
+              {months[c]}
+            </span>,
+            // Sempre 7 casas por coluna, mesmo na última semana (que termina em
+            // hoje): o fluxo por coluna depende disso para alinhar as linhas.
+            ...Array.from({ length: 7 }, (_, r) => {
+              const cell = week[r];
+              return cell ? (
+                <div
+                  key={cell.key}
+                  title={`${formatDateBR(cell.key)} · ${
+                    cell.active
+                      ? `${formatBRL(cell.spent)} de ${formatBRL(ritmo.dailyPace)}`
+                      : "sem lançamentos"
+                  }`}
+                  style={{ backgroundColor: heatColor(heatLevel(cell, ritmo.dailyPace)) }}
+                  className={`heat-cell w-full aspect-square ${
+                    cell.key === hoje
+                      ? "ring-1 ring-accent ring-offset-1 ring-offset-surface"
+                      : ""
+                  }`}
+                />
+              ) : (
+                <div key={`vazio-${c}-${r}`} />
+              );
+            }),
+          ])}
+        </div>
+        </>
+      )}
+
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 mt-auto pt-4 text-xs text-content-3">
+        {/* A cota é o que dá sentido a "no ritmo": dita em número, com a
+            regra no hover. */}
+        <span
+          title="Dia no ritmo é o dia em que você gastou até a cota. A cota é a sua receita dos últimos seis meses dividida pelos dias."
+        >
+          {ritmo.hasPace ? `Cota de ${formatBRL(ritmo.dailyPace)} por dia` : `Últimos ${dias} dias`}
+        </span>
+        {/* Cada cor dita pelo que é: sem lançamento, folga crescente, estouro. */}
+        <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span className="flex items-center gap-1.5">
+            <span className="heat-cell size-2.5 shrink-0" style={{ backgroundColor: heatColor(1) }} />
+            Sem lançamento
+          </span>
+          <span className="flex items-center gap-1">
+            Folga: pouca
+            {[2, 3, 4].map((level) => (
+              <span
+                key={level}
+                className="heat-cell size-2.5 shrink-0"
+                style={{ backgroundColor: heatColor(level) }}
+              />
+            ))}
+            muita
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="heat-cell size-2.5 shrink-0" style={{ backgroundColor: heatColor("over") }} />
+            Estourou
+          </span>
         </span>
       </div>
     </div>

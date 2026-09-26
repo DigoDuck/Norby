@@ -1,3 +1,5 @@
+import nubankLogo from "@/assets/banks/nubank.svg";
+import itauLogo from "@/assets/banks/itau.svg";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 
@@ -54,29 +56,26 @@ describe("Wallets", () => {
     expect(walletsApi.create).not.toHaveBeenCalled();
   });
 
-  it("mostra a marca do banco no chip, e a inicial quando não há banco", async () => {
+  it("mostra o logo do banco, e a inicial quando não há banco", async () => {
     walletsApi.list.mockResolvedValue({
       data: [
         { id: "1", name: "Conta principal", balance: "10.00", bank: "nubank" },
         { id: "2", name: "Poupança", balance: "20.00", bank: null },
       ],
     });
-    render(<Wallets />);
+    const { container } = render(<Wallets />);
 
-    // Com banco, a marca vence o nome: "Conta principal" mostraria "C".
-    expect(await screen.findByText("Nu")).toBeInTheDocument();
+    // Com banco, o logo vence o nome: "Conta principal" mostraria "C".
+    await screen.findByText("Poupança");
+    const logos = [...container.querySelectorAll("img")];
+    expect(logos).toHaveLength(1);
+    expect(logos[0].getAttribute("src")).toBe(nubankLogo);
     // Sem banco, nada muda em relação ao que já existia.
     expect(screen.getByText("P")).toBeInTheDocument();
   });
 
-  it("agrupa a cor pelo banco, não pelo nome", async () => {
-    // Duas carteiras do mesmo banco com nomes DIFERENTES têm de ficar com o
-    // mesmo chip. É esse o ganho de escolher um banco: reconhecer de relance.
-    //
-    // Não se afirma aqui que bancos diferentes têm cores diferentes, e a
-    // primeira versão deste teste afirmava: são 11 bancos para 9 cores na
-    // paleta, então colisão é garantida por casa dos pombos. A cor agrupa,
-    // não identifica — quem identifica é a marca de duas letras.
+  it("carteiras do mesmo banco mostram o mesmo logo, com nomes diferentes", async () => {
+    // É esse o ganho de escolher um banco: reconhecer de relance.
     walletsApi.list.mockResolvedValue({
       data: [
         { id: "1", name: "Conta principal", balance: "1.00", bank: "itau" },
@@ -84,13 +83,12 @@ describe("Wallets", () => {
       ],
     });
     const { container } = render(<Wallets />);
-    await screen.findAllByText("It");
+    await screen.findByText("Reserva de emergência");
 
-    const cores = [...container.querySelectorAll("[style*='color-mix']")].map(
-      (el) => el.style.color,
-    );
-    expect(cores).toHaveLength(2);
-    expect(cores[0]).toBe(cores[1]);
+    const srcs = [...container.querySelectorAll("img")].map((img) => img.getAttribute("src"));
+    expect(srcs).toHaveLength(2);
+    expect(srcs[0]).toBe(itauLogo);
+    expect(srcs[0]).toBe(srcs[1]);
   });
 
   it("omite `bank` quando nenhum banco foi escolhido", async () => {

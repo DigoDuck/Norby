@@ -8,11 +8,15 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-accent-fill/90 [a]:hover:bg-accent-fill/90",
+        // Ação principal em tinta (preto no claro, branco no escuro): o azul fica
+        // para seleção, links e o destaque do dashboard.
+        default: "bg-content text-bg-base hover:bg-content/85 [a]:hover:bg-content/85",
         outline:
-          "border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground",
+          "border-line/15 bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground",
         secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80 aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
+          // Borda própria: o fundo inset sozinho some sobre painel e tile, e o
+          // botão lia como texto solto (ou desabilitado, no tema claro).
+          "border-line/15 bg-secondary text-secondary-foreground hover:bg-state/[0.08] aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
         ghost:
           "hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground",
         destructive:

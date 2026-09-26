@@ -1,190 +1,391 @@
-# Design — Norby "Vidro Iridescente"
+---
+name: Norby
+description: Organizador financeiro pessoal com IA. Seu norte financeiro.
+colors:
+  bg-base: "#09090B"
+  surface: "#111113"
+  surface-inset: "#18181B"
+  content: "#F4F4F5"
+  content-2: "#A1A1AA"
+  content-3: "#8E8E98"
+  accent-text: "#4581FF"
+  sapphire-fill: "#234AFE"
+  focus: "#68A5FF"
+  income: "#0DD986"
+  expense: "#FF5260"
+  danger-fill: "#DC2626"
+  warning: "#FB923C"
+  pie-1: "#68A5FF"
+  pie-2: "#4581FF"
+  pie-3: "#2356FF"
+  pie-4: "#1938D7"
+  pie-5: "#14279E"
+  pie-rest: "#71717A"
+  heat-idle: "#1F1F22"
+  heat-empty: "#18203A"
+  heat-low: "#1938D7"
+  heat-mid: "#306BFE"
+  heat-high: "#68A5FF"
+  bg-base-light: "#F0F0F2"
+  surface-light: "#FFFFFF"
+  surface-inset-light: "#F5F5F6"
+  content-light: "#09090B"
+  content-2-light: "#52525B"
+  content-3-light: "#686870"
+  accent-text-light: "#2356FF"
+  income-light: "#03663C"
+  expense-light: "#BB061E"
+  danger-fill-light: "#BB061E"
+typography:
+  page-title:
+    fontFamily: "Geist Variable, system-ui, sans-serif"
+    fontSize: "1.875rem"
+    fontWeight: 700
+    letterSpacing: "-0.025em"
+  figure-hero:
+    fontFamily: "Geist Variable, system-ui, sans-serif"
+    fontSize: "2.25rem"
+    fontWeight: 600
+    letterSpacing: "-0.025em"
+    fontFeature: "tnum"
+  figure-tile:
+    fontFamily: "Geist Variable, system-ui, sans-serif"
+    fontSize: "1.5rem"
+    fontWeight: 600
+    fontFeature: "tnum"
+  card-title:
+    fontFamily: "Geist Variable, system-ui, sans-serif"
+    fontSize: "1rem"
+    fontWeight: 600
+  body:
+    fontFamily: "Geist Variable, system-ui, sans-serif"
+    fontSize: "0.875rem"
+    fontWeight: 400
+    lineHeight: 1.5
+  meta:
+    fontFamily: "Geist Variable, system-ui, sans-serif"
+    fontSize: "0.75rem"
+    fontWeight: 400
+  label:
+    fontFamily: "Geist Variable, system-ui, sans-serif"
+    fontSize: "0.6875rem"
+    fontWeight: 500
+    letterSpacing: "0.1em"
+rounded:
+  cell: "4px"
+  control: "12px"
+  tile: "16px"
+  panel: "20px"
+  pill: "9999px"
+spacing:
+  tile: "16px"
+  panel: "24px"
+  grid: "16px"
+components:
+  button-primary:
+    backgroundColor: "{colors.content}"
+    textColor: "{colors.bg-base}"
+    rounded: "{rounded.pill}"
+    height: "36px"
+    padding: "0 16px"
+  button-secondary:
+    backgroundColor: "{colors.surface-inset}"
+    textColor: "{colors.content}"
+    rounded: "{rounded.pill}"
+    height: "36px"
+    padding: "0 16px"
+  button-destructive:
+    backgroundColor: "{colors.danger-fill}"
+    textColor: "#FFFFFF"
+    rounded: "{rounded.pill}"
+    height: "36px"
+  panel:
+    backgroundColor: "{colors.surface}"
+    rounded: "{rounded.panel}"
+    padding: "{spacing.panel}"
+  kpi-tile:
+    backgroundColor: "{colors.surface-inset}"
+    textColor: "{colors.content}"
+    rounded: "{rounded.tile}"
+    padding: "{spacing.tile}"
+  kpi-tile-focus:
+    backgroundColor: "{colors.sapphire-fill}"
+    textColor: "#FFFFFF"
+    rounded: "{rounded.tile}"
+    padding: "{spacing.tile}"
+  input:
+    backgroundColor: "{colors.surface-inset}"
+    textColor: "{colors.content}"
+    rounded: "{rounded.control}"
+    height: "40px"
+  chip:
+    rounded: "{rounded.pill}"
+    padding: "2px 8px"
+  segmented-active:
+    backgroundColor: "{colors.content}"
+    textColor: "{colors.bg-base}"
+    rounded: "{rounded.pill}"
+    height: "32px"
+    padding: "0 12px"
+  search-input:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.content}"
+    rounded: "{rounded.pill}"
+    height: "40px"
+---
 
-Dois temas, escuro e claro, com paridade total: nenhum recurso existe só num
-deles. O escuro é o padrão. Cena física: painel de instrumentos sob vidro — o
-conteúdo flutua sobre uma atmosfera fria, e o brilho é ambiente, nunca dado.
+# Design System: Norby
 
-## Color
+## 1. Overview: A Bússola de Safira
 
-Não há hex solto em componente. Toda cor sai de um token, e os valores vieram
-de amostragem por região dos PNGs de referência (`design-references/`).
+**Creative North Star: "A Bússola de Safira"**
 
-Duas camadas de token, com propósitos diferentes:
+Uma bússola é uma ferramenta sólida, de leitura instantânea, com um único ponto de
+cor que aponta o rumo. É isso que o Norby é: superfícies opacas e quietas, números
+em tinta e cinza, e **um** foco em safira por tela dizendo onde olhar primeiro. A
+cena física é a de quem confere o mês à noite, no desktop, sob luz baixa, e quer
+acreditar no número em um segundo. Por isso o escuro é o padrão (preto neutro, não
+azulado) e o claro é escolha do usuário, com paridade total entre os dois.
 
-**1. Cor, em canais RGB** — declarada em `src/index.css` e exposta ao Tailwind
-por `rgb(var(--x) / <alpha-value>)`, de modo que `bg-surface/70` continua
-funcionando. É o que o `tailwind.config.js` mapeia.
+O sistema **rejeita** o que o Norby já foi: o vidro com blur, o brilho em volta das
+coisas, o gradiente iridescente, o anel 3D e o neon (cor clara e saturada ao mesmo
+tempo). Também rejeita o dashboard-template de SaaS, o arco-íris de categorias e o
+emoji como ícone. A referência vigente é o dashboard **Finexy** (enviada pelo dono em
+2026-09-25): saudação como cabeçalho, KPIs em blocos com um só preenchido na cor de
+destaque, ação principal em tinta, três degraus de superfície. O laranja dela **não**
+veio junto: o destaque do Norby é safira. O vão do cabeçalho do Dashboard leva
+ferramentas (busca de lançamentos, troca de tema), nunca um número que já mora num KPI.
 
-| Token | Papel |
-|---|---|
-| `--bg-base` | Fundo da página (azul-preto no escuro, quase branco no claro) |
-| `--surface` / `--surface-inset` | Superfície sólida e bloco interno de card |
-| `--content` / `-2` / `-3` | Texto principal, secundário, microlabel |
-| `--line` | Bordas e divisórias — sempre com alpha (`border-line/10`) |
-| `--accent` | Texto interativo: links, valores, ícone de ação |
-| `--accent-fill` / `--accent-contrast` | Preenchimento de CTA e texto sobre ele |
-| `--focus` / `--focus-offset` | Anel de foco e o respiro entre ele e o elemento |
-| `--income` / `--expense` / `--danger` / `--warning` | Semânticos |
-| `--chart-1..9` | Paleta categórica, exclusiva de data-viz |
-| `--heat-0..4`, `--heat-over` | Escala sequencial do Ritmo financeiro |
-| `--grid-line` / `--axis` | Malha e eixos de gráfico |
+Mecânica de tema, inalterada: `data-theme="dark" | "light"` no `<html>` é a única
+fonte de verdade; um script inline no `index.html` evita o flash; a escolha vive em
+`localStorage` (`norby-theme`, falha cai em `dark`); `lib/theme.js` é o único ponto
+de leitura e escrita; o tema do sistema não é consultado. A troca rápida é o botão de
+sol e lua no topo do Dashboard (`ThemeButton`); a escolha com prévia fica em
+Configurações > Aparência (`ThemeToggle`). Os tokens de cor são canais
+RGB em `src/index.css`, expostos ao Tailwind como `rgb(var(--x) / <alpha-value>)`,
+então `bg-surface/70` funciona. Layout: shell com sidebar de 16rem que vira gaveta
+abaixo de `lg`; o dashboard só divide em 12 colunas a partir de `xl` (1280px), com `gap`
+de 16px. Abaixo disso cada card ocupa a largura toda: entre 1024 e 1279px a divisão
+4/5/3 quebrava o saldo e cortava o nome das carteiras. Card que muda de arranjo pela
+própria largura usa container query, não breakpoint de tela (a pizza).
 
-**2. Composição** — carregam alpha, blur e gradiente próprios, então ficam
-fora do Tailwind: `--glass-bg`, `--glass-border`, `--glass-blur`,
-`--shadow-card`, `--inner-highlight`, `--mesh`, `--glow-accent`.
+**Key Characteristics:**
+- Superfície opaca em três degraus: página, painel, bloco interno.
+- Um único preenchimento safira por tela; ação principal em tinta.
+- Números em Geist com algarismos tabulares, centavos um degrau menores.
+- Ícones Lucide de traço, nunca emoji.
+- Nenhum número inventado: carregando é esqueleto, falha é aviso com "Tentar de novo".
+- Movimento curto e com função: fade a cada rota, KPIs entrando em sequência, campos
+  do login abrindo e fechando. `prefers-reduced-motion` zera tudo.
 
-**3. Iridescência** — `--iris-1` a `--iris-4` são canais, e não um gradiente
-pronto, porque a cáustica do herói precisa dos stops soltos com alpha próprio.
-Deles derivam `--iris` (a moldura) e `--iris-glow`. O `--iris-brand` é fixo nos
-dois temas — ver Signature.
+## 2. Colors: Tinta, Cinza e um Ponto de Safira
 
-Regras:
+Paleta restrita: neutros sem tinta carregam a tela, e a cor aparece só onde tem
+função (foco, seleção, sinal financeiro, dado).
 
-- Os espectros funcionais **diferem entre os temas**, não são o mesmo valor
-  invertido: o ciano de receita é `#22D3EE` no escuro e `#0C6680` no claro,
-  porque o claro precisa de valor escuro para passar contraste.
-- O vidro do escuro **esfria** a superfície (branco azulado a 4,5%), não só
-  clareia. O do claro é branco a 72% com blur maior.
-- `--accent` é azure e vive no texto; o índigo aparece apenas em `--accent-fill`.
-- Paleta categórica ≠ escala sequencial. Reusar a do donut no heatmap faria o
-  painel parecer que codifica categoria quando codifica intensidade.
-- Cada categoria de despesa tem cor própria: são 9 em `lib/categories.js` e há
-  9 tokens de gráfico. Menos que isso e duas fatias do mesmo donut saem iguais.
+### Primary
+- **Safira Royal** (sapphire-fill, #234AFE): o preenchimento de destaque, no limite
+  do sRGB. Aparece no tile focal do dashboard (Sobra do mês), no filtro selecionado e
+  em barras de progresso. Texto branco sobre ele mede 6,0:1. Igual nos dois temas.
+- **Safira de Texto** (accent-text, #4581FF no escuro / #2356FF no claro): links,
+  valores clicáveis, ícone de item ativo, estrela da IA. 5,2:1 sobre o painel escuro,
+  5,5:1 sobre branco.
 
-## Theming
+### Neutral
+- **Preto de Bússola** (bg-base, #09090B / claro #F0F0F2): a página. Quase preto,
+  nunca #000: preto absoluto com texto branco borra em OLED e apaga a borda do card.
+- **Painel** (surface, #111113 / claro #FFFFFF): cards e sidebar.
+- **Bloco Interno** (surface-inset, #18181B / claro #F5F5F6): tiles de KPI, campos,
+  bolhas do chat, botão secundário.
+- **Tinta** (content, #F4F4F5 / claro #09090B): texto principal e o fundo do botão
+  primário.
+- **Cinza de Apoio** (content-2, #A1A1AA / claro #52525B): texto secundário.
+- **Cinza de Rodapé** (content-3, #8E8E98 / claro #686870): meta e rótulos de 11px;
+  passa 4,5:1 inclusive sobre o bloco interno.
+- **Borda**: `--line` sempre com alpha (`border-line/10`); o card usa
+  `--panel-border` (branco a 8% no escuro, tinta a 9% no claro).
 
-`data-theme="dark" | "light"` no `<html>` é a **única** fonte de verdade. Não
-há store, contexto nem classe paralela.
+### Semantic
+- **Receita** (income, #0DD986 / claro #03663C) e **Despesa** (expense, #FF5260 /
+  claro #BB061E): valores e chips de variação, sempre com sinal ou seta. Na tabela do
+  Extrato a despesa fica em tinta; só a entrada é verde.
+- **Vermelho de Ação** (danger-fill, #DC2626 / claro #BB061E): preenchimento de botão
+  destrutivo, com 4,8:1 sob texto branco. `--danger` continua sendo o de texto.
 
-- Um script inline no `index.html` roda antes do bundle e evita o flash.
-- Persistência em `localStorage` (`norby-theme`); qualquer falha cai em `dark`.
-- O tema do sistema **não** é consultado: a escolha é do usuário, explícita.
-- Tailwind: `darkMode: ["selector", '[data-theme="dark"]']`.
-- `lib/theme.js` é o único ponto de leitura/escrita.
+### Data
+- **Degraus de Safira** (pie-1 a pie-5): a pizza pinta por posição, maior fatia
+  primeiro (a mais clara no escuro, a mais escura no claro); "Demais categorias" fica
+  em cinza (pie-rest). Quem diz a categoria é a legenda, sempre visível.
+- **Rampa do Ritmo** (heat-idle a heat-high, estouro em expense): sequencial em
+  safira. O dia sem lançamento (heat-empty) fica quase na cor do fundo, como a casa
+  vazia do GitHub; heat-idle só aparece quando não há cota.
+- **Paleta categórica** (`--chart-1..9`): hoje só colore o chip da carteira sem banco.
 
-## Typography
+### Named Rules
+**The One Sapphire Rule.** O preenchimento safira aparece em um lugar por tela. Se
+dois elementos disputam o azul cheio, um deles está errado.
 
-- **Geist Variable** (`@fontsource-variable/geist`), família única.
-- Escala fixa em rem, ratio ~1.2: `text-[11px]` microlabel uppercase
-  `tracking-widest` · `text-xs` meta · `text-sm` corpo de UI · `text-base`
-  prosa · `text-xl` título de card · `text-3xl` título de página · `text-4xl`
-  valor-herói.
-- Monetário e tabela: `font-variant-numeric: tabular-nums` (`.tnum`),
-  `tracking-tight` em valores grandes.
-- Hierarquia de microlabel vem de tamanho, caixa e tracking — não de apagar a
-  cor até reprovar contraste.
+**The Ink Action Rule.** Ação principal é tinta (preto no claro, branco no escuro),
+nunca azul. Azul em botão significa seleção, não "clique aqui".
 
-## Signature
+**The No Invented Number Rule.** Valor desconhecido nunca vira R$ 0,00: esqueleto
+enquanto carrega, aviso com "Tentar de novo" quando falha.
 
-**A estrela-norte de 4 pontas** (path do monograma em `shared/Logo.jsx`) marca
-posição: item ativo da sidebar, presença da IA, loading. O monograma é
-intocável: nenhum path ou stroke muda.
+## 3. Typography
 
-**O tile da marca** (`.brand-tile`) carrega o monograma sobre o gradiente
-iridescente. Ele **não segue o tema**: a referência mostra os mesmos stops
-saturados nos dois, e sobre os stops claros do tema light o monograma branco cai
-para 1,45:1. Superfície acompanha o tema, marca é constante. A variante redonda
-(`.brand-tile-round`) com a estrela no centro é a presença da IA.
+**Fonte única:** Geist Variable (`@fontsource-variable/geist`), com system-ui de reserva.
 
-**O anel** é **um só**: `shared/HeroRing.jsx`, o toro renderizado em
-`assets/brand/`, usado no herói do dashboard e no login. Não existe segundo
-anel. O `conic-gradient` em CSS que ocupava esse papel foi removido — ao lado do
-asset ele lia como um círculo chapado, desenhado em outra perspectiva.
+**Character:** uma sans técnica e neutra que carrega título, rótulo e número. A
+hierarquia vem de tamanho e peso, não de uma segunda família.
 
-A cáustica que acompanha o toro deriva dos stops `--iris-*`; nenhum deles é cor
-semântica, e nenhum pode virar sinal de receita, despesa ou alerta.
+### Hierarchy
+- **Título de página** (700, 30px, tracking -0.025em): "Boa noite, Diogo", "Extrato".
+- **Número herói** (600, 36px, tabular): o saldo total. Centavos em 24px, cinza.
+- **Número de tile** (600, 24px, 20px abaixo de `sm`, tabular): KPIs; quebra linha
+  em vez de truncar.
+- **Título de card** (600, 16px): "Ritmo financeiro", "Onde vai seu dinheiro".
+- **Corpo de UI** (400, 14px, 1.5): texto de interface e formulários.
+- **Meta** (400, 12px): subtítulos, datas, legendas.
+- **Rótulo** (500, 11px, tracking 0.1em, caixa alta): cabeçalho de tabela e rótulos
+  pontuais de dado (Metas, Admin, grupos do chat). Nunca como sobretítulo de seção.
 
-## Components
+### Named Rules
+**The Tabular Money Rule.** Todo valor monetário usa `tabular-nums` e passa por
+`formatBRL`/`formatSinal`: sinal de menos tipográfico (U+2212) antes do R$, "+R$" /
+"−R$" em lançamentos, percentual com vírgula via `formatPct`.
 
-- **Card:** `.glass` — o **único** lugar com `backdrop-filter`. Blocos internos
-  usam `.inset-panel`, superfície sólida: blur empilhado derruba o frame rate no
-  mobile e não muda nada aos olhos no segundo nível.
-- **Profundidade:** todo controle que precisa ler como objeto usa as mesmas três
-  camadas — `--elev-1` (sombra embaixo), `--rim` (luz na aresta superior) e uma
-  borda fina. A sombra é **tingida**, nunca cinza: na referência ela mede
-  204 216 248 sobre uma página em 252 252 252, porque é a luz da cena que a
-  colore. `--shadow-card` continua sendo só do card; controle dentro de card usa
-  `--elev-1` e o card não ganha nada a mais, senão vira borrão.
-- **Preenchimento de ação:** `--action-primary-fill` — gradiente que atravessa o
-  matiz (azul → índigo → violeta), rim no topo, glow tingido embaixo.
-  Iridescência aqui é **matiz, não claridade**: a referência clareia as pontas e
-  com isso o texto branco dela cai para 2,33:1; o nosso mede 4,75:1 no pixel
-  renderizado, sob o rótulo. Fixo nos dois temas, como o tile da marca.
-  Tem **dois** consumidores, e os dois são sancionados pelo princípio 2 do
-  PRODUCT.md (o azure marca ação primária **e seleção**): `.hero-cta`, o CTA
-  primário, e `.auth-mode-active`, o modo selecionado no login. O antigo
-  `.cta-primary` foi apagado em 2026-07-29, quando ficou sem nenhum uso.
-- **Hover:** cresce a **luz em volta** (aura do pseudo + `--elev-glow`), nunca o
-  brilho da superfície. `filter: brightness()` em botão preenchido com texto
-  branco sempre derruba o contraste: medido, levava o CTA de 4,75:1 para 4,37:1
-  e reprovava AA justamente quando o ponteiro chegava. Card sobe 2px; botão não
-  sobe, porque o `Button` já traz `active:scale-[0.98]` e um transform apagaria
-  o afundar do clique. Curva ease-out-quint, 180–200ms, sem bounce. Não recebem
-  hover: controle não interativo (`.control-raised`) e item já selecionado.
-- **Item ativo da navegação:** `.nav-active` — pílula elevada por cima de uma
-  forma iridescente 3px mais larga, então só as fatias laterais aparecem. **Não**
-  é moldura: no PNG o topo e a base não têm cor.
-- **Controle elevado:** `.control-raised` — superfície sólida com elevação, para
-  chip de data e afins. `.glass` ali só traria `backdrop-filter` que não faz
-  nada num controle de 28px.
-- **Moldura iridescente:** `.stroke-iris` — 1px de gradiente com miolo
-  transparente, feito com `mask-composite`. Uso **definido**: CTA secundário e o
-  primeiro insight da IA. Não é enfeite de card qualquer. O `.stroke-iris-glow`
-  é opcional e some com o `@supports` de fallback, que degrada para borda sólida
-  do acento.
-- **Glow:** o limite de **dois por tela** vale para o glow difuso de card
-  (`--glow-accent`). A moldura iridescente é padrão de componente e não conta
-  nesse limite.
-- **Célula de heatmap:** `.heat-cell` — azulejo com borda própria e gradiente
-  diagonal. A cor entra por `backgroundColor` inline; o atalho `background`
-  apagaria o gradiente do utilitário.
-- **Botão primário:** pill `bg-accent-fill text-accent-contrast`.
-- **Atalhos de fluxo:** pílulas tingidas (`bg-income/[0.12] text-income` e o
-  par de despesa), mesmo peso entre si.
-- **Chip de tendência:** `.chip-pos` / `.chip-neg` / `.chip-neutral`, sempre com
-  seta — variação nunca é texto solto.
-- **Foco:** `focus-visible` com anel de `--focus` e offset; nos primitivos a
-  opacidade mínima é 70%, abaixo disso não alcança 3:1 sobre o vidro claro.
-- **Estados obrigatórios:** default, hover, focus-visible, active, disabled,
-  loading, empty (que ensina a agir), error.
-- Ícones: **lucide-react** exclusivamente.
+**The Sentence Case Rule.** Títulos e botões em caixa de frase: "Nova transação",
+nunca "Nova Transação". Caixa alta com tracking só no rótulo de dado (`.microlabel`).
 
-## Layout
+## 4. Elevation
 
-- Shell: sidebar flutuante de 16rem (`lg:` para cima) que vira gaveta abaixo
-  disso, com todas as rotas e o logout — nada some, só recolhe.
-- A navegação **não tem rótulos de seção**: um filete separa preferências do
-  resto. Com sete itens, dois cabeçalhos custam mais ruído do que organizam.
-- Dashboard em **grade de 12 colunas**; proporções por `col-span`, não por
-  frações arbitrárias.
-- Padding interno de card: `p-6` (compacto `p-5`).
+Plano por padrão. A profundidade vem de degrau de superfície e borda de 1px, não de
+sombra: no escuro a sombra do card é nula (não se vê contra quase preto); no claro
+existe uma só, curta e neutra, que assenta o card branco na página cinza. Sem blur,
+sem glow, sem sombra tingida.
 
-## Motion
+### Shadow Vocabulary
+- **Assento do card, claro** (`box-shadow: 0 1px 2px rgb(9 9 11 / 0.05)`): todo `.panel` no tema claro.
+- **Controle elevado** (`box-shadow: 0 1px 2px rgb(9 9 11 / 0.06)`; escuro `0 1px 2px rgb(0 0 0 / 0.4)`): chip de data e afins.
 
-- 150–250ms, `ease-out`; nada de bounce ou elastic.
-- Motion comunica estado. Ambiente permitido: a flutuação lenta do anel do herói
-  e o pulso da marca da IA. Nada mais.
-- `@media (prefers-reduced-motion: reduce)` desativa tudo, sempre — verificado
-  com a preferência emulada, não presumido.
+### Named Rules
+**The Flat Glass-Free Rule.** Nenhum `backdrop-filter`, nenhum glow, nenhuma aura.
+Se um elemento "brilha", ele está errado.
 
-## Accessibility
+## 5. Components
 
-Contraste é medido contra o **vidro renderizado** (composto sobre o fundo da
-página), nunca contra o token de superfície, e no navegador — o valor do token
-sozinho mente. Onde a referência reprova AA, ela perde: o microlabel, o ciano de
-receita e o vermelho de despesa do tema claro usam valores mais escuros que os
-do PNG.
+### Buttons
+- **Forma:** pílula (9999px), 36px de altura (40px no tamanho `lg`).
+- **Primário:** fundo tinta, texto na cor da página; hover a 85%. É o default do
+  componente `Button`: não se força cor por cima dele.
+- **Secundário:** bloco interno com borda `line/15` (sem a borda ele lia como texto
+  solto ou desabilitado).
+- **Destrutivo:** Vermelho de Ação sob texto branco, só dentro de confirmação.
+- **Foco:** anel de `--focus` com offset; botões crus caem na regra base de
+  `:focus-visible` (contorno de 2px na cor de foco).
+- **Alvo mínimo:** ícone de ação com área de 32px.
 
-O nível 0 do heatmap fica abaixo de 3:1 de propósito: é ausência de lançamento,
-e o valor de cada dia está no `title` da célula.
+### Chips
+- **Estilo:** pílula, 12px semibold; `chip-pos` e `chip-neg` com fundo do próprio
+  sinal a 12% (a 20% o vermelho media 4,3:1), `chip-neutral` em cinza. Sempre com seta ou ícone: cor nunca é o
+  único canal.
 
-## Anti-padrões (deste projeto)
+### Cards / Containers
+- **Painel (`.panel`):** 20px de canto, superfície opaca, borda `--panel-border`,
+  padding 24px. Hover de card clicável (`.panel-hover`) só clareia a borda.
+- **Tile de KPI:** 16px de canto, bloco interno, padding 16px, rótulo + ícone Lucide
+  num círculo + número + chip de variação; é um `role="group"` com o nome do KPI. O
+  tile focal é safira com texto branco. Os quatro do mês são gratuitos: Sobra (focal),
+  Receitas, Despesas e Taxa de poupança (sobra ÷ receita, "—" sem receita, sinal de
+  menos tipográfico quando negativa, sem "−0%").
+- **Score financeiro:** só no premium, num bloco à direita do saldo ("72/100"). Com a
+  IA fora do ar (score nulo) o bloco some; o free não vê Score em lugar nenhum.
+- **Pizza ("Onde vai seu dinheiro"):** 144px; legenda com barra de participação e o
+  valor numa coluna de largura fixa, para as barras terem o mesmo trilho; legenda ao
+  lado da pizza só quando o card tem 18rem de conteúdo (container query); rodapé
+  centralizado com média por dia, maior despesa do mês e variação contra o mês
+  anterior (alta de despesa em vermelho, queda em verde).
+- **Estados:** carregando é esqueleto no formato final (`LoadingCards`); falha é
+  `LoadError` com "Tentar de novo"; recurso do plano Premium é `PremiumLock` (cadeado + uma
+  frase + "Conhecer o plano Premium"), nunca um vazio falso.
 
-- Âmbar/dourado/laranja como accent (era Lumea) — proibido.
-- Hex fixo em componente; `norby-*` (namespace morto) e `.glass-card` (ponte
-  removida).
-- Fundo em WebGL/canvas: o Aurora saiu porque o mesh CSS entrega a mesma
-  atmosfera sem 50 kB de shader.
-- Blur empilhado, glow em todo card, gradient text.
-- Cor como único canal semântico; `#000` puro.
-- Spinner circular genérico (usar a estrela).
+### Inputs / Fields
+- **Estilo:** 12px de canto, 40px de altura, fundo `line/5`, borda `line/15`.
+- **Foco:** anel de `--focus`. **Erro:** borda e mensagem em `--danger`, específica
+  ("Informe um valor maior que zero").
+- **Busca do topo:** pílula de 40px sobre `surface`, lupa à esquerda e a dica
+  `Ctrl K` / `⌘ K` à direita (some ao digitar, onde fica o "x" nativo), com
+  `aria-keyshortcuts`. Procura lançamentos: Enter leva ao Extrato com `?q=`; abaixo
+  de 2 caracteres não navega. No celular ganha linha própria.
+
+### Segmented
+- **Estilo:** trilho em pílula (`line/6%`, padding 4px) com as opções dentro; a ativa
+  vira uma pílula de tinta, ou tingida do tipo no formulário (receita verde, despesa
+  vermelha). Mesma linguagem do Entrar/Cadastrar do login.
+- **Semântica:** grupo nomeado com `aria-pressed` em cada opção: a seleção nunca é só
+  cor. Usado no filtro de tipo do Extrato e nos formulários.
+
+### Dialogs
+- **Anatomia única:** título + subtítulo de uma linha; rodapé com "Cancelar"
+  (secundário) à esquerda e a ação principal à direita. Confirmação de exclusão diz
+  o que sai ("Almoço · −R$ 40,00 · 25/09/2026"). Fundo escurecido, sem blur.
+- **Verbo:** apagar registro é **Excluir**, do botão que abre à confirmação ("Excluir
+  esta transação?"). "Remover" só onde nada é apagado (a foto de perfil).
+
+### Navigation
+- **Sidebar:** item ativo com fundo neutro (`state/7%`), ícone em safira e a
+  estrela-norte à direita; hover em `state/4%`. Rótulos em caixa de frase, sem
+  cabeçalhos de seção. Abaixo de `lg` vira gaveta, com todas as rotas.
+- **Subabas das Configurações:** coluna lateral fixa a partir de `lg`, fileira
+  rolável no celular; a aba vive em `?aba=`, então o voltar funciona e o convite do
+  Premium abre direto em `?aba=plano`.
+
+### Assinaturas
+- **Logo da marca:** o monograma N sobre o gradiente iridescente (`--iris-brand`), o
+  único gradiente do app, fixo nos dois temas. O desenho do monograma é intocável.
+- **Estrela-norte:** marca posição (item ativo), presença da IA (`AiOrb`: estrela em
+  safira num círculo tingido) e carregamento (pulso). Em nenhum outro lugar.
+- **Marca da carteira (`WalletMark`):** logo real do banco num quadrado branco fixo
+  (os logos são desenhados para fundo claro); "Dinheiro" usa cédula; sem banco, a
+  sigla ou a inicial no chip tingido.
+- **Ritmo financeiro:** grade estilo GitHub, 7 linhas (Dom a Sáb), quadrados de ~30px
+  com canto de 4px; o número de semanas se ajusta à largura (até 26), medida antes da
+  pintura; a célula nunca estica. Cota, sequência e status de cada dia saem sempre das
+  26 semanas: a largura só decide quantas aparecem. Rodapé com a cota diária em reais.
+- **Ícone de categoria (`CategoryIcon`):** um mapa Lucide em `lib/categories.js`,
+  igual em todas as telas.
+
+## 6. Do's and Don'ts
+
+### Do:
+- **Do** usar token semântico para toda cor (`bg-surface`, `text-content-2`,
+  `bg-accent-fill`). Exceções documentadas: o gradiente do logo e o branco fixo do
+  quadrado de logo de banco.
+- **Do** medir contraste no pixel renderizado, nos dois temas: 4,5:1 para texto, 3:1
+  para elementos gráficos. O valor do token sozinho não prova nada.
+- **Do** manter um só preenchimento safira por tela (The One Sapphire Rule).
+- **Do** dizer o plano antes da ação: recurso do plano Premium aparece como `PremiumLock`,
+  limite de carteiras como "2 de 2 no plano gratuito".
+- **Do** fazer a pizza fechar com o total do tile de Despesas ("Demais categorias").
+- **Do** usar os movimentos do sistema, em ease-out-quint e sem bounce: `motion-page`
+  (220ms, fade e 4px a cada rota), `motion-rise` (420ms, 8px, em sequência de 60ms via
+  `--i`) e blocos que abrem e fecham animando a linha do grid (0fr ↔ 1fr, 300ms),
+  nunca `height`, `inert` quando fechados. Estados de controle em 150–250ms.
+  `prefers-reduced-motion` zera tudo.
+
+### Don't:
+- **Don't** reintroduzir vidro: `backdrop-filter`, glassmorphism, glow, mesh de fundo,
+  gradiente iridescente fora do logo ou o anel 3D (removidos em 2026-09-25).
+- **Don't** usar âmbar, dourado ou laranja como acento (a paleta da era Lumea).
+- **Don't** usar o gradiente roxo-azul genérico de SaaS/fintech nem neon (cor clara e
+  saturada ao mesmo tempo).
+- **Don't** montar o dashboard-template: hero-metric com gradiente, cards idênticos em
+  grade, glassmorphism decorativo.
+- **Don't** usar emoji como ícone, nem no título (leitor de tela lê "mão acenando").
+- **Don't** usar `border-left` ou `border-right` maior que 1px como faixa colorida
+  (nem em bolha de chat).
+- **Don't** pintar botão principal de azul, nem forçar cor por cima do `Button`.
+- **Don't** usar `#000` puro, nem hex solto em componente.
+- **Don't** mostrar R$ 0,00 ou "nenhuma ainda" para valor que não carregou.
+- **Don't** usar badge, confete ou banner de upsell: o Norby organiza, não vende.
+- **Don't** repetir no topo do Dashboard um número que já está num KPI.

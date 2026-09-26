@@ -15,10 +15,10 @@ import {
 export const mainItems = [
   { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/wallets", icon: Wallet, label: "Carteiras" },
-  { to: "/transactions", icon: FileText, label: "Relatórios" },
+  { to: "/transactions", icon: FileText, label: "Extrato" },
   { to: "/recurring", icon: Repeat, label: "Recorrências" },
   { to: "/goals", icon: Target, label: "Metas" },
-  { to: "/ai", icon: BrainCircuit, label: "IA Analista" },
+  { to: "/ai", icon: BrainCircuit, label: "Norby IA" },
 ];
 
 export const prefItems = [

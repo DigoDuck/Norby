@@ -359,3 +359,135 @@ describe("Transactions", () => {
     );
   }, 15000);
 });
+
+// Só o relógio é falso: timers reais, porque o Select abre com animação.
+function hojeE(data) {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(data);
+}
+
+// Como a pessoa faz: abre, passa o mouse, clica. O Base UI só aceita o clique
+// numa opção destacada, e quem destaca é o hover.
+async function escolherMes(nome) {
+  fireEvent.click(screen.getByRole("combobox", { name: "Mês" }));
+  const opcao = await screen.findByRole("option", { name: nome });
+  fireEvent.mouseMove(opcao);
+  fireEvent.click(opcao);
+}
+
+describe("Transactions, filtro por mês", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    transactionsApi.list.mockResolvedValue(pagina(3, 3, "m-"));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("escolher um mês pede só aquele mês, inclusive o do ano anterior", async () => {
+    // Em janeiro, o mês anterior é dezembro do ANO anterior: um cálculo que
+    // só subtrai o mês pediria o mês 0, ou dezembro do ano corrente.
+    hojeE(new Date(2026, 0, 15, 12));
+    render(
+      <MemoryRouter>
+        <Transactions />
+      </MemoryRouter>,
+    );
+    await screen.findAllByText("Item m-0");
+
+    await escolherMes("Dezembro de 2025");
+
+    await waitFor(() =>
+      expect(transactionsApi.list).toHaveBeenLastCalledWith(
+        expect.objectContaining({ month: 12, year: 2025, offset: 0 }),
+      ),
+    );
+  });
+
+  it("a busca que ainda estava esperando não desfaz o mês escolhido nesse meio-tempo", async () => {
+    // A busca espera 300ms. Se o mês muda dentro da espera, a busca atrasada
+    // não pode sair com o mês de antes: a lista voltaria a ser de todos os
+    // meses com o seletor ainda mostrando agosto.
+    hojeE(new Date(2026, 8, 25, 12));
+    render(
+      <MemoryRouter>
+        <Transactions />
+      </MemoryRouter>,
+    );
+    await screen.findAllByText("Item m-0");
+
+    fireEvent.change(screen.getByLabelText(/buscar transações/i), {
+      target: { value: "mercado" },
+    });
+    await escolherMes("Agosto de 2026");
+    await act(() => new Promise((r) => setTimeout(r, 400)));
+
+    expect(transactionsApi.list).toHaveBeenLastCalledWith(
+      expect.objectContaining({ q: "mercado", month: 8, year: 2026 }),
+    );
+  });
+  it("a paginação continua no mês escolhido", async () => {
+    hojeE(new Date(2026, 8, 25, 12));
+    transactionsApi.list.mockResolvedValue(pagina(50, 120, "m-"));
+    render(
+      <MemoryRouter>
+        <Transactions />
+      </MemoryRouter>,
+    );
+    await screen.findAllByText("Item m-0");
+
+    await escolherMes("Agosto de 2026");
+    fireEvent.click(await screen.findByRole("button", { name: /próxima/i }));
+
+    await waitFor(() =>
+      expect(transactionsApi.list).toHaveBeenLastCalledWith(
+        expect.objectContaining({ month: 8, year: 2026, offset: 50 }),
+      ),
+    );
+  });
+
+  it("voltar para 'Todos os meses' pede o histórico inteiro de novo", async () => {
+    hojeE(new Date(2026, 8, 25, 12));
+    render(
+      <MemoryRouter>
+        <Transactions />
+      </MemoryRouter>,
+    );
+    await screen.findAllByText("Item m-0");
+
+    await escolherMes("Agosto de 2026");
+    await escolherMes("Todos os meses");
+
+    await waitFor(() => {
+      const ultima = transactionsApi.list.mock.lastCall[0];
+      expect(ultima).not.toHaveProperty("month");
+      expect(ultima).not.toHaveProperty("year");
+    });
+  });
+});
+
+describe("Transactions, busca vinda da URL", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    transactionsApi.list.mockResolvedValue(pagina(3, 3, "q-"));
+  });
+
+  it("abrir o Extrato com ?q= já pede a primeira página com o termo e mostra o termo no campo", async () => {
+    // É o destino da busca do Dashboard. A primeira requisição já vem
+    // filtrada: pedir a lista inteira antes gastava uma ida ao servidor à toa.
+    render(
+      <MemoryRouter initialEntries={["/transactions?q=mercado"]}>
+        <Transactions />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() =>
+      expect(transactionsApi.list).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ q: "mercado", offset: 0 }),
+      ),
+    );
+    expect(screen.getByLabelText(/buscar transações/i)).toHaveValue("mercado");
+  });
+});

@@ -1,16 +1,17 @@
 import { useState } from "react";
+import { Moon, Sun } from "lucide-react";
 import { getTheme, setTheme } from "@/lib/theme";
 
 const OPTIONS = [
   {
     value: "dark",
     label: "Escuro",
-    hint: "Padrão. Painel de instrumentos sob pouca luz.",
+    hint: "Padrão. Preto neutro para conferir as contas à noite.",
   },
   {
     value: "light",
     label: "Claro",
-    hint: "Vidro leitoso sobre fundo lavanda.",
+    hint: "Página cinza e cards brancos, para o dia.",
   },
 ];
 
@@ -19,7 +20,7 @@ function Preview({ theme }) {
     <div
       data-theme={theme}
       aria-hidden="true"
-      className="app-mesh flex h-20 w-full gap-1.5 overflow-hidden rounded-xl bg-bg-base p-2 pointer-events-none"
+      className="flex h-20 w-full gap-1.5 overflow-hidden rounded-md bg-bg-base p-2 pointer-events-none"
     >
       <div className="w-1/4 rounded-md border border-line/10 bg-surface" />
       <div className="flex flex-1 flex-col gap-1.5">
@@ -68,5 +69,27 @@ export default function ThemeToggle() {
         );
       })}
     </div>
+  );
+}
+
+/**
+ * Versão compacta, para o topo do Dashboard: um clique alterna escuro e claro.
+ * O ícone e o nome acessível dizem para onde o clique leva, não onde se está.
+ */
+export function ThemeButton() {
+  const [theme, setLocal] = useState(getTheme);
+  const paraClaro = theme === "dark";
+  const nome = paraClaro ? "Usar tema claro" : "Usar tema escuro";
+
+  return (
+    <button
+      type="button"
+      aria-label={nome}
+      title={nome}
+      onClick={() => setLocal(setTheme(paraClaro ? "light" : "dark"))}
+      className="grid size-10 shrink-0 place-items-center rounded-full border border-line/15 text-content-2 transition-colors hover:bg-state/[0.08] hover:text-content"
+    >
+      {paraClaro ? <Sun size={16} aria-hidden="true" /> : <Moon size={16} aria-hidden="true" />}
+    </button>
   );
 }

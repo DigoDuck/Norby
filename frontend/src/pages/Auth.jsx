@@ -21,7 +21,6 @@ import {
 } from "lucide-react";
 import NorbyMark from "../components/shared/Logo";
 import NorthStar from "../components/shared/NorthStar";
-import HeroRing from "../components/shared/HeroRing";
 
 const loginSchema = z.object({
   email: z.string().email("Email inválido"),
@@ -73,7 +72,7 @@ const benefits = [
   {
     icon: ShieldCheck,
     title: "Segurança e privacidade",
-    desc: "Conexão criptografada e senha guardada só como hash.",
+    desc: "Conexão criptografada; sua senha nunca é guardada em texto.",
   },
 ];
 
@@ -111,6 +110,27 @@ function Field({ id, label, icon, error, children }) {
           {error}
         </p>
       )}
+    </div>
+  );
+}
+
+// Bloco que entra e sai com o modo (Entrar/Cadastrar) sem salto de layout:
+// anima a linha do grid (0fr ↔ 1fr), não `height`. Fechado fica `inert`: fora
+// do Tab e do leitor de tela, mesmo continuando no DOM. O -mx-1/px-1 dá folga
+// para o anel de foco dos campos não ser cortado pelo overflow. O espaçamento
+// (className) vai no filho de dentro: padding na div do min-h-0 não encolhe, e
+// o bloco fechado ficava com 12px, dobrando o vão entre os campos.
+function Reveal({ open, className = "", children }) {
+  return (
+    <div
+      inert={!open}
+      className={`grid transition-[grid-template-rows,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+        open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+      }`}
+    >
+      <div className="-mx-1 min-h-0 overflow-hidden px-1">
+        <div className={className}>{children}</div>
+      </div>
     </div>
   );
 }
@@ -184,7 +204,7 @@ export default function Auth() {
   }
 
   return (
-    <div className="app-mesh relative min-h-screen w-full overflow-x-hidden bg-bg-base">
+    <div className="relative min-h-screen w-full overflow-x-hidden bg-bg-base">
       {/* Marca no topo. Só no desktop amplo: abaixo de xl o card já traz o tile, e
           repetir a marca em duas alturas numa tela estreita é ruído. */}
       <header className="absolute left-8 top-8 z-10 hidden items-center gap-3 xl:flex">
@@ -198,7 +218,7 @@ export default function Auth() {
       </header>
 
       <main className="flex min-h-screen w-full items-center">
-        <div className="auth-layout mx-auto grid w-full max-w-[100rem] items-center gap-12 px-6 py-12 xl:grid-cols-[minmax(0,22rem)_minmax(18rem,1fr)_minmax(0,30rem)] xl:gap-6 xl:py-16 2xl:grid-cols-[minmax(0,28rem)_minmax(24rem,1fr)_minmax(0,34rem)] 2xl:px-10">
+        <div className="auth-layout mx-auto grid w-full max-w-6xl items-center gap-12 px-6 py-12 xl:grid-cols-2 xl:gap-20 xl:py-16">
         {/* Proposta de valor. Abaixo de xl desce para baixo do card: quem volta
             para entrar quer o formulário primeiro, não o argumento de venda. */}
         <section className="auth-copy relative z-10 order-2 xl:order-1">
@@ -244,41 +264,9 @@ export default function Auth() {
           </ul>
         </section>
 
-        {/* Cena: anel + pódio + painéis de dashboard ao fundo. Puramente
-            decorativa, e por isso inteira em aria-hidden — os valores são de
-            exemplo e não podem ser anunciados como saldo de ninguém. */}
-        <div
-          aria-hidden="true"
-          className="relative z-0 order-3 hidden h-[32rem] xl:order-2 xl:block"
-        >
-          <div className="ghost-panel absolute right-0 top-[6%] w-48 p-4 opacity-75">
-            <p className="text-xs text-content-3">Saldo total</p>
-            <p className="mt-1.5 text-xl font-bold tnum text-content-2">
-              R$ 8.822,<span className="text-sm">00</span>
-            </p>
-            <p className="mt-1.5 text-[11px] text-content-3">↑ 13,1% vs. mês passado</p>
-          </div>
-
-          <div className="ghost-panel absolute right-0 top-[50%] w-44 p-4 opacity-75">
-            <p className="text-xs text-content-3">Receitas</p>
-            <p className="mt-1.5 text-lg font-bold tnum text-content-2">R$ 1.200,00</p>
-            <div className="mt-2.5 h-1.5 w-2/3 rounded-full bg-income/40" />
-          </div>
-
-          {/* O palco cria o apoio óptico visto na referência sem introduzir
-              outra camada de backdrop-filter. */}
-          {/* Largura fixa em 22rem: o 2xl:w-[26rem] levava o anel a 416px numa
-              coluna de 416px em 1536, sem deixar nada para o painel ao lado, e
-              o "Receitas" saía cortado. Em telas maiores o scale do
-              .auth-layout já amplia a peça. */}
-          <div className="auth-ring-stage absolute left-[29%] top-1/2 w-[22rem] -translate-x-1/2 -translate-y-1/2">
-            <HeroRing className="hero-ring--inline" />
-          </div>
-        </div>
-
         {/* Card de acesso */}
-        <div className="relative z-10 order-1 w-full max-w-[34rem] justify-self-center xl:order-3">
-          <div className="glass w-full p-8 sm:p-10">
+        <div className="relative z-10 order-1 w-full max-w-[34rem] justify-self-center xl:order-2 xl:justify-self-end">
+          <div className="panel w-full p-8 sm:p-10">
             <div className="text-center">
               {/* mx-auto, não inline-grid: .brand-tile aplica display:grid e
                   vence o inline, então o text-center do pai não centralizaria. */}
@@ -306,20 +294,27 @@ export default function Auth() {
             <div
               role="group"
               aria-label="Entrar ou cadastrar"
-              className="mt-7 flex gap-1 rounded-full bg-line/[0.06] p-1"
+              className="relative mt-7 flex gap-1 rounded-full bg-line/[0.06] p-1"
             >
+              {/* Pílula de tinta que desliza para o modo escolhido: a troca
+                  vira movimento, não um salto de cor. */}
+              <span
+                aria-hidden="true"
+                className="absolute inset-y-1 left-1 w-[calc(50%-6px)] rounded-full bg-content transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
+                style={{ transform: mode === "register" ? "translateX(calc(100% + 4px))" : "none" }}
+              />
               {["login", "register"].map((m) => (
                 <button
                   key={m}
                   type="button"
                   aria-pressed={mode === m}
                   onClick={() => setMode(m)}
-                  className={`flex-1 rounded-full py-2.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-focus-offset ${
+                  className={`relative z-10 flex-1 rounded-full py-2.5 text-sm font-semibold transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-focus-offset ${
                     mode === m
                       ? // A aba já selecionada não ganha hover: clicar nela não
                         // faz nada, e prometer resposta seria mentira.
-                        "auth-mode-active text-accent-contrast"
-                      : "text-content-2 hover:bg-state/[0.05] hover:text-content"
+                        "text-bg-base"
+                      : "text-content-2 hover:text-content"
                   }`}
                 >
                   {m === "login" ? "Entrar" : "Cadastrar"}
@@ -345,8 +340,8 @@ export default function Auth() {
               </div>
             )}
 
-            <form className="mt-5 space-y-3" onSubmit={handleSubmit(onSubmit)}>
-              {mode === "register" && (
+            <form className="mt-5 flex flex-col" onSubmit={handleSubmit(onSubmit)}>
+              <Reveal open={mode === "register"} className="pb-3">
                 <Field
                   id="auth-name"
                   label="Seu nome"
@@ -355,7 +350,7 @@ export default function Auth() {
                 >
                   <Input placeholder="Seu nome" {...register("name")} className={authInputCls} />
                 </Field>
-              )}
+              </Reveal>
 
               <Field
                 id="auth-email"
@@ -372,6 +367,7 @@ export default function Auth() {
                 />
               </Field>
 
+              <div className="mt-3">
               <Field
                 id="auth-password"
                 label="Senha"
@@ -397,8 +393,9 @@ export default function Auth() {
                   </span>
                 </button>
               </Field>
+              </div>
 
-              {mode === "register" && (
+              <Reveal open={mode === "register"} className="pt-3">
                 <Field
                   id="auth-confirm-password"
                   label="Confirmar senha"
@@ -413,12 +410,12 @@ export default function Auth() {
                     className={authInputCls}
                   />
                 </Field>
-              )}
+              </Reveal>
 
               {/* Deixou de ser "em breve" com o #36: /auth/forgot-password
                   existe. O botão desabilitado e o chip saíram junto — rótulo de
                   estado que não corresponde mais ao estado é pior que nenhum. */}
-              {mode === "login" && (
+              <Reveal open={mode === "login"} className="pt-3">
                 <div className="flex items-center justify-between gap-3 pt-0.5">
                   {/* #175: desmarcada por padrão. Sem ela, a sessão acaba 24h
                       depois do login e o cookie some com o navegador — o
@@ -440,9 +437,9 @@ export default function Auth() {
                     Esqueceu a senha?
                   </Link>
                 </div>
-              )}
+              </Reveal>
 
-              {mode === "register" && (
+              <Reveal open={mode === "register"} className="pt-3">
                 <div>
                   <label className="flex items-start gap-2 text-xs text-content-2">
                     <input
@@ -480,12 +477,12 @@ export default function Auth() {
                     </p>
                   )}
                 </div>
-              )}
+              </Reveal>
 
               {error && (
                 <div
                   role="alert"
-                  className="rounded-xl border border-danger/20 bg-danger/10 p-3 text-sm text-danger"
+                  className="mt-3 rounded-xl border border-danger/20 bg-danger/10 p-3 text-sm text-danger"
                 >
                   {error}
                 </div>
@@ -494,7 +491,7 @@ export default function Auth() {
               <Button
                 type="submit"
                 disabled={loading}
-                className="hero-cta h-14 w-full justify-between px-6 text-base font-semibold"
+                className="mt-3 h-12 w-full justify-between px-6 text-base font-semibold"
               >
                 {loading ? (
                   <>
@@ -512,10 +509,6 @@ export default function Auth() {
               </Button>
             </form>
 
-            <p className="mt-6 flex items-center justify-center gap-2 text-center text-xs text-content-2">
-              <ShieldCheck size={15} aria-hidden="true" className="shrink-0 text-accent" />
-              Conexão criptografada e senha guardada só como hash.
-            </p>
           </div>
         </div>
         </div>

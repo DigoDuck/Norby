@@ -1,0 +1,186 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-26T01:30:00-03:00",
+  "title": "Design System: Norby",
+  "extensions": {
+    "colorMeta": {
+      "sapphire-fill": {
+        "role": "primary",
+        "displayName": "Safira Royal",
+        "canonical": "oklch(0.52 0.266 266)",
+        "tonalRamp": ["#0B1A5C", "#14279E", "#1938D7", "#234AFE", "#4581FF", "#68A5FF", "#9DC7FE", "#D6E6FF"]
+      },
+      "accent-text": {
+        "role": "primary",
+        "displayName": "Safira de Texto",
+        "canonical": "oklch(0.63 0.198 263)",
+        "tonalRamp": ["#0B1A5C", "#14279E", "#1938D7", "#234AFE", "#4581FF", "#68A5FF", "#9DC7FE", "#D6E6FF"]
+      },
+      "bg-base": {
+        "role": "neutral",
+        "displayName": "Preto de Bússola",
+        "canonical": "#09090B",
+        "tonalRamp": ["#09090B", "#111113", "#18181B", "#27272A", "#52525B", "#8E8E98", "#A1A1AA", "#F4F4F5"]
+      },
+      "surface": { "role": "neutral", "displayName": "Painel" },
+      "surface-inset": { "role": "neutral", "displayName": "Bloco Interno" },
+      "content": { "role": "neutral", "displayName": "Tinta" },
+      "content-2": { "role": "neutral", "displayName": "Cinza de Apoio" },
+      "content-3": { "role": "neutral", "displayName": "Cinza de Rodapé" },
+      "income": {
+        "role": "semantic",
+        "displayName": "Receita",
+        "tonalRamp": ["#013D24", "#03663C", "#067D4D", "#09A668", "#0DD986", "#58E3A8", "#97EDC6", "#D2F8E6"]
+      },
+      "expense": {
+        "role": "semantic",
+        "displayName": "Despesa",
+        "tonalRamp": ["#6B0311", "#BB061E", "#DC2626", "#FF5260", "#FF7A84", "#FFA3A9", "#FFC9CC", "#FFEDEE"]
+      },
+      "danger-fill": { "role": "semantic", "displayName": "Vermelho de Ação" }
+    },
+    "typographyMeta": {
+      "page-title": { "displayName": "Título de página", "purpose": "Saudação do dashboard e título de cada página." },
+      "figure-hero": { "displayName": "Número herói", "purpose": "Saldo total. Centavos um degrau menores, em cinza." },
+      "figure-tile": { "displayName": "Número de tile", "purpose": "KPIs do mês; 20px abaixo de sm, quebra linha em vez de truncar." },
+      "card-title": { "displayName": "Título de card", "purpose": "Cabeçalho de painel." },
+      "body": { "displayName": "Corpo de UI", "purpose": "Texto de interface e formulários." },
+      "meta": { "displayName": "Meta", "purpose": "Subtítulos, datas, legendas." },
+      "label": { "displayName": "Rótulo", "purpose": "Cabeçalho de tabela e rótulos pontuais de dado; nunca sobretítulo de seção." }
+    },
+    "shadows": [
+      { "name": "panel-seat-light", "value": "0 1px 2px rgb(9 9 11 / 0.05)", "purpose": "Assenta o card branco na página cinza, só no tema claro. No escuro o card não tem sombra." },
+      { "name": "control-raised", "value": "0 1px 2px rgb(0 0 0 / 0.4)", "purpose": "Chip de data e controles elevados no escuro (claro: rgb(9 9 11 / 0.06))." }
+    ],
+    "motion": [
+      { "name": "ease-out-quint", "value": "cubic-bezier(0.22, 1, 0.36, 1)", "purpose": "Curva de todo movimento do sistema." },
+      { "name": "page-in", "value": "220ms ease-out-quint, opacity 0 e translateY(4px) para 0", "purpose": "motion-page: a cada troca de rota e de subaba." },
+      { "name": "rise-in", "value": "420ms ease-out-quint, translateY(8px), atraso de 60ms × --i", "purpose": "motion-rise: KPIs do Dashboard entrando em sequência." },
+      { "name": "reveal", "value": "300ms ease-out-quint em grid-template-rows 0fr ↔ 1fr e opacity", "purpose": "Campos do login que abrem e fecham com o modo; fechado fica inert." },
+      { "name": "state-change", "value": "150-250ms ease-out", "purpose": "Hover, foco e seleção. Sem bounce; prefers-reduced-motion zera tudo." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px", "purpose": "Busca do topo sai da linha própria; tabela do Extrato." },
+      { "name": "lg", "value": "1024px", "purpose": "Sidebar fixa; subabas das Configurações em coluna." },
+      { "name": "xl", "value": "1280px", "purpose": "Dashboard divide em 12 colunas; abaixo, um card por linha." },
+      { "name": "pie-card (container)", "value": "18rem de conteúdo", "purpose": "Legenda da pizza ao lado do gráfico." }
+    ]
+  },
+  "components": [
+    {
+      "name": "Botão primário (tinta)",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Ação principal da tela. Preto no claro, branco no escuro; nunca azul.",
+      "html": "<button class=\"ds-btn-primary\">+ Receita</button>",
+      "css": ".ds-btn-primary { background: rgb(var(--content)); color: rgb(var(--bg-base)); height: 36px; padding: 0 16px; border-radius: 9999px; border: 1px solid transparent; font: 500 14px 'Geist Variable', system-ui, sans-serif; cursor: pointer; transition: background-color 150ms ease-out; } .ds-btn-primary:hover { background: rgb(var(--content) / 0.85); } .ds-btn-primary:focus-visible { outline: 2px solid rgb(var(--focus)); outline-offset: 2px; } .ds-btn-primary:active { transform: scale(0.98); }"
+    },
+    {
+      "name": "Botão secundário",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Segunda ação ao lado da principal (Despesa, Cancelar). A borda é o que o separa do fundo.",
+      "html": "<button class=\"ds-btn-secondary\">− Despesa</button>",
+      "css": ".ds-btn-secondary { background: rgb(var(--surface-inset)); color: rgb(var(--content)); height: 36px; padding: 0 16px; border-radius: 9999px; border: 1px solid rgb(var(--line) / 0.15); font: 500 14px 'Geist Variable', system-ui, sans-serif; cursor: pointer; transition: background-color 150ms ease-out; } .ds-btn-secondary:hover { background: rgb(var(--state-hover) / 0.08); } .ds-btn-secondary:focus-visible { outline: 2px solid rgb(var(--focus)); outline-offset: 2px; }"
+    },
+    {
+      "name": "Painel",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "Superfície de primeiro nível: opaca, borda de 1px, canto de 20px.",
+      "html": "<section class=\"ds-panel\"><h3 class=\"ds-panel-title\">Saldo total</h3><p class=\"ds-panel-figure\">R$ 27.096<span>,50</span></p></section>",
+      "css": ".ds-panel { background: rgb(var(--surface)); border: 1px solid var(--panel-border); box-shadow: var(--shadow-card); border-radius: 20px; padding: 24px; color: rgb(var(--content)); font-family: 'Geist Variable', system-ui, sans-serif; } .ds-panel-title { margin: 0; font-size: 14px; font-weight: 500; color: rgb(var(--content-2)); } .ds-panel-figure { margin: 12px 0 0; font-size: 36px; font-weight: 600; letter-spacing: -0.025em; font-variant-numeric: tabular-nums; } .ds-panel-figure span { font-size: 24px; color: rgb(var(--content-2)); }"
+    },
+    {
+      "name": "Tile de KPI focal",
+      "kind": "custom",
+      "refersTo": "kpi-tile-focus",
+      "description": "O único preenchimento safira da tela: a Sobra do mês no dashboard.",
+      "html": "<div class=\"ds-tile-focus\"><span class=\"ds-tile-label\">Sobra do mês</span><p class=\"ds-tile-figure\">R$ 3.286<span>,00</span></p><span class=\"ds-tile-note\">este mês</span></div>",
+      "css": ".ds-tile-focus { background: rgb(var(--accent-fill)); color: #fff; border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 12px; font-family: 'Geist Variable', system-ui, sans-serif; } .ds-tile-label { font-size: 14px; font-weight: 500; } .ds-tile-figure { margin: 0; font-size: 24px; font-weight: 600; letter-spacing: -0.025em; font-variant-numeric: tabular-nums; } .ds-tile-figure span { font-size: 18px; color: rgb(255 255 255 / 0.75); } .ds-tile-note { font-size: 11px; }"
+    },
+    {
+      "name": "Campo de texto",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Input padrão dos formulários.",
+      "html": "<input class=\"ds-input\" placeholder=\"Ex: mercado, cinema...\" />",
+      "css": ".ds-input { height: 40px; width: 100%; padding: 0 12px; border-radius: 12px; border: 1px solid rgb(var(--line) / 0.15); background: rgb(var(--line) / 0.05); color: rgb(var(--content)); font: 400 14px 'Geist Variable', system-ui, sans-serif; outline: none; transition: border-color 150ms ease-out; } .ds-input::placeholder { color: rgb(var(--content-3)); } .ds-input:focus-visible { border-color: rgb(var(--focus)); box-shadow: 0 0 0 3px rgb(var(--focus) / 0.4); }"
+    },
+    {
+      "name": "Chip de variação",
+      "kind": "chip",
+      "refersTo": "chip",
+      "description": "Variação contra o mês passado, sempre com seta.",
+      "html": "<span class=\"ds-chip-pos\">↗ 13,8%</span> <span class=\"ds-chip-neg\">↗ 191%</span>",
+      "css": ".ds-chip-pos, .ds-chip-neg { display: inline-flex; align-items: center; gap: 4px; border-radius: 9999px; padding: 2px 8px; font: 600 12px 'Geist Variable', system-ui, sans-serif; font-variant-numeric: tabular-nums; } .ds-chip-pos { background: rgb(var(--income) / 0.12); color: rgb(var(--income)); } .ds-chip-neg { background: rgb(var(--expense) / 0.12); color: rgb(var(--expense)); }"
+    },
+    {
+      "name": "Item de navegação ativo",
+      "kind": "nav",
+      "refersTo": "nav-item-active",
+      "description": "Fundo neutro, ícone em safira e a estrela-norte marcando a posição.",
+      "html": "<a class=\"ds-nav-active\" href=\"#\"><span class=\"ds-nav-icon\">▦</span>Dashboard<span class=\"ds-nav-star\">✦</span></a>",
+      "css": ".ds-nav-active { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 16px; background: rgb(var(--state-hover) / 0.07); color: rgb(var(--content)); font: 500 14px 'Geist Variable', system-ui, sans-serif; text-decoration: none; } .ds-nav-icon, .ds-nav-star { color: rgb(var(--accent)); } .ds-nav-star { margin-left: auto; font-size: 12px; } .ds-nav-active:focus-visible { outline: 2px solid rgb(var(--focus)); outline-offset: 2px; }"
+    },
+    {
+      "name": "Seletor segmentado",
+      "kind": "segmented",
+      "refersTo": "segmented-active",
+      "description": "Uma escolha entre 2 ou 3 opções: trilho em pílula, opção ativa em tinta, aria-pressed.",
+      "html": "<div class=\"ds-seg\" role=\"group\" aria-label=\"Tipo\"><button aria-pressed=\"true\">Todos</button><button aria-pressed=\"false\">Receitas</button><button aria-pressed=\"false\">Despesas</button></div>",
+      "css": ".ds-seg { display: inline-grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; border-radius: 9999px; background: rgb(var(--line) / 0.06); } .ds-seg button { height: 32px; padding: 0 12px; border: 0; border-radius: 9999px; background: transparent; color: rgb(var(--content-2)); font: 500 14px 'Geist Variable', system-ui, sans-serif; cursor: pointer; transition: color 150ms ease-out, background-color 150ms ease-out; } .ds-seg button:hover { color: rgb(var(--content)); } .ds-seg button[aria-pressed=\"true\"] { background: rgb(var(--content)); color: rgb(var(--bg-base)); } .ds-seg button:focus-visible { outline: 2px solid rgb(var(--focus)); outline-offset: 2px; }"
+    },
+    {
+      "name": "Busca do topo",
+      "kind": "input",
+      "refersTo": "search-input",
+      "description": "Busca de lançamentos no cabeçalho do Dashboard; Enter leva ao Extrato com ?q=.",
+      "html": "<form class=\"ds-search\" role=\"search\"><input type=\"search\" aria-label=\"Buscar lançamentos\" placeholder=\"Buscar lançamentos\" aria-keyshortcuts=\"Control+K Meta+K\" /><kbd aria-hidden=\"true\">Ctrl K</kbd></form>",
+      "css": ".ds-search { position: relative; max-width: 448px; } .ds-search input { height: 40px; width: 100%; padding: 0 64px 0 40px; border-radius: 9999px; border: 1px solid rgb(var(--line) / 0.1); background: rgb(var(--surface)); color: rgb(var(--content)); font: 400 14px 'Geist Variable', system-ui, sans-serif; outline: none; } .ds-search input::placeholder { color: rgb(var(--content-3)); } .ds-search input:focus-visible { border-color: rgb(var(--focus)); box-shadow: 0 0 0 3px rgb(var(--focus) / 0.4); } .ds-search kbd { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); padding: 2px 6px; border-radius: 6px; border: 1px solid rgb(var(--line) / 0.15); color: rgb(var(--content-3)); font: 400 11px 'Geist Variable', system-ui, sans-serif; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "A Bússola de Safira",
+    "overview": "Uma bússola é uma ferramenta sólida, de leitura instantânea, com um único ponto de cor que aponta o rumo. É isso que o Norby é: superfícies opacas e quietas, números em tinta e cinza, e um foco em safira por tela dizendo onde olhar primeiro. O sistema rejeita o vidro com blur, o brilho em volta das coisas, o gradiente iridescente, o anel 3D e o neon; também o dashboard-template de SaaS, o arco-íris de categorias e o emoji como ícone.",
+    "keyCharacteristics": [
+      "Superfície opaca em três degraus: página, painel, bloco interno.",
+      "Um único preenchimento safira por tela; ação principal em tinta.",
+      "Números em Geist com algarismos tabulares, centavos um degrau menores.",
+      "Ícones Lucide de traço, nunca emoji.",
+      "Nenhum número inventado: carregando é esqueleto, falha é aviso com Tentar de novo.",
+      "Movimento curto e com função: fade a cada rota, KPIs em sequência, campos do login abrindo e fechando; prefers-reduced-motion zera tudo."
+    ],
+    "rules": [
+      { "name": "The One Sapphire Rule", "body": "O preenchimento safira aparece em um lugar por tela. Se dois elementos disputam o azul cheio, um deles está errado.", "section": "colors" },
+      { "name": "The Ink Action Rule", "body": "Ação principal é tinta (preto no claro, branco no escuro), nunca azul. Azul em botão significa seleção, não clique aqui.", "section": "colors" },
+      { "name": "The No Invented Number Rule", "body": "Valor desconhecido nunca vira R$ 0,00: esqueleto enquanto carrega, aviso com Tentar de novo quando falha.", "section": "colors" },
+      { "name": "The Tabular Money Rule", "body": "Todo valor monetário usa tabular-nums e passa por formatBRL/formatSinal/formatPct.", "section": "typography" },
+      { "name": "The Sentence Case Rule", "body": "Títulos e botões em caixa de frase; caixa alta com tracking só no rótulo de dado.", "section": "typography" },
+      { "name": "The Flat Glass-Free Rule", "body": "Nenhum backdrop-filter, nenhum glow, nenhuma aura. Se um elemento brilha, ele está errado.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do usar token semântico para toda cor; exceções: o gradiente do logo e o branco fixo do quadrado de logo de banco.",
+      "Do medir contraste no pixel renderizado, nos dois temas.",
+      "Do manter um só preenchimento safira por tela.",
+      "Do dizer o plano antes da ação: PremiumLock e o contador de carteiras.",
+      "Do fazer a pizza fechar com o total do tile de Despesas.",
+      "Do usar os movimentos do sistema (motion-page 220ms, motion-rise 420ms em sequência de 60ms, reveal pela linha do grid), em ease-out-quint; prefers-reduced-motion zera tudo.",
+      "Do usar Excluir para apagar registro, do botão à confirmação; Remover só onde nada é apagado."
+    ],
+    "donts": [
+      "Don't reintroduzir vidro: backdrop-filter, glassmorphism, glow, mesh, gradiente iridescente fora do logo, anel 3D.",
+      "Don't usar âmbar, dourado ou laranja como acento.",
+      "Don't usar o gradiente roxo-azul de SaaS nem neon.",
+      "Don't montar o dashboard-template: hero-metric com gradiente, cards idênticos em grade.",
+      "Don't usar emoji como ícone.",
+      "Don't usar border-left ou border-right maior que 1px como faixa colorida.",
+      "Don't pintar botão principal de azul nem forçar cor por cima do Button.",
+      "Don't usar #000 puro nem hex solto em componente.",
+      "Don't mostrar R$ 0,00 ou nenhuma ainda para valor que não carregou.",
+      "Don't usar badge, confete ou banner de upsell.",
+      "Don't repetir no topo do Dashboard um número que já está num KPI."
+    ]
+  }
+}

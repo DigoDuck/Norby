@@ -6,11 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import NorthStar from "@/components/shared/NorthStar";
 import AiOrb from "@/components/shared/AiOrb";
+import PremiumLock from "@/components/shared/PremiumLock";
+import { usePlano } from "@/lib/plan";
 
 const WELCOME = {
   role: "assistant",
   content:
-    "Oi 👋 Sou a Norby, sua analista financeira. Posso analisar seus gastos, sugerir economias e responder dúvidas sobre suas finanças. No que posso ajudar hoje?",
+    "Oi! Sou a Norby, sua analista financeira. Posso analisar seus gastos, sugerir economias e responder dúvidas sobre suas finanças. No que posso ajudar hoje?",
 };
 
 // Agrupa sessões por recência (Hoje / 7 dias / Anteriores) usando updated_at.
@@ -42,10 +44,13 @@ export default function AIAnalyst() {
   const [insight, setInsight] = useState(null);
   const bottomRef = useRef(null);
 
+  const { iaLiberada } = usePlano();
+
   useEffect(() => {
+    if (!iaLiberada) return;
     aiApi.getSessions().then((r) => setSessions(r.data)).catch(() => {});
     aiApi.getInsight().then((r) => setInsight(r.data)).catch(() => {});
-  }, []);
+  }, [iaLiberada]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -113,7 +118,7 @@ export default function AIAnalyst() {
       <button
         type="button"
         onClick={newConversation}
-        className="flex w-full items-center justify-center gap-2 rounded-full bg-accent-fill py-2.5 text-sm font-semibold text-accent-contrast transition-colors hover:bg-accent-fill/90 active:scale-[0.98]"
+        className="flex w-full items-center justify-center gap-2 rounded-full bg-content py-2.5 text-sm font-semibold text-bg-base transition-colors hover:bg-content/85 active:scale-[0.98]"
       >
         <Plus size={16} /> Nova conversa
       </button>
@@ -159,14 +164,25 @@ export default function AIAnalyst() {
     </>
   );
 
+  if (!iaLiberada) {
+    return (
+      <div className="panel p-10 flex items-center justify-center min-h-[420px]">
+        <PremiumLock
+          title="A Norby IA faz parte do plano Premium"
+          text="Converse sobre seus gastos, peça sugestões de economia e receba a leitura do seu mês."
+        />
+      </div>
+    );
+  }
+
   return (
-    <div className="flex h-[calc(100vh-3rem)] flex-col gap-4 lg:flex-row">
+    <div className="flex h-[calc(100dvh-5rem)] flex-col gap-4 lg:h-[calc(100dvh-4.75rem)] lg:flex-row">
       {/* Painel de sessões (interno à página — não é a sidebar do app) */}
-      <aside className="glass hidden w-72 shrink-0 flex-col gap-3 overflow-hidden p-4 lg:flex">
+      <aside className="panel hidden w-72 shrink-0 flex-col gap-3 overflow-hidden p-4 lg:flex">
         {sessionsContent}
       </aside>
 
-      <details className="glass shrink-0 p-4 lg:hidden">
+      <details className="panel shrink-0 p-4 lg:hidden">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-medium text-content [&::-webkit-details-marker]:hidden">
           <span className="flex items-center gap-2">
             <MessageCircle size={16} className="text-accent" />
@@ -180,21 +196,13 @@ export default function AIAnalyst() {
       </details>
 
       {/* Chat */}
-      <div className="glass flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+      <div className="panel flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         {/* Header */}
         <div className="flex items-center gap-3 border-b border-line/[0.08] px-4 py-4 sm:px-6">
-          <div className="relative shrink-0">
-            <AiOrb size={32} pulse={false} />
-            <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-surface bg-income" />
-          </div>
+          <AiOrb size={32} />
           <div>
-            <p className="text-[15px] font-semibold text-content">Norby AI</p>
-            <div className="flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-income" />
-              <span className="text-xs text-income">
-                online · pronta pra ajudar
-              </span>
-            </div>
+            <p className="text-[15px] font-semibold text-content">Norby IA</p>
+            <p className="text-xs text-content-2">Sua analista financeira</p>
           </div>
         </div>
 
@@ -216,11 +224,11 @@ export default function AIAnalyst() {
               </div>
             )}
 
-            {/* Insight do dia (só em conversa nova) */}
+            {/* Leitura de hoje (só em conversa nova) */}
             {sessionId === null && insightLine && (
               <div className="inset-panel rounded-tl-md border-accent/25 p-5">
                 <span className="chip-neutral mb-3 text-accent">
-                  <NorthStar size={10} /> INSIGHT DO DIA
+                  <NorthStar size={10} /> Leitura de hoje
                 </span>
                 <p className="text-pretty text-[15px] leading-relaxed text-content">
                   {insightLine}
@@ -236,8 +244,8 @@ export default function AIAnalyst() {
                 <div
                   className={`inset-panel max-w-[86%] px-4 py-3 text-[14px] leading-relaxed sm:max-w-[78%] ${
                     msg.role === "user"
-                      ? "rounded-tr-md text-content"
-                      : "rounded-tl-md border-l-2 border-l-accent/40 text-content"
+                      ? "rounded-tr-md border-accent/20 bg-accent/10 text-content"
+                      : "rounded-tl-md text-content"
                   }`}
                 >
                   {msg.content}
@@ -248,7 +256,7 @@ export default function AIAnalyst() {
             {loading && (
               <div className="flex items-center gap-2.5">
                 <AiOrb size={28} />
-                <div className="inset-panel rounded-tl-md border-l-2 border-l-accent/40 px-4 py-3 text-xs text-content-2">
+                <div className="inset-panel rounded-tl-md px-4 py-3 text-xs text-content-2">
                   Norby está analisando…
                 </div>
               </div>
@@ -273,7 +281,7 @@ export default function AIAnalyst() {
                 onClick={sendMessage}
                 disabled={loading || !input.trim()}
                 size="icon-lg"
-                className="shrink-0 rounded-xl bg-accent-fill text-accent-contrast hover:bg-accent-fill/90 disabled:opacity-40"
+                className="shrink-0 rounded-xl disabled:opacity-40"
               >
                 <Send size={17} />
                 <span className="sr-only">Enviar</span>

@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import { recurringApi } from "@/api/recurring";
 import { accountApi } from "@/api/account";
 import { authApi } from "@/api/auth";
@@ -8,6 +8,7 @@ import Sidebar from "./Sidebar";
 import MobileNav from "./MobileNav";
 
 export default function AppLayout() {
+  const { pathname } = useLocation();
   const user = useAuthStore((s) => s.user);
   const photoFor = useAuthStore((s) => s.photoFor);
   const setPhoto = useAuthStore((s) => s.setPhoto);
@@ -82,13 +83,16 @@ export default function AppLayout() {
   }, [marca, photoFor, setPhoto]);
 
   return (
-    <div className="relative min-h-screen w-full overflow-hidden bg-bg-base app-mesh">
+    <div className="relative min-h-screen w-full overflow-hidden bg-bg-base">
       <div className="relative z-10 flex h-screen p-0 lg:p-[18px]">
         <Sidebar />
         <MobileNav />
 
         <main className="flex-1 overflow-y-auto px-4 pt-16 pb-4 lg:px-6 lg:pt-5 lg:pb-5">
-          <Outlet />
+          {/* key pela rota: cada troca de página entra com o fade curto. */}
+          <div key={pathname} className="motion-page">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

@@ -1,13 +1,15 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, Trash2, Repeat, Pause, Play } from "lucide-react";
+import { LoadError, LoadingCards } from "@/components/shared/LoadState";
+import { useLoad } from "@/lib/useLoad";
 
 import { recurringApi } from "@/api/recurring";
 import { walletsApi } from "@/api/wallets";
 import { categoriesFor, reconcileCategory, TRANSACTION_TYPE_OPTIONS } from "@/lib/categories";
 import { recurringSchema } from "@/lib/schemas";
-import { apiErrorMessage, formatDateBR, formatBRL, inputCls } from "@/lib/utils";
+import { apiErrorMessage, formatDateBR, inputCls, formatSinal } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 
 import { Button } from "@/components/ui/button";
@@ -73,15 +75,12 @@ export default function Recurring() {
     defaultValues: emptyForm(),
   });
 
-  async function load() {
+  const load = useCallback(async () => {
     const [r, w] = await Promise.all([recurringApi.list(), walletsApi.list()]);
     setItems(r.data);
     setWallets(w.data);
-  }
-
-  useEffect(() => {
-    load(); // eslint-disable-line react-hooks/set-state-in-effect
   }, []);
+  const { status, reload } = useLoad(load);
 
   const walletOptions = wallets.map((w) => ({ value: w.id, label: w.name }));
 
@@ -163,14 +162,17 @@ export default function Recurring() {
         <Dialog open={open} onOpenChange={handleOpenChange}>
           <DialogTrigger
             render={
-              <Button className="bg-accent-fill text-accent-contrast hover:bg-accent-fill/90 font-medium" />
+              <Button className="font-medium" />
             }
           >
-            <Plus size={16} className="mr-1" /> Nova Recorrência
+            <Plus size={16} className="mr-1" /> Nova recorrência
           </DialogTrigger>
           <DialogContent className="bg-surface border-line/10 text-content">
             <DialogHeader>
               <DialogTitle>Nova recorrência</DialogTitle>
+              <p className="text-xs text-content-2 mt-0.5">
+                Uma conta ou receita que o Norby lança sozinho na data
+              </p>
             </DialogHeader>
 
             <form
@@ -336,28 +338,47 @@ export default function Recurring() {
                 <p className="text-danger text-xs">{serverError}</p>
               )}
 
-              <Button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full bg-accent-fill text-accent-contrast hover:bg-accent-fill/90 font-medium"
-              >
-                {isSubmitting ? "Salvando…" : "Criar recorrência"}
-              </Button>
+              <div className="flex gap-2.5 pt-1">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => handleOpenChange(false)}
+                  className="flex-1"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="flex-[1.4] font-medium"
+                >
+                  {isSubmitting ? "Salvando…" : "Criar recorrência"}
+                </Button>
+              </div>
             </form>
           </DialogContent>
         </Dialog>
       </div>
 
       <div className="space-y-3">
-        {items.length === 0 && (
-          <div className="glass p-8 text-center text-content-3 text-sm">
-            Nenhuma recorrência ainda.
+        {status === "loading" && <LoadingCards count={2} className="min-h-[88px]" />}
+        {status === "error" && <LoadError what="suas recorrências" onRetry={reload} />}
+        {status === "ok" && items.length === 0 && (
+          <div className="panel p-10 flex flex-col items-center text-center">
+            <div className="w-11 h-11 rounded-xl bg-accent/[0.15] flex items-center justify-center mb-3">
+              <Repeat size={20} className="text-accent" aria-hidden="true" />
+            </div>
+            <p className="text-sm font-medium text-content">Nenhuma recorrência ainda</p>
+            <p className="text-xs text-content-2 mt-1 max-w-xs leading-relaxed">
+              Cadastre o que se repete, como aluguel, salário e assinaturas, e o
+              Norby lança para você na data certa.
+            </p>
           </div>
         )}
         {items.map((it) => (
           <article
             key={it.id}
-            className="glass-hover flex flex-col gap-4 p-4 lg:flex-row lg:items-center"
+            className="panel-hover flex flex-col gap-4 p-4 lg:flex-row lg:items-center"
           >
             <div className="flex min-w-0 items-center gap-3 lg:flex-1">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent/[0.15]">
@@ -378,8 +399,7 @@ export default function Recurring() {
                   it.type === "INCOME" ? "text-income" : "text-expense"
                 }`}
               >
-                <span aria-hidden="true">{it.type === "INCOME" ? "↑" : "↓"}</span>{" "}
-                {it.type === "INCOME" ? "+" : "−"} {formatBRL(it.amount)}
+                {formatSinal(it.amount, it.type === "INCOME")}
               </span>
               <span className="text-xs text-content-3 tnum lg:min-w-40">
                 Próx. {formatDateBR(it.next_run_date)}
@@ -400,9 +420,10 @@ export default function Recurring() {
                 </span>
               </button>
               <ConfirmDialog
-                title="Remover esta recorrência?"
-                confirmLabel="Remover"
-                errorFallback="Não foi possível remover a recorrência."
+                title="Excluir esta recorrência?"
+                description={`${it.description || it.category} · ${formatSinal(it.amount, it.type === "INCOME")}. Os lançamentos já feitos continuam.`}
+                confirmLabel="Excluir"
+                errorFallback="Não foi possível excluir a recorrência."
                 onConfirm={() => deleteRecurring(it.id)}
                 trigger={
                   <button

@@ -1,14 +1,16 @@
 import { useEffect, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, Search, Trash2, Pencil } from "lucide-react";
+import { LoadError } from "@/components/shared/LoadState";
 
 import { transactionsApi } from "@/api/transactions";
 import { walletsApi } from "@/api/wallets";
-import { categoriesFor, emojiForCategory, reconcileCategory, TRANSACTION_TYPE_OPTIONS } from "@/lib/categories";
+import { categoriesFor, reconcileCategory, TRANSACTION_TYPE_OPTIONS } from "@/lib/categories";
+import CategoryIcon from "@/components/shared/CategoryIcon";
 import { transactionSchema } from "@/lib/schemas";
-import { apiErrorMessage, formatDateBR, formatBRL, inputCls, toDateInput, todayInput } from "@/lib/utils";
+import { apiErrorMessage, formatDateBR, inputCls, toDateInput, todayInput, formatSinal } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 
 import { Button } from "@/components/ui/button";
@@ -17,7 +19,6 @@ import { MoneyInput } from "@/components/ui/money-input";
 import { Field } from "@/components/ui/field";
 import { Segmented } from "@/components/ui/segmented";
 import { Select } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -29,6 +30,30 @@ import {
 
 
 const PAGE_SIZE = 50;
+
+// "" é "sem filtro de tipo", o mesmo valor que o backend entende.
+const FILTRO_TIPO = [
+  { value: "", label: "Todos" },
+  { value: "INCOME", label: "Receitas" },
+  { value: "EXPENSE", label: "Despesas" },
+];
+
+// "Todos os meses" + os últimos 24 meses, do atual para trás. O dia 1 no
+// construtor deixa a Date virar o ano sozinha (janeiro - 1 = dezembro do ano
+// anterior).
+// ponytail: janela fixa de 24 meses; buscar a data do lançamento mais antigo
+// se alguém precisar filtrar antes disso.
+function opcoesDeMes(hoje = new Date()) {
+  const meses = Array.from({ length: 24 }, (_, i) => {
+    const d = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+    const rotulo = d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+    return {
+      value: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
+      label: rotulo[0].toUpperCase() + rotulo.slice(1),
+    };
+  });
+  return [{ value: "todos", label: "Todos os meses" }, ...meses];
+}
 
 // Valores iniciais do formulário (date sempre fresca → função).
 const emptyForm = () => ({
@@ -47,7 +72,10 @@ export default function Transactions() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [serverError, setServerError] = useState(null);
-  const [search, setSearch] = useState("");
+  // ?q= é a porta de entrada da busca do Dashboard: o campo já nasce com o
+  // termo, e a primeira carga já vem filtrada.
+  const [params] = useSearchParams();
+  const [search, setSearch] = useState(() => params.get("q") ?? "");
   // Termo cuja RESPOSTA está na tela, que não é o mesmo que o digitado: entre
   // a tecla e o fim do debounce a lista ainda é a anterior. Anunciar a partir
   // do texto digitado faz o leitor de tela ouvir uma contagem que não é da
@@ -55,9 +83,12 @@ export default function Transactions() {
   // contagem da lista sem filtro nenhum.
   const [buscaAplicada, setBuscaAplicada] = useState("");
   const [filterType, setFilterType] = useState("");
+  // "todos" ou "aaaa-mm". "" não serve: é o valor que o Select trata como vazio.
+  const [mes, setMes] = useState("todos");
   const [offset, setOffset] = useState(0);
   const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(false);
+  // Começa carregando: sem isso o primeiro render já dizia "nenhuma transação".
+  const [loading, setLoading] = useState(true);
   // false quando o header X-Total-Count não chegou (backend antigo, proxy,
   // CORS mal configurado): nesse caso `total` é só o length da página, não o
   // total real, e a UI não pode tratá-lo como se fosse.
@@ -112,16 +143,19 @@ export default function Transactions() {
     }
   }
 
-  // Espelha `filterType` numa ref: o efeito de busca abaixo depende só de
-  // `search` (não de `filterType`), então o setTimeout já agendado por uma
-  // digitação precisa enxergar o filtro de tipo MAIS RECENTE quando disparar,
-  // não o que existia no instante em que foi agendado. A escrita mora num
+  // Espelha `filterType` e `mes` em refs: o efeito de busca abaixo depende só
+  // de `search`, então o setTimeout já agendado por uma digitação precisa
+  // enxergar os filtros MAIS RECENTES quando disparar, não os do instante em
+  // que foi agendado. Sem isso, trocar o mês durante a espera da busca fazia a
+  // busca atrasada voltar a lista para todos os meses. A escrita mora num
   // efeito à parte porque refs não podem ser lidas nem escritas durante o
   // render (react-hooks/refs).
   const filterTypeRef = useRef(filterType);
+  const mesRef = useRef(mes);
   useEffect(() => {
     filterTypeRef.current = filterType;
-  }, [filterType]);
+    mesRef.current = mes;
+  }, [filterType, mes]);
 
   // Parâmetros do filtro de tipo + busca ativa, para toda chamada de load()
   // que precisa preservá-los (paginação, reload após criar/editar/excluir,
@@ -129,9 +163,12 @@ export default function Transactions() {
   // porque o clique no botão de tipo passa o valor NOVO antes de setFilterType
   // refletir no state — os demais chamadores usam o filtro atual por padrão.
   // `trim()`: dois espaços não é uma busca válida.
-  function filtroAtivo(tipo = filterType) {
+  function filtroAtivo(tipo = filterType, mesEscolhido = mes) {
     return {
       ...(tipo ? { type: tipo } : {}),
+      ...(mesEscolhido !== "todos"
+        ? { year: Number(mesEscolhido.slice(0, 4)), month: Number(mesEscolhido.slice(5)) }
+        : {}),
       ...(search.trim().length >= 2 ? { q: search.trim() } : {}),
     };
   }
@@ -144,7 +181,10 @@ export default function Transactions() {
     // mount é o padrão do React sem biblioteca de data fetching, e este
     // projeto não tem uma.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    load();
+    load(filtroAtivo());
+    // Só no mount: filtroAtivo lê a busca que veio da URL. Depois disso, quem
+    // recarrega é o efeito da busca, com espera.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Busca no servidor, com espera de 300ms. Antes disto a busca era no
@@ -161,12 +201,12 @@ export default function Transactions() {
       return;
     }
     const id = setTimeout(() => {
-      load(filtroAtivo(filterTypeRef.current), 0);
+      load(filtroAtivo(filterTypeRef.current, mesRef.current), 0);
     }, 300);
     return () => clearTimeout(id);
     // filtroAtivo de propósito fora: é recriada a cada render, e incluí-la
-    // reagendaria a busca a cada render (não só quando `search` muda). O tipo
-    // mais recente já chega pela ref, lida dentro do timeout, não do closure.
+    // reagendaria a busca a cada render (não só quando `search` muda). Tipo e
+    // mês mais recentes chegam pelas refs, lidas dentro do timeout, não do closure.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
 
@@ -313,10 +353,10 @@ export default function Transactions() {
       <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-3xl font-bold text-content tracking-tight">
-            Relatórios
+            Extrato
           </h1>
           <p className="text-content-2 text-sm mt-1">
-            Histórico completo de transações
+            Todas as suas entradas e saídas
           </p>
         </div>
         <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -324,17 +364,20 @@ export default function Transactions() {
             render={
               <Button
                 onClick={openNew}
-                className="bg-accent-fill text-accent-contrast hover:bg-accent-fill/90 font-medium"
+                className="font-medium"
               />
             }
           >
-            <Plus size={16} className="mr-1" /> Nova Transação
+            <Plus size={16} className="mr-1" /> Nova transação
           </DialogTrigger>
           <DialogContent className="bg-surface border-line/10 text-content">
             <DialogHeader>
               <DialogTitle>
-                {editing ? "Editar Transação" : "Nova Transação"}
+                {editing ? "Editar transação" : "Nova transação"}
               </DialogTitle>
+              <p className="text-xs text-content-2 mt-0.5">
+                Uma entrada ou saída de uma das suas carteiras
+              </p>
             </DialogHeader>
 
             {/* eslint-disable-next-line react-hooks/refs -- falso positivo
@@ -456,29 +499,46 @@ export default function Transactions() {
                 <p className="text-danger text-xs">{serverError}</p>
               )}
 
-              <Button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full bg-accent-fill text-accent-contrast hover:bg-accent-fill/90 font-medium"
-              >
-                {isSubmitting
-                  ? "Salvando..."
-                  : editing
-                    ? "Salvar alterações"
-                    : "Registrar Transação"}
-              </Button>
+              <div className="flex gap-2.5 pt-1">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => handleOpenChange(false)}
+                  className="flex-1"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="flex-[1.4] font-medium"
+                >
+                  {isSubmitting
+                    ? "Salvando…"
+                    : editing
+                      ? "Salvar alterações"
+                      : "Registrar transação"}
+                </Button>
+              </div>
             </form>
           </DialogContent>
         </Dialog>
       </div>
 
       {/* Filtros e relatório em uma única superfície */}
-      <div className="glass overflow-hidden p-4 sm:p-5">
+      <div className="panel overflow-hidden p-4 sm:p-5">
         {serverError && !open && (
-          <p className="text-danger text-xs pb-3">{serverError}</p>
+          <LoadError
+            what="suas transações"
+            onRetry={() => load(filtroAtivo(), offset)}
+            className="mb-4 border-0 shadow-none"
+          />
         )}
-        <div className="inset-panel mb-4 flex flex-col gap-3 p-4 sm:flex-row">
-          <div className="relative flex-1 sm:max-w-xs">
+        {/* Barra de filtros solta no card, sem caixa própria: uma caixa aqui
+            era um card dentro do card. Busca à esquerda; mês e tipo, que
+            recortam a lista, juntos à direita. */}
+        <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center">
+          <div className="relative flex-1 md:max-w-sm">
             <Search size={16} className="absolute left-3 top-2.5 text-content-3" />
             <Input
               aria-label="Buscar transações"
@@ -486,28 +546,33 @@ export default function Transactions() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               maxLength={100}
-              className="pl-9 bg-surface border-line/10 text-content placeholder:text-content-3"
+              className="pl-9 bg-surface-inset border-line/10 text-content placeholder:text-content-3"
             />
           </div>
-          <div className="grid grid-cols-3 gap-2 sm:flex">
-            {["", "INCOME", "EXPENSE"].map((t) => (
-              <button
-                key={t}
-                type="button"
-                aria-pressed={filterType === t}
-                onClick={() => {
-                  setFilterType(t);
-                  load(filtroAtivo(t), 0);
-                }}
-                className={`rounded-xl px-3 py-2 text-sm transition-colors ${
-                  filterType === t
-                    ? "bg-accent-fill text-accent-contrast font-medium"
-                    : "bg-line/5 text-content-2 hover:text-content"
-                }`}
-              >
-                {t === "" ? "Todos" : t === "INCOME" ? "Receitas" : "Despesas"}
-              </button>
-            ))}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center md:ml-auto">
+          <div className="sm:w-52">
+            <Select
+              id="filtro-mes"
+              ariaLabel="Mês"
+              value={mes}
+              options={opcoesDeMes()}
+              onChange={(v) => {
+                const escolhido = v || "todos";
+                setMes(escolhido);
+                load(filtroAtivo(filterType, escolhido), 0);
+              }}
+            />
+          </div>
+          <Segmented
+            ariaLabel="Tipo"
+            value={filterType}
+            onChange={(tipo) => {
+              setFilterType(tipo);
+              load(filtroAtivo(tipo), 0);
+            }}
+            options={FILTRO_TIPO}
+            className="sm:w-72"
+          />
           </div>
         </div>
 
@@ -534,7 +599,7 @@ export default function Transactions() {
         <table className="hidden w-full md:table">
           <thead>
             <tr className="border-b border-line/10">
-              {["Categoria", "Descrição", "Tipo", "Valor", "Data", ""].map((h) => (
+              {["Categoria", "Descrição", "Valor", "Data", ""].map((h) => (
                 <th
                   key={h}
                   className="microlabel px-4 py-3 text-left"
@@ -556,24 +621,15 @@ export default function Transactions() {
                 <td className="px-4 py-3 text-sm text-content-2">
                   {t.description || "-"}
                 </td>
-                <td className="px-4 py-3">
-                  <Badge
-                    className={
-                      t.type === "INCOME"
-                        ? "bg-income/[0.15] text-income border-income/20 rounded-lg"
-                        : "bg-expense/[0.15] text-expense border-expense/20 rounded-lg"
-                    }
-                  >
-                    {t.type === "INCOME" ? "Receita" : "Despesa"}
-                  </Badge>
-                </td>
+                {/* O sinal já diz entrada ou saída; o vermelho em toda linha de
+                    despesa pintava a tabela inteira. Verde só para entrada,
+                    como nas movimentações do dashboard. */}
                 <td
                   className={`px-4 py-3 text-sm font-semibold tnum ${
-                    t.type === "INCOME" ? "text-income" : "text-expense"
+                    t.type === "INCOME" ? "text-income" : "text-content"
                   }`}
                 >
-                  {t.type === "INCOME" ? "+" : "-"}
-                  {formatBRL(t.amount)}
+                  {formatSinal(t.amount, t.type === "INCOME")}
                 </td>
                 <td className="px-4 py-3 text-sm text-content-2 tnum">
                   {formatDateBR(t.date)}
@@ -583,20 +639,21 @@ export default function Transactions() {
                     <button
                       type="button"
                       onClick={() => openEdit(t)}
-                      className="text-content-3 hover:text-content transition-colors"
+                      className="grid place-items-center size-8 rounded-md text-content-3 hover:text-content hover:bg-state/[0.06] transition-colors"
                     >
                       <Pencil size={16} />
                       <span className="sr-only">Editar transação</span>
                     </button>
                     <ConfirmDialog
-                      title="Remover esta transação?"
-                      confirmLabel="Remover"
-                      errorFallback="Não foi possível remover a transação."
+                      title="Excluir esta transação?"
+                      description={`${t.description || t.category} · ${formatSinal(t.amount, t.type === "INCOME")} · ${formatDateBR(t.date)}`}
+                      confirmLabel="Excluir"
+                      errorFallback="Não foi possível excluir a transação."
                       onConfirm={() => deleteTransaction(t.id)}
                       trigger={
                         <button
                           type="button"
-                          className="text-content-3 hover:text-danger transition-colors"
+                          className="grid place-items-center size-8 rounded-md text-content-3 hover:text-danger hover:bg-danger/10 transition-colors"
                         >
                           <Trash2 size={16} />
                           <span className="sr-only">Excluir transação</span>
@@ -612,60 +669,50 @@ export default function Transactions() {
 
         <div className="space-y-3 md:hidden">
           {transactions.map((t) => (
-            <article key={t.id} className="inset-panel p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="flex items-center gap-2 text-sm font-medium text-content">
-                    <span aria-hidden="true">{emojiForCategory(t.category, t.type)}</span>
-                    <span className="truncate">{t.category}</span>
-                  </p>
-                  <p className="mt-1 truncate text-xs text-content-2">
-                    {t.description || "Sem descrição"}
-                  </p>
-                </div>
+            <article key={t.id} className="inset-panel px-3.5 py-3">
+              <div className="flex items-center justify-between gap-3">
+                <p className="flex min-w-0 items-center gap-2 text-sm font-medium text-content">
+                  <CategoryIcon category={t.category} type={t.type} size={15} className="shrink-0 text-content-3" />
+                  <span className="truncate">{t.category}</span>
+                </p>
                 <p
                   className={`shrink-0 text-sm font-semibold tnum ${
-                    t.type === "INCOME" ? "text-income" : "text-expense"
+                    t.type === "INCOME" ? "text-income" : "text-content"
                   }`}
                 >
-                  {t.type === "INCOME" ? "+" : "-"}
-                  {formatBRL(t.amount)}
+                  {formatSinal(t.amount, t.type === "INCOME")}
                 </p>
               </div>
-
-              <div className="mt-4 flex items-center justify-between gap-3 border-t border-line/[0.08] pt-3">
-                <div className="flex items-center gap-2">
-                  <span className={t.type === "INCOME" ? "chip-pos" : "chip-neg"}>
-                    {t.type === "INCOME" ? "Receita" : "Despesa"}
-                  </span>
-                  <time className="text-xs text-content-3 tnum">
-                    {formatDateBR(t.date)}
-                  </time>
-                </div>
-                <div className="flex items-center gap-3">
+              <div className="mt-1 flex items-center justify-between gap-3">
+                <p className="min-w-0 truncate text-xs text-content-2">
+                  {t.description || "Sem descrição"} ·{" "}
+                  <time className="tnum">{formatDateBR(t.date)}</time>
+                </p>
+                <div className="-my-1 flex shrink-0 items-center gap-1">
                   <button
                     type="button"
                     onClick={() => openEdit(t)}
-                    className="text-content-3 hover:text-content transition-colors"
+                    className="grid place-items-center size-8 rounded-md text-content-3 hover:text-content hover:bg-state/[0.06] transition-colors"
                   >
-                    <Pencil size={16} />
+                    <Pencil size={15} />
                     <span className="sr-only">Editar transação</span>
                   </button>
-                  <ConfirmDialog
-                    title="Remover esta transação?"
-                    confirmLabel="Remover"
-                    errorFallback="Não foi possível remover a transação."
-                    onConfirm={() => deleteTransaction(t.id)}
-                    trigger={
-                      <button
-                        type="button"
-                        className="text-content-3 hover:text-danger transition-colors"
-                      >
-                        <Trash2 size={16} />
-                        <span className="sr-only">Excluir transação</span>
-                      </button>
-                    }
-                  />
+                    <ConfirmDialog
+                      title="Excluir esta transação?"
+                        description={`${t.description || t.category} · ${formatSinal(t.amount, t.type === "INCOME")} · ${formatDateBR(t.date)}`}
+                      confirmLabel="Excluir"
+                      errorFallback="Não foi possível excluir a transação."
+                      onConfirm={() => deleteTransaction(t.id)}
+                      trigger={
+                        <button
+                          type="button"
+                          className="grid place-items-center size-8 rounded-md text-content-3 hover:text-danger hover:bg-danger/10 transition-colors"
+                        >
+                          <Trash2 size={16} />
+                          <span className="sr-only">Excluir transação</span>
+                        </button>
+                      }
+                    />
                 </div>
               </div>
             </article>
@@ -675,7 +722,7 @@ export default function Transactions() {
         {/* Texto genérico de propósito: a frase específica de busca ("...para
             essa busca.") já mora no role="status" logo acima — repeti-la aqui
             faria um leitor de tela ouvir a mesma sentença duas vezes. */}
-        {transactions.length === 0 && (
+        {transactions.length === 0 && !loading && !serverError && (
           <div className="text-center py-12 text-content-3 text-sm">
             Nenhuma transação encontrada.
           </div>

@@ -97,7 +97,7 @@ export function ConfirmDialog({
             type="button"
             onClick={handleConfirm}
             disabled={loading || (requirePassword && !password)}
-            className="bg-danger hover:bg-danger/80 text-accent-contrast disabled:opacity-40"
+            className="bg-danger-fill hover:bg-danger-fill/90 text-accent-contrast disabled:opacity-40"
           >
             {loading ? "..." : confirmLabel}
           </Button>

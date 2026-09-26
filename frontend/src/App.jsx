@@ -16,6 +16,8 @@ import Termos from "./pages/Termos";
 import EsqueciSenha from "./pages/EsqueciSenha";
 import RedefinirSenha from "./pages/RedefinirSenha";
 import Admin from "./pages/Admin";
+import NorthStar from "@/components/shared/NorthStar";
+import { LoadError } from "@/components/shared/LoadState";
 
 function ProtectedRoute({ children }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -41,27 +43,52 @@ function RootRoute() {
 export default function App() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const [booting, setBooting] = useState(isAuthenticated);
+  const [bootFalhou, setBootFalhou] = useState(false);
 
   // No boot: se a sessão sobreviveu à recarga, pede um access token novo com o
   // cookie de refresh e revalida o usuário antes de liberar as rotas (#110,
   // #100). Cookie expirado ou revogado -> logout, sem "flash" de tela protegida.
-  useEffect(() => {
-    if (!isAuthenticated) return;
+  function boot() {
+    setBooting(true);
+    setBootFalhou(false);
     authApi
       // authApi.refresh() já guarda o token novo no store (single-flight em
       // ./axios); aqui só encadeamos o /auth/me depois que ele resolve.
       .refresh()
       .then(() => authApi.me())
       .then((res) => useAuthStore.getState().updateUser(res.data))
-      .catch(() => useAuthStore.getState().logout())
+      .catch((err) => {
+        // Só a recusa da sessão (4xx) desloga. 5xx ou rede é o servidor fora
+        // do ar, não a sessão: deslogar ali jogava a pessoa no login sem
+        // motivo, parecendo conta com problema.
+        const status = err?.response?.status;
+        if (status && status < 500) useAuthStore.getState().logout();
+        else setBootFalhou(true);
+      })
       .finally(() => setBooting(false));
+  }
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    // O boot só chama setState depois das promessas; o primeiro setBooting
+    // repete o true que já é o estado inicial.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    boot();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (booting) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-bg-base text-content-2">
-        Carregando...
+      <div className="min-h-screen flex items-center justify-center bg-bg-base">
+        <NorthStar size={32} className="text-accent star-loading" aria-label="Carregando" />
+      </div>
+    );
+  }
+
+  if (bootFalhou) {
+    return (
+      <div className="min-h-screen grid place-items-center bg-bg-base p-6">
+        <LoadError what="o Norby agora" onRetry={boot} className="w-full max-w-md" />
       </div>
     );
   }

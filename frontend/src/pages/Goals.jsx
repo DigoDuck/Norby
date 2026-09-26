@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -13,6 +13,8 @@ import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { AmountPromptDialog } from "@/components/shared/AmountPromptDialog";
 import Money from "@/components/shared/Money";
 import AiOrb from "@/components/shared/AiOrb";
+import { LoadError, LoadingCards } from "@/components/shared/LoadState";
+import { useLoad } from "@/lib/useLoad";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -75,12 +77,12 @@ export default function Goals() {
   // Observa o type para alternar campos condicionais e o rótulo.
   const type = useWatch({ control, name: "type" });
 
-  async function load() {
+  const load = useCallback(async () => {
     setGoals((await goalsApi.list()).data);
-  }
+  }, []);
+  const { status, reload } = useLoad(load);
 
   useEffect(() => {
-    load(); // eslint-disable-line react-hooks/set-state-in-effect
     aiApi.getInsight().then((r) => setInsight(r.data)).catch(() => {});
   }, []);
 
@@ -176,7 +178,9 @@ export default function Goals() {
             Suas metas
           </h1>
           <p className="text-content-2 text-sm mt-1">
-            {goals.length} {goals.length === 1 ? "meta ativa" : "metas ativas"}
+            {status !== "ok" && <span aria-hidden="true" className="inline-block h-3.5 w-48 rounded-full bg-line/[0.07] motion-safe:animate-pulse align-middle" />}
+            {status === "ok" && goals.length === 0 && "Guarde dinheiro com um objetivo ou limite um tipo de gasto"}
+            {status === "ok" && goals.length > 0 && (goals.length === 1 ? "1 meta ativa" : `${goals.length} metas ativas`)}
             {totalSaved > 0 && (
               <>
                 {" "}· você já guardou{" "}
@@ -196,7 +200,7 @@ export default function Goals() {
               ultimoGatilho.current = e.currentTarget;
             }}
             render={
-              <Button className="bg-accent-fill text-accent-contrast hover:bg-accent-fill/90 font-medium" />
+              <Button className="font-medium" />
             }
           >
             <Plus size={16} /> Nova meta
@@ -206,17 +210,10 @@ export default function Goals() {
             className="bg-surface border-line/10 text-content"
           >
             <DialogHeader>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-accent-fill flex items-center justify-center shrink-0">
-                  <Target size={20} className="text-accent-contrast" />
-                </div>
-                <div>
-                  <DialogTitle>{editing ? "Editar meta" : "Nova meta"}</DialogTitle>
-                  <p className="text-xs text-content-2 mt-0.5">
-                    Poupança para um objetivo ou orçamento de uma categoria
-                  </p>
-                </div>
-              </div>
+              <DialogTitle>{editing ? "Editar meta" : "Nova meta"}</DialogTitle>
+              <p className="text-xs text-content-2 mt-0.5">
+                Poupança para um objetivo ou orçamento de uma categoria
+              </p>
             </DialogHeader>
 
             <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="space-y-3 mt-1">
@@ -318,16 +315,16 @@ export default function Goals() {
               <div className="flex gap-2.5 pt-1">
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="secondary"
                   onClick={() => handleOpenChange(false)}
-                  className="flex-1 border-line/10 bg-transparent text-content-2 hover:bg-state/5"
+                  className="flex-1"
                 >
                   Cancelar
                 </Button>
                 <Button
                   type="submit"
                   disabled={isSubmitting}
-                  className="flex-[1.4] bg-accent-fill text-accent-contrast hover:bg-accent-fill/90 font-medium"
+                  className="flex-[1.4] font-medium"
                 >
                   {isSubmitting ? "Salvando…" : editing ? "Salvar" : "Criar meta"}
                 </Button>
@@ -339,7 +336,7 @@ export default function Goals() {
 
       {/* Banner Sugestão da Norby (some quando não há insight) */}
       {insight?.suggested_action && (
-        <div className="relative overflow-hidden glass border-accent/25 p-6">
+        <div className="relative overflow-hidden panel border-accent/25 p-6">
           <div className="relative flex items-center gap-5 flex-wrap">
             <div className="flex min-w-0 flex-1 items-start gap-4 sm:min-w-[300px]">
               <AiOrb size={44} className="mt-0.5" />
@@ -354,7 +351,7 @@ export default function Goals() {
             </div>
             <Button
               onClick={() => navigate("/ai")}
-              className="bg-accent-fill text-accent-contrast hover:bg-accent-fill/90 font-medium shrink-0"
+              className="font-medium shrink-0"
             >
               Conversar com a Norby <ArrowRight size={15} />
             </Button>
@@ -364,8 +361,13 @@ export default function Goals() {
 
       {/* Grid de metas */}
       <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-        {goals.length === 0 && (
-          <div className="col-span-full glass p-10 flex flex-col items-center text-center">
+        {status === "loading" && <LoadingCards count={3} className="min-h-[220px]" />}
+        {status === "error" && (
+          <LoadError what="suas metas" onRetry={reload} className="col-span-full" />
+        )}
+
+        {status === "ok" && goals.length === 0 && (
+          <div className="col-span-full panel p-10 flex flex-col items-center text-center">
             <div className="w-11 h-11 rounded-xl bg-accent/[0.15] flex items-center justify-center mb-3">
               <Target size={20} className="text-accent" />
             </div>
@@ -391,7 +393,7 @@ export default function Goals() {
           return (
             <div
               key={g.id}
-              className="group relative overflow-hidden glass-hover p-6 flex flex-col"
+              className="group relative overflow-hidden panel-hover p-6 flex flex-col"
             >
               {/* topo: tipo textual + status/prazo */}
               <div className="relative flex items-start justify-between mb-4">
@@ -461,7 +463,11 @@ export default function Goals() {
 
               <p className="relative text-xs text-content-2 mt-3">
                 {done
-                  ? "Meta alcançada 🎉"
+                  ? (
+                    <span className="inline-flex items-center gap-1 text-income font-medium">
+                      <Check size={12} aria-hidden="true" /> Meta alcançada
+                    </span>
+                  )
                   : over
                     ? `Ultrapassou em ${formatBRL(parseFloat(g.current_amount) - parseFloat(g.target_amount))}`
                     : `Faltam ${formatBRL(g.remaining)}`}
@@ -500,9 +506,10 @@ export default function Goals() {
                   <Pencil size={14} />
                 </button>
                 <ConfirmDialog
-                  title="Remover esta meta?"
-                  confirmLabel="Remover"
-                  errorFallback="Não foi possível remover a meta."
+                  title="Excluir esta meta?"
+                  description={`"${g.name}" sai da sua lista de metas.`}
+                  confirmLabel="Excluir"
+                  errorFallback="Não foi possível excluir a meta."
                   onConfirm={() => deleteGoal(g.id)}
                   trigger={
                     <button
@@ -521,7 +528,7 @@ export default function Goals() {
         })}
 
         {/* Card tracejado "criar" */}
-        {goals.length > 0 && (
+        {status === "ok" && goals.length > 0 && (
           <button
             type="button"
             onClick={(e) => {
