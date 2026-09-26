@@ -1,13 +1,18 @@
 from fastapi import APIRouter, Depends, Query, HTTPException, status, Response, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import func, or_, select
+from sqlalchemy import case, func, or_, select
 from uuid import UUID
 from datetime import date
 from typing import Optional
 from app.dependencies import get_db, get_current_user
 from app.limiter import limiter, user_key
 from app.models.sql_models import User, Transaction, TransactionType, Wallet
-from app.schemas.transaction import TransactionCreate, TransactionUpdate, TransactionResponse
+from app.schemas.transaction import (
+    TransactionCreate,
+    TransactionResponse,
+    TransactionSummary,
+    TransactionUpdate,
+)
 from app.services.transaction_service import apply_delta, revert_delta
 from app.services.wallet_service import get_owned_wallet
 from app.services.goal_service import current_month_range
@@ -75,8 +80,7 @@ async def _get_owned_transaction(transaction_id: UUID, user: User, db: AsyncSess
     return transaction
 
 
-@router.get("/", response_model=list[TransactionResponse])
-async def list_transactions(
+def filtros_da_listagem(
     category: Optional[str] = Query(None),
     type: Optional[TransactionType] = Query(None),
     month: Optional[int] = Query(None, ge=1, le=12),
@@ -84,12 +88,15 @@ async def list_transactions(
     # ano fora do suportado e o erro vira 500 no handler global.
     year: Optional[int] = Query(None, ge=1900, le=2100),
     q: Optional[str] = Query(None, max_length=100),
-    limit: int = Query(200, ge=1, le=500),
-    offset: int = Query(0, ge=0),
+    wallet_id: Optional[UUID] = Query(None),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-    response: Response = None,
-):
+) -> list:
+    """Os filtros de GET / e de GET /summary, num lugar só.
+
+    Dependência compartilhada, e não cópia: o total que o Extrato mostra tem
+    de ser o total da lista que está embaixo dele. Duas cópias do filtro
+    divergem na primeira mudança que esquecer uma delas.
+    """
     filters = [Transaction.user_id == current_user.id]
 
     if category:
@@ -106,6 +113,9 @@ async def list_transactions(
         )
     if type:
         filters.append(Transaction.type == type)
+    # Junto do user_id: a carteira de outra pessoa devolve zero, nunca os dados dela.
+    if wallet_id:
+        filters.append(Transaction.wallet_id == wallet_id)
     # month e year andam juntos. Aceitar um sozinho devolvia 200 com o filtro
     # silenciosamente ignorado: o cliente pedia junho e recebia o histórico
     # inteiro achando que era junho.
@@ -118,7 +128,17 @@ async def list_transactions(
         start, end = current_month_range(date(year, month, 1))
         filters.append(Transaction.date >= start)
         filters.append(Transaction.date < end)
+    return filters
 
+
+@router.get("/", response_model=list[TransactionResponse])
+async def list_transactions(
+    filters: list = Depends(filtros_da_listagem),
+    limit: int = Query(200, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    db: AsyncSession = Depends(get_db),
+    response: Response = None,
+):
     # Contagem com os MESMOS filtros e sem limit/offset: é o que permite a UI
     # dizer "página 2 de 7". Sem isso o front mostra 200 linhas e cala sobre o resto.
     total = (
@@ -134,6 +154,29 @@ async def list_transactions(
         .offset(offset)
     )
     return result.scalars().all()
+
+
+@router.get("/summary", response_model=TransactionSummary)
+async def summarize_transactions(
+    filters: list = Depends(filtros_da_listagem),
+    db: AsyncSession = Depends(get_db),
+):
+    """Quantos lançamentos, quanto entrou e quanto saiu, com os filtros da lista.
+
+    Endpoint e não header: somas em header exigiriam expose_headers no CORS, a
+    armadilha que o X-Total-Count já armou neste repo.
+    """
+    def soma(tipo):
+        return func.coalesce(func.sum(case((Transaction.type == tipo, Transaction.amount))), 0)
+
+    count, income, expenses = (
+        await db.execute(
+            select(func.count(), soma(TransactionType.INCOME), soma(TransactionType.EXPENSE))
+            .select_from(Transaction)
+            .where(*filters)
+        )
+    ).one()
+    return TransactionSummary(count=count, income=income, expenses=expenses)
 
 
 @router.post("/", response_model=TransactionResponse, status_code=status.HTTP_201_CREATED)
