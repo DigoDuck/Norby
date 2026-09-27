@@ -1,12 +1,15 @@
 import { useCallback, useId, useRef, useState } from "react";
-import { Plus, Pencil, Trash2, Wallet } from "lucide-react";
+import { Plus, Pencil, Trash2, Wallet, ReceiptText } from "lucide-react";
 import { walletsApi } from "@/api/wallets";
 import { transactionsApi } from "@/api/transactions";
+import { transfersApi } from "@/api/transfers";
 import { apiErrorMessage, formatBRL, shadcnInputCls } from "@/lib/utils";
 import { OPCOES_BANCO, bancoDaCarteira } from "@/lib/bancos";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import Money from "@/components/shared/Money";
 import WalletMark from "@/components/shared/WalletMark";
+import PagarFaturaDialog from "@/components/wallets/PagarFaturaDialog";
+import PagamentosDialog from "@/components/wallets/PagamentosDialog";
 import { LoadError, LoadingCards } from "@/components/shared/LoadState";
 import { useLoad } from "@/lib/useLoad";
 import { usePlano } from "@/lib/plan";
@@ -25,11 +28,17 @@ import {
 
 // O que sai junto com a carteira, dito em número. Sem o resumo (contando ou
 // falhou) fica "os lançamentos dela": melhor vago do que um zero inventado.
-function oQueVaiJunto(resumo, saldo) {
+// `transferencias` soma as transferências em que a carteira é origem ou
+// destino (ex.: pagamentos de fatura de um cartão), que o resumo de
+// transações não conta.
+function oQueVaiJunto(resumo, saldo, transferencias) {
   const valor = `o saldo de ${formatBRL(saldo)}`;
-  if (!resumo) return `os lançamentos dela e ${valor}`;
-  if (resumo.count === 0) return `${valor} (ela não tem lançamentos)`;
-  return `${resumo.count} ${resumo.count === 1 ? "lançamento" : "lançamentos"} e ${valor}`;
+  const extra = transferencias
+    ? ` e ${transferencias} ${transferencias === 1 ? "transferência" : "transferências"}`
+    : "";
+  if (!resumo) return `os lançamentos dela${extra} e ${valor}`;
+  if (resumo.count === 0) return `${valor}${extra} (ela não tem lançamentos)`;
+  return `${resumo.count} ${resumo.count === 1 ? "lançamento" : "lançamentos"}${extra} e ${valor}`;
 }
 
 const TIPOS = [
@@ -43,6 +52,7 @@ const ehCartao = (w) => w.kind === "CREDIT_CARD";
 // e não na carga da página, que custaria uma requisição por carteira.
 function ExcluirCarteira({ wallet, onConfirm, trigger }) {
   const [resumo, setResumo] = useState(null);
+  const [transferencias, setTransferencias] = useState(0);
 
   async function aoAbrir(aberto) {
     if (!aberto) return;
@@ -52,12 +62,18 @@ function ExcluirCarteira({ wallet, onConfirm, trigger }) {
     } catch {
       setResumo(null);
     }
+    setTransferencias(0);
+    try {
+      setTransferencias((await transfersApi.list({ wallet_id: wallet.id })).data.length);
+    } catch {
+      setTransferencias(0);
+    }
   }
 
   return (
     <ConfirmDialog
       title="Excluir esta carteira?"
-      description={`Excluir "${wallet.name}" leva junto ${oQueVaiJunto(resumo, wallet.balance)}. Não dá para desfazer.`}
+      description={`Excluir "${wallet.name}" leva junto ${oQueVaiJunto(resumo, wallet.balance, transferencias)}. Não dá para desfazer.`}
       confirmLabel="Excluir"
       errorFallback="Não foi possível excluir a carteira."
       onConfirm={onConfirm}
@@ -341,11 +357,46 @@ export default function Wallets() {
                 />
               )}
 
-              <div className="relative flex items-center justify-between mt-auto pt-4 border-t border-line/[0.08]">
-                <span className="text-[11px] text-content-3">
-                  Criada em {new Date(w.created_at).toLocaleDateString("pt-BR")}
-                </span>
+              <div className="relative flex items-center justify-between gap-2 mt-auto pt-4 border-t border-line/[0.08]">
+                {/* Pagar fatura é a ação principal do cartão: diferente de
+                    Editar/Pagamentos/Excluir (secundárias, gerenciam a
+                    carteira), ela fica sempre visível, não escondida atrás do
+                    hover da barra de ações. Substitui a data de criação, que
+                    aqui é a informação de menor valor no card. */}
+                {ehCartao(w) ? (
+                  <PagarFaturaDialog
+                    cartao={w}
+                    contas={wallets.filter((c) => !ehCartao(c))}
+                    onDone={load}
+                    trigger={
+                      <Button size="sm" className="font-medium">
+                        Pagar fatura
+                      </Button>
+                    }
+                  />
+                ) : (
+                  <span className="text-[11px] text-content-3">
+                    Criada em {new Date(w.created_at).toLocaleDateString("pt-BR")}
+                  </span>
+                )}
                 <div className="flex items-center gap-1.5 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 focus-within:opacity-100">
+                  {ehCartao(w) && (
+                    <PagamentosDialog
+                      cartao={w}
+                      contas={wallets}
+                      onChange={load}
+                      trigger={
+                        <button
+                          type="button"
+                          title="Pagamentos"
+                          className="w-8 h-8 flex items-center justify-center rounded-lg border border-line/10 text-content-3 hover:text-content hover:border-line/20 transition-colors"
+                        >
+                          <ReceiptText size={14} />
+                          <span className="sr-only">Pagamentos da fatura</span>
+                        </button>
+                      }
+                    />
+                  )}
                   <button
                     type="button"
                     onClick={(e) => openEdit(w, e)}

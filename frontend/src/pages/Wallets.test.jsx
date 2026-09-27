@@ -7,6 +7,7 @@ import { render, screen, fireEvent, waitFor, within } from "@testing-library/rea
 
 import { walletsApi } from "@/api/wallets";
 import { transactionsApi } from "@/api/transactions";
+import { transfersApi } from "@/api/transfers";
 import Wallets from "./Wallets";
 
 vi.mock("@/api/transactions", () => ({ transactionsApi: { summary: vi.fn() } }));
@@ -193,6 +194,7 @@ describe("Wallets, excluir carteira", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     walletsApi.list.mockResolvedValue({ data: [NUBANK] });
+    transfersApi.list.mockResolvedValue({ data: [] });
   });
 
   it("antes de excluir, diz quantos lançamentos e qual saldo vão junto", async () => {
@@ -281,5 +283,29 @@ describe("Wallets, cartão de crédito", () => {
 
     await waitFor(() => expect(walletsApi.create).toHaveBeenCalled());
     expect(walletsApi.create.mock.calls[0][0]).toMatchObject({ kind: "ACCOUNT", balance: 50 });
+  });
+
+  it("só o cartão tem o botão Pagar fatura", async () => {
+    walletsApi.list.mockResolvedValue({
+      data: [
+        { id: "c1", name: "Cartão", balance: "-300.00", bank: null, kind: "CREDIT_CARD", created_at: "2026-09-01T00:00:00Z" },
+        { id: "a1", name: "Conta", balance: "1000.00", bank: null, kind: "ACCOUNT", created_at: "2026-09-01T00:00:00Z" },
+      ],
+    });
+    render(<Wallets />);
+    expect(await screen.findAllByRole("button", { name: "Pagar fatura" })).toHaveLength(1);
+  });
+
+  it("o aviso de excluir carteira cita as transferências que vão junto", async () => {
+    walletsApi.list.mockResolvedValue({
+      data: [{ id: "c1", name: "Cartão", balance: "0.00", bank: null, kind: "CREDIT_CARD", created_at: "2026-09-01T00:00:00Z" }],
+    });
+    transactionsApi.summary.mockResolvedValue({ data: { count: 2, income: "0", expenses: "300" } });
+    transfersApi.list.mockResolvedValue({ data: [{ id: "t1" }] });
+    render(<Wallets />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Excluir carteira", expanded: false }));
+    const dialog = await screen.findByRole("dialog");
+    expect(await within(dialog).findByText(/1 transferência/)).toBeInTheDocument();
   });
 });
