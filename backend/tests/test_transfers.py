@@ -130,6 +130,23 @@ async def test_deleting_the_card_keeps_the_payment_in_the_account(make_auth_clie
     assert (await ac.get("/transfers/", params={"wallet_id": conta["id"]})).json() == []
 
 
+@pytest.mark.asyncio
+async def test_deleting_the_same_transfer_twice_only_undoes_it_once(make_auth_client):
+    # Regressão: o segundo DELETE não pode desfazer o efeito de novo. O lock na
+    # linha da transferência (ver routers/transfers.py) é o que impede a
+    # duplicação quando dois DELETEs concorrentes leem a mesma linha antes de
+    # qualquer um dos dois travar as carteiras.
+    ac = await make_auth_client()
+    conta = await _carteira(ac, "Conta", "1000.00")
+    cartao = await _carteira(ac, "Cartão", "-300.00", "CREDIT_CARD")
+    t = (await _transferir(ac, conta["id"], cartao["id"])).json()
+
+    assert (await ac.delete(f"/transfers/{t['id']}")).status_code == 204
+    assert (await ac.delete(f"/transfers/{t['id']}")).status_code == 404
+    assert await _saldo(ac, conta["id"]) == 1000.0
+    assert await _saldo(ac, cartao["id"]) == -300.0
+
+
 def test_wallets_are_locked_in_a_fixed_order():
     # A→B e B→A travando em ordens opostas dariam deadlock no Postgres.
     a, b = uuid.uuid4(), uuid.uuid4()

@@ -48,8 +48,15 @@ async def remove_transfer(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    # Trava a linha ANTES das carteiras (mesma ordem de _get_owned_transaction em
+    # transactions.py): sem o lock, dois DELETE concorrentes leem a mesma
+    # transferência, cada um trava as carteiras por sua vez e desfaz o efeito
+    # duas vezes — o saldo sai duplicado, mesmo o segundo DELETE não apagando
+    # nenhuma linha (o SQLAlchemy só avisa, não levanta erro, quando afeta 0 linhas).
     transfer = await db.scalar(
-        select(Transfer).where(Transfer.id == transfer_id, Transfer.user_id == current_user.id)
+        select(Transfer)
+        .where(Transfer.id == transfer_id, Transfer.user_id == current_user.id)
+        .with_for_update()
     )
     if transfer is None:
         # Inexistente e "de outro dono" respondem igual (sem oráculo de ids).
