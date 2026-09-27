@@ -20,6 +20,19 @@ import { apiErrorMessage, shadcnInputCls, todayInput } from "@/lib/utils";
 // Fatura atual = o negativo do saldo. Cartão em crédito ou zerado não deve nada.
 const faturaDe = (cartao) => Math.max(0, -Number(cartao.balance));
 
+// GET /wallets/ vem em created_at desc (mais nova primeiro), então contas[0]
+// era a conta MAIS NOVA — sem querer, o padrão de "de onde sai o pagamento".
+// A mais antiga costuma ser a conta principal de quem usa o app; sem
+// created_at em nenhuma conta (ex.: dado de teste), cai no último item.
+function contaMaisAntiga(contas) {
+  let escolhida = null;
+  for (const c of contas) {
+    if (!c.created_at) continue;
+    if (!escolhida || new Date(c.created_at) < new Date(escolhida.created_at)) escolhida = c;
+  }
+  return escolhida ?? contas[contas.length - 1];
+}
+
 /**
  * Pagar a fatura = transferir de uma conta para o cartão. Não é despesa: o
  * gasto já foi contado quando cada compra entrou no cartão (ADR 0005).
@@ -38,9 +51,9 @@ export default function PagarFaturaDialog({ cartao, contas, trigger, onDone }) {
   function handleOpenChange(v) {
     setOpen(v);
     if (v) {
-      // Reabre sempre com a fatura do momento e a primeira conta.
+      // Reabre sempre com a fatura do momento e a conta mais antiga.
       setValor(faturaDe(cartao));
-      setOrigem(contas[0]?.id ?? "");
+      setOrigem(contas.length ? contaMaisAntiga(contas).id : "");
       setData(todayInput());
       setError(null);
     }

@@ -66,6 +66,38 @@ describe("PagarFaturaDialog", () => {
     expect(await screen.findByRole("button", { name: "Confirmar pagamento" })).not.toBeDisabled();
   });
 
+  it("origem padrão é a conta mais antiga, não a primeira do array (GET /wallets/ vem created_at desc)", async () => {
+    const nova = {
+      id: "a-nova",
+      name: "Nova",
+      balance: "1.00",
+      kind: "ACCOUNT",
+      created_at: "2026-09-20T00:00:00Z",
+    };
+    const antiga = {
+      id: "a-antiga",
+      name: "Antiga",
+      balance: "1.00",
+      kind: "ACCOUNT",
+      created_at: "2026-01-01T00:00:00Z",
+    };
+    transfersApi.create.mockResolvedValue({ data: {} });
+    render(
+      <PagarFaturaDialog
+        cartao={CARTAO}
+        contas={[nova, antiga]}
+        onDone={vi.fn()}
+        trigger={<button type="button">Pagar fatura</button>}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "Pagar fatura", expanded: false }));
+    fireEvent.click(await screen.findByRole("button", { name: "Confirmar pagamento" }));
+
+    await waitFor(() => expect(transfersApi.create).toHaveBeenCalled());
+    expect(transfersApi.create.mock.calls[0][0]).toMatchObject({ from_wallet_id: "a-antiga" });
+  });
+
   it("sem conta de origem, explica em vez de mostrar um form inútil", async () => {
     render(
       <PagarFaturaDialog
