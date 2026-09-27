@@ -20,6 +20,10 @@ class TransactionType(str, PyEnum):
     INCOME = "INCOME" # Renda
     EXPENSE = "EXPENSE" # Despesas
 
+class WalletKind(str, PyEnum):
+    ACCOUNT = "ACCOUNT"          # conta, poupança, dinheiro
+    CREDIT_CARD = "CREDIT_CARD"  # saldo negativo = fatura em aberto
+
 class RecurrenceFrequency(str, PyEnum):
     WEEKLY = "WEEKLY"
     MONTHLY = "MONTHLY"
@@ -258,6 +262,11 @@ class Wallet(Base):
     # sem banco definido — e o front cai no comportamento antigo. Guarda o slug,
     # nao o nome: o rotulo e a marca sao apresentacao e vivem no frontend.
     bank: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    # Só apresentação: a regra de saldo é a mesma para os dois tipos. Despesa
+    # no cartão deixa o saldo negativo, e esse negativo É a fatura em aberto.
+    kind: Mapped[WalletKind] = mapped_column(
+        Enum(WalletKind), nullable=False, default=WalletKind.ACCOUNT, server_default="ACCOUNT"
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     
     user: Mapped["User"] = relationship("User", back_populates="wallets")

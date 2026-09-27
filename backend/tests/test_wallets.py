@@ -129,3 +129,43 @@ async def test_update_can_switch_banks(make_auth_client):
     assert res.status_code == 200, res.text
     assert res.json()["bank"] == "itau"
 
+
+# --- Tipo de carteira (Task 1) -------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_wallet_defaults_to_account(make_auth_client):
+    ac = await make_auth_client()
+    w = await make_wallet(ac)
+    assert w["kind"] == "ACCOUNT"
+
+
+@pytest.mark.asyncio
+async def test_credit_card_starts_with_the_open_invoice_as_negative_balance(make_auth_client):
+    ac = await make_auth_client()
+    res = await ac.post(
+        "/wallets/",
+        json={"name": "Cartão Nubank", "kind": "CREDIT_CARD", "balance": "-1200.00"},
+    )
+    assert res.status_code == 201, res.text
+    assert res.json()["kind"] == "CREDIT_CARD"
+    assert float(res.json()["balance"]) == -1200.0
+
+
+@pytest.mark.asyncio
+async def test_credit_card_rejects_positive_initial_balance(make_auth_client):
+    ac = await make_auth_client()
+    res = await ac.post(
+        "/wallets/", json={"name": "Cartão", "kind": "CREDIT_CARD", "balance": "50.00"}
+    )
+    assert res.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_kind_can_be_changed_on_update(make_auth_client):
+    ac = await make_auth_client()
+    w = await make_wallet(ac, balance="0.00")
+    res = await ac.put(f"/wallets/{w['id']}", json={"kind": "CREDIT_CARD"})
+    assert res.status_code == 200, res.text
+    assert res.json()["kind"] == "CREDIT_CARD"
+

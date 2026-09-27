@@ -18,6 +18,9 @@ Money = Annotated[Decimal, Field(gt=0, le=MAX_MONEY, decimal_places=2)]
 # Valor monetário que pode ser zero (saldo inicial, progresso de meta).
 MoneyOrZero = Annotated[Decimal, Field(ge=0, le=MAX_MONEY, decimal_places=2)]
 
+# Valor monetário com sinal: saldo inicial de cartão (a fatura em aberto é negativa).
+SignedMoney = Annotated[Decimal, Field(ge=-MAX_MONEY, le=MAX_MONEY, decimal_places=2)]
+
 # Espelha String(100) das colunas name/category.
 ShortText = Annotated[str, Field(min_length=1, max_length=100)]
 
