@@ -48,7 +48,23 @@ describe("PagamentosDialog", () => {
     expect(await screen.findByText("Nenhum pagamento registrado.")).toBeInTheDocument();
   });
 
-  it("excluir devolve à lista atualizada e avisa quem usa", async () => {
+  it("excluir pede confirmação antes de chamar a API", async () => {
+    transfersApi.list.mockResolvedValue({
+      data: [{ id: "t1", from_wallet_id: "a1", to_wallet_id: "c1", amount: "300.00", date: "2026-09-20" }],
+    });
+    renderizar();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Pagamentos", expanded: false }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Excluir pagamento", expanded: false }),
+    );
+
+    // O diálogo de confirmação abriu, mas ninguém confirmou ainda.
+    expect(await screen.findByText("Excluir este pagamento?")).toBeInTheDocument();
+    expect(transfersApi.delete).not.toHaveBeenCalled();
+  });
+
+  it("confirmar exclusão devolve à lista atualizada, avisa quem usa e chama a API uma vez", async () => {
     transfersApi.list
       .mockResolvedValueOnce({
         data: [{ id: "t1", from_wallet_id: "a1", to_wallet_id: "c1", amount: "300.00", date: "2026-09-20" }],
@@ -58,11 +74,15 @@ describe("PagamentosDialog", () => {
     const onChange = renderizar();
 
     fireEvent.click(await screen.findByRole("button", { name: "Pagamentos", expanded: false }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Excluir pagamento", expanded: false }),
+    );
     fireEvent.click(await screen.findByRole("button", { name: "Excluir" }));
 
     await waitFor(() => expect(transfersApi.delete).toHaveBeenCalledWith("t1"));
     expect(await screen.findByText("Nenhum pagamento registrado.")).toBeInTheDocument();
     expect(onChange).toHaveBeenCalled();
+    expect(transfersApi.delete).toHaveBeenCalledTimes(1);
   });
 
   it("falha ao carregar mostra erro com jeito de tentar de novo", async () => {

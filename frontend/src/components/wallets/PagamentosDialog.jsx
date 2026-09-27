@@ -10,9 +10,10 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import Money from "@/components/shared/Money";
 import { LoadError } from "@/components/shared/LoadState";
-import { apiErrorMessage, formatDateBR } from "@/lib/utils";
+import { apiErrorMessage, formatBRL, formatDateBR } from "@/lib/utils";
 
 /**
  * Pagamentos já registrados para o cartão, com desfazer. Busca ao abrir, e
@@ -32,18 +33,23 @@ export default function PagamentosDialog({ cartao, contas, trigger, onChange }) 
     }
   }
 
+  // Reabrir com a lista da vez anterior ainda em tela mentia o "Carregando…":
+  // limpa os dois antes de buscar de novo.
+  function aoAbrir(aberto) {
+    if (!aberto) return;
+    setItens(null);
+    setError(null);
+    carregar();
+  }
+
   async function excluir(id) {
-    try {
-      await transfersApi.delete(id);
-      await carregar();
-      onChange?.();
-    } catch (err) {
-      setError(apiErrorMessage(err, "Não foi possível excluir o pagamento."));
-    }
+    await transfersApi.delete(id);
+    await carregar();
+    onChange?.();
   }
 
   return (
-    <Dialog onOpenChange={(v) => v && carregar()}>
+    <Dialog onOpenChange={aoAbrir}>
       <DialogTrigger render={trigger} />
       <DialogContent>
         <DialogHeader>
@@ -51,10 +57,11 @@ export default function PagamentosDialog({ cartao, contas, trigger, onChange }) 
           <DialogDescription>Excluir um pagamento devolve o valor à conta de origem.</DialogDescription>
         </DialogHeader>
 
-        {/* Falha na busca inicial: sem itens para mostrar, o mesmo aviso com
-            "Tentar de novo" das outras telas, não um texto solto. Falha ao
-            excluir é outro caso: a lista que já carregou continua na tela,
-            só o aviso entra junto (ver abaixo). */}
+        {/* Falha na busca inicial (abrir ou "Tentar de novo"): sem itens para
+            mostrar, o mesmo aviso com retry das outras telas. Falha ao excluir
+            aparece dentro do próprio ConfirmDialog da linha; o aviso abaixo é
+            só para quando o refetch que SEGUE um excluir bem-sucedido falha e
+            a lista antiga fica em tela. */}
         {error && itens === null && <LoadError what="os pagamentos" onRetry={carregar} />}
         {itens === null && !error && <p role="status" className="text-sm text-content-2">Carregando…</p>}
         {itens?.length === 0 && <p className="text-sm text-content-2">Nenhum pagamento registrado.</p>}
@@ -65,12 +72,24 @@ export default function PagamentosDialog({ cartao, contas, trigger, onChange }) 
                 <div>
                   <Money value={t.amount} className="text-sm font-medium text-content" />
                   <p className="text-xs text-content-3">
-                    {formatDateBR(t.date)} · de {nomeDa(t.from_wallet_id)}
+                    {formatDateBR(t.date)} ·{" "}
+                    {t.to_wallet_id === cartao.id
+                      ? `de ${nomeDa(t.from_wallet_id)}`
+                      : `para ${nomeDa(t.to_wallet_id)}`}
                   </p>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => excluir(t.id)}>
-                  Excluir
-                </Button>
+                <ConfirmDialog
+                  title="Excluir este pagamento?"
+                  description={`Devolve ${formatBRL(t.amount)} para ${nomeDa(t.from_wallet_id)}.`}
+                  confirmLabel="Excluir"
+                  errorFallback="Não foi possível excluir o pagamento."
+                  onConfirm={() => excluir(t.id)}
+                  trigger={
+                    <Button variant="outline" size="sm" aria-label="Excluir pagamento">
+                      Excluir
+                    </Button>
+                  }
+                />
               </li>
             ))}
           </ul>
