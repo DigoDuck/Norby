@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 from starlette.requests import ClientDisconnect
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from app.routers import auth, wallets, transactions, ai, recurring, goals, dashboard, billing, admin
+from app.routers import auth, wallets, transactions, ai, recurring, goals, dashboard, billing, admin, transfers
 from app.services.plan_service import PlanRefused
 from app.services.wallet_service import WalletNotFound
 from app.config import get_settings
@@ -158,6 +158,7 @@ async def response_headers(request: Request, call_next):
 app.include_router(auth.router)
 app.include_router(wallets.router)
 app.include_router(transactions.router)
+app.include_router(transfers.router)
 app.include_router(ai.router)
 app.include_router(recurring.router)
 app.include_router(goals.router)

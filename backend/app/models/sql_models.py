@@ -296,6 +296,33 @@ class Transaction(Base):
     user: Mapped["User"] = relationship("User", back_populates="transactions")
     wallet: Mapped["Wallet"] = relationship("Wallet", back_populates="transactions")
 
+class Transfer(Base):
+    """Dinheiro movido entre duas carteiras do mesmo dono: pagar a fatura do cartão.
+
+    Tabela própria, e não um terceiro TransactionType, de propósito: toda
+    agregação de receita e despesa lê `transactions`, então aqui ela não
+    enxerga transferência por construção. Um tipo TRANSFER lá dentro obrigaria
+    cada query a lembrar de excluí-lo, e a primeira que esquecesse voltaria a
+    contar o pagamento da fatura como gasto.
+    """
+    __tablename__ = "transfers"
+
+    __table_args__ = (
+        CheckConstraint("amount > 0", name="ck_transfers_amount_positive"),
+        CheckConstraint("from_wallet_id <> to_wallet_id", name="ck_transfers_distinct_wallets"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    # CASCADE nas duas pontas: excluir uma carteira apaga a transferência, e a
+    # outra ponta mantém o saldo, porque o dinheiro de fato se moveu.
+    from_wallet_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("wallets.id", ondelete="CASCADE"), index=True)
+    to_wallet_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("wallets.id", ondelete="CASCADE"), index=True)
+    amount: Mapped[Decimal] = mapped_column(Numeric(15, 2), nullable=False)
+    date: Mapped[date] = mapped_column(Date, nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
 class RecurringTransaction(Base):
     __tablename__ = "recurring_transactions"
 
