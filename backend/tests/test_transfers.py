@@ -216,6 +216,8 @@ async def test_blocked_destination_is_refused(make_auth_client, db_session, payw
     res = await _transferir(ac, str(antiga.id), str(nova.id), "10.00")
     assert res.status_code == 403, res.text
     assert res.json()["detail"]["code"] == "WALLET_READ_ONLY"
+    # Recusada de ponta a ponta: nem a origem, que só doaria, se mexe.
+    assert await _saldo(ac, str(antiga.id)) == 100.0
 
 
 @pytest.mark.asyncio
@@ -225,3 +227,28 @@ async def test_blocked_origin_can_be_drained(make_auth_client, db_session, paywa
 
     res = await _transferir(ac, str(nova.id), str(antiga.id), "10.00")
     assert res.status_code == 201, res.text
+    assert await _saldo(ac, str(nova.id)) == 90.0
+    assert await _saldo(ac, str(antiga.id)) == 110.0
+
+
+@pytest.mark.asyncio
+async def test_deleting_a_transfer_is_allowed_even_if_destination_became_blocked(
+    make_auth_client, db_session
+):
+    # Cria com o paywall desligado (default da suíte), depois liga o flag: o
+    # delete não pode passar a recusar uma transferência que já existia,
+    # senão desfazer (sempre permitido, igual excluir transação) quebraria
+    # assim que o dono da carteira estourasse o teto.
+    ac = await make_auth_client()
+    antiga, _meio, nova = await _tres_carteiras(ac, db_session)
+    t = (await _transferir(ac, str(antiga.id), str(nova.id), "10.00")).json()
+
+    settings = get_settings()
+    antes = settings.paywall_enabled
+    settings.paywall_enabled = True
+    try:
+        res = await ac.delete(f"/transfers/{t['id']}")
+    finally:
+        settings.paywall_enabled = antes
+
+    assert res.status_code == 204
