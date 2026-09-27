@@ -223,7 +223,7 @@ export default function Wallets() {
             <DialogTitle>{editing ? "Editar carteira" : "Nova carteira"}</DialogTitle>
             <p className="text-xs text-content-2 mt-0.5">
               {editing
-                ? "Atualize o nome desta carteira"
+                ? "Atualize o nome, o tipo e o banco desta carteira"
                 : "Adicione uma conta ou cartão para acompanhar"}
             </p>
           </DialogHeader>
