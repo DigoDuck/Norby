@@ -191,6 +191,9 @@ describe("Transactions", () => {
     );
   });
 
+  // Timeout aumentado para 15s: este teste renderiza três páginas de 50 linhas e cada
+  // passo é CPU pura (render + getByRole num DOM grande), sem espera travada. Medido:
+  // ~4s sozinho e ~6s na suíte completa, passando dos 5s padrão.
   it("a busca sobrevive à paginação: 'Próxima' carrega com o termo ativo", async () => {
     transactionsApi.list
       .mockResolvedValueOnce(pagina(50, 50, "p1-")) // mount
@@ -219,7 +222,7 @@ describe("Transactions", () => {
     expect(transactionsApi.list).toHaveBeenLastCalledWith(
       expect.objectContaining({ q: "mercado", offset: 50 }),
     );
-  });
+  }, 15000);
 
   it("anuncia no role=status quando a busca não encontra nada", async () => {
     transactionsApi.list

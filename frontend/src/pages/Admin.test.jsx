@@ -77,10 +77,18 @@ function renderAdmin() {
   );
 }
 
-// Timeout maior: o Dialog do Base UI monta em portal, e a máquina de CI pode
-// demorar mais que o padrão de 1s sob carga.
+// O gatilho do Dialog do Base UI chega ao DOM antes de responder ao clique:
+// o handler e o aria-expanded dependem de uma inscrição no store que o React
+// só faz nos efeitos passivos, uma tarefa depois do commit. O findByText
+// resolve no commit e, sob carga, o clique caía nessa janela: o diálogo nunca
+// abria (não era lentidão, nem com 10s de espera ele abria). Esperar
+// aria-expanded="false" é esperar o mesmo render que liga o clique.
+async function abrirDialogo(linha, nome) {
+  fireEvent.click(await within(linha).findByRole("button", { name: nome, expanded: false }));
+}
+
 async function fillPassword(value) {
-  fireEvent.change(await screen.findByLabelText("Sua senha atual", {}, { timeout: 3000 }), {
+  fireEvent.change(await screen.findByLabelText("Sua senha atual"), {
     target: { value },
   });
 }
@@ -173,9 +181,7 @@ describe("Admin", () => {
     await screen.findByText("alice@test.com");
 
     const linha = screen.getByText("alice@test.com").closest("li");
-    fireEvent.click(
-      within(linha).getByRole("button", { name: "Cancelar assinatura" }),
-    );
+    await abrirDialogo(linha, "Cancelar assinatura");
 
     await fillPassword("secret123");
     fireEvent.click(screen.getByRole("button", { name: "Confirmar" }));
@@ -196,7 +202,7 @@ describe("Admin", () => {
     await screen.findByText("alice@test.com");
 
     const linha = screen.getByText("alice@test.com").closest("li");
-    fireEvent.click(within(linha).getByRole("button", { name: "Excluir conta" }));
+    await abrirDialogo(linha, "Excluir conta");
 
     await fillPassword("senhaerrada");
     fireEvent.click(screen.getByRole("button", { name: "Confirmar" }));
@@ -219,7 +225,7 @@ describe("Admin", () => {
     await screen.findByText("alice@test.com");
 
     const linha = screen.getByText("alice@test.com").closest("li");
-    fireEvent.click(within(linha).getByRole("button", { name: "Excluir conta" }));
+    await abrirDialogo(linha, "Excluir conta");
     await fillPassword("secret123");
 
     // A exclusão em si funciona; só a releitura seguinte falha desta vez.
