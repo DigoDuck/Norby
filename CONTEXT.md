@@ -76,3 +76,19 @@ Resolvido pelo [ADR 0004](docs/adr/0004-area-de-admin.md) (issue #23).
 | mensagem de erro como identificador | o `code` da recusa | `message` muda quando o texto melhora; quem o frontend testa é o `code` |
 | "moderador", "staff" | admin | Existe **um** papel de controlador nesta v2, sem hierarquia entre eles |
 | "admin premium", "premium de cortesia" | admin | O admin passa pelos portões sem ser premium. Premium é quem paga, e é isso que as métricas contam |
+
+## Cartão de crédito
+
+Resolvido pelo [ADR 0005](docs/adr/0005-cartao-de-credito-e-transferencia.md).
+
+| Termo | Significa | Como se mede |
+|---|---|---|
+| **cartão** | Carteira com `kind = CREDIT_CARD`. Mesma regra de saldo de qualquer carteira; conta no teto de carteiras | `wallets.kind` |
+| **fatura atual** | O que se deve no cartão agora. Não existe fechamento nem vencimento: é o saldo devedor | `-balance` quando `balance < 0` |
+| **transferência** | Dinheiro movido entre duas carteiras do mesmo dono. **Nunca** é receita nem despesa | linha em `transfers` |
+| **pagar a fatura** | Transferência de uma conta para o cartão | `POST /transfers` com o cartão no destino |
+
+| Não usar | Usar | Por quê |
+|---|---|---|
+| "despesa de pagamento de fatura" | pagar a fatura (transferência) | Lançar o pagamento como despesa conta o mesmo gasto duas vezes |
+| `TRANSFER` como tipo de transação | `transfers` | Toda agregação lê `transactions`; tabela separada fica fora delas por construção |

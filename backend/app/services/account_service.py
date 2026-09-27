@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import ai_insights_collection, chat_history_collection
 from app.models.sql_models import (
-    User, Wallet, Transaction, RecurringTransaction, Goal,
+    User, Wallet, Transaction, RecurringTransaction, Goal, Transfer,
 )
 from app.services.billing_service import cancel_subscription
 
@@ -90,6 +90,7 @@ async def export_data(user: User, db: AsyncSession) -> dict:
         },
         "wallets": await _scoped(db, Wallet, user.id),
         "transactions": await _scoped(db, Transaction, user.id),
+        "transfers": await _scoped(db, Transfer, user.id),
         "recurring_transactions": await _scoped(db, RecurringTransaction, user.id),
         "goals": await _scoped(db, Goal, user.id),
         "ai_insights": insights,

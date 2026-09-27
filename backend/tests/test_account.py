@@ -188,3 +188,19 @@ async def test_deleting_a_user_without_a_subscription_calls_no_gateway(make_auth
         "DELETE", "/auth/me", json={"confirm": True, "password": "secret123"}
     )
     assert res.status_code == 204
+
+
+@pytest.mark.asyncio
+async def test_export_includes_transfers(make_auth_client, mongo):
+    ac = await make_auth_client()
+    conta = (await ac.post("/wallets/", json={"name": "Conta", "balance": "100.00"})).json()
+    cartao = (await ac.post("/wallets/", json={"name": "Cartão", "kind": "CREDIT_CARD"})).json()
+    res = await ac.post(
+        "/transfers/",
+        json={"from_wallet_id": conta["id"], "to_wallet_id": cartao["id"], "amount": "40.00", "date": "2026-09-01"},
+    )
+    assert res.status_code == 201, res.text
+
+    dump = (await ac.get("/auth/me/export")).json()
+    assert len(dump["transfers"]) == 1
+    assert float(dump["transfers"][0]["amount"]) == 40.0
