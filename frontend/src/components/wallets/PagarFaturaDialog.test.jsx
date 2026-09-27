@@ -52,6 +52,20 @@ describe("PagarFaturaDialog", () => {
     expect(transfersApi.create).not.toHaveBeenCalled();
   });
 
+  it("falha ao registrar mostra o erro, mantém o diálogo aberto e não chama onDone", async () => {
+    transfersApi.create.mockRejectedValue(new Error("500"));
+    const onDone = renderizar();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Pagar fatura", expanded: false }));
+    const confirmar = await screen.findByRole("button", { name: "Confirmar pagamento" });
+    fireEvent.click(confirmar);
+
+    expect(await screen.findByText("Não foi possível registrar o pagamento.")).toBeInTheDocument();
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    expect(onDone).not.toHaveBeenCalled();
+    expect(await screen.findByRole("button", { name: "Confirmar pagamento" })).not.toBeDisabled();
+  });
+
   it("sem conta de origem, explica em vez de mostrar um form inútil", async () => {
     render(
       <PagarFaturaDialog
