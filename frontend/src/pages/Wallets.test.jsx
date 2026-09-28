@@ -7,6 +7,7 @@ import { render, screen, fireEvent, waitFor, within } from "@testing-library/rea
 
 import { walletsApi } from "@/api/wallets";
 import { transactionsApi } from "@/api/transactions";
+import { transfersApi } from "@/api/transfers";
 import Wallets from "./Wallets";
 
 vi.mock("@/api/transactions", () => ({ transactionsApi: { summary: vi.fn() } }));
@@ -18,6 +19,10 @@ vi.mock("@/api/wallets", () => ({
     update: vi.fn(),
     delete: vi.fn(),
   },
+}));
+
+vi.mock("@/api/transfers", () => ({
+  transfersApi: { list: vi.fn(), create: vi.fn(), delete: vi.fn() },
 }));
 
 describe("Wallets", () => {
@@ -189,6 +194,7 @@ describe("Wallets, excluir carteira", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     walletsApi.list.mockResolvedValue({ data: [NUBANK] });
+    transfersApi.list.mockResolvedValue({ data: [] });
   });
 
   it("antes de excluir, diz quantos lançamentos e qual saldo vão junto", async () => {
@@ -218,5 +224,88 @@ describe("Wallets, excluir carteira", () => {
     expect(within(dialog).getByText(/os lançamentos dela/)).toBeInTheDocument();
     expect(within(dialog).queryByText(/\d+ lançamentos?/)).not.toBeInTheDocument();
     expect(within(dialog).getByText(/não dá para desfazer/i)).toBeInTheDocument();
+  });
+});
+
+describe("Wallets, cartão de crédito", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    walletsApi.list.mockResolvedValue({ data: [] });
+  });
+
+  it("cartão mostra a fatura atual, sem sinal de menos", async () => {
+    walletsApi.list.mockResolvedValue({
+      data: [{ id: "c1", name: "Cartão", balance: "-1200.50", bank: null, kind: "CREDIT_CARD", created_at: "2026-09-01T00:00:00Z" }],
+    });
+    render(<Wallets />);
+
+    // O header também mostra o saldo total (que também é negativo aqui), então
+    // as asserções precisam ficar restritas ao card da carteira, não à página
+    // inteira: `getByText` sem escopo casaria com os dois lugares.
+    const fatura = await screen.findByText("Fatura atual");
+    const card = fatura.closest(".panel-hover");
+    expect(within(card).getByText(/R\$ 1\.200/)).toBeInTheDocument();
+    expect(within(card).queryByText(/−R\$/)).not.toBeInTheDocument();
+  });
+
+  it("cartão com saldo positivo mostra crédito", async () => {
+    walletsApi.list.mockResolvedValue({
+      data: [{ id: "c1", name: "Cartão", balance: "30.00", bank: null, kind: "CREDIT_CARD", created_at: "2026-09-01T00:00:00Z" }],
+    });
+    render(<Wallets />);
+    expect(await screen.findByText("Crédito no cartão")).toBeInTheDocument();
+  });
+
+  it("criar cartão envia a fatura em aberto como saldo negativo", async () => {
+    walletsApi.create.mockResolvedValue({ data: {} });
+    render(<Wallets />);
+    fireEvent.click(await screen.findByRole("button", { name: /nova carteira/i }));
+    await screen.findByRole("dialog");
+
+    fireEvent.change(screen.getByLabelText("Nome da carteira"), { target: { value: "Cartão" } });
+    fireEvent.click(screen.getByRole("button", { name: "Cartão de crédito" }));
+    fireEvent.change(screen.getByLabelText("Fatura em aberto"), { target: { value: "120000" } });
+    fireEvent.click(screen.getByRole("button", { name: /criar carteira/i }));
+
+    await waitFor(() => expect(walletsApi.create).toHaveBeenCalled());
+    expect(walletsApi.create.mock.calls[0][0]).toMatchObject({ kind: "CREDIT_CARD", balance: -1200 });
+  });
+
+  it("conta continua com saldo inicial positivo", async () => {
+    walletsApi.create.mockResolvedValue({ data: {} });
+    render(<Wallets />);
+    fireEvent.click(await screen.findByRole("button", { name: /nova carteira/i }));
+    await screen.findByRole("dialog");
+
+    fireEvent.change(screen.getByLabelText("Nome da carteira"), { target: { value: "Conta" } });
+    fireEvent.change(screen.getByLabelText("Saldo inicial"), { target: { value: "5000" } });
+    fireEvent.click(screen.getByRole("button", { name: /criar carteira/i }));
+
+    await waitFor(() => expect(walletsApi.create).toHaveBeenCalled());
+    expect(walletsApi.create.mock.calls[0][0]).toMatchObject({ kind: "ACCOUNT", balance: 50 });
+  });
+
+  it("só o cartão tem o botão Pagar fatura", async () => {
+    walletsApi.list.mockResolvedValue({
+      data: [
+        { id: "c1", name: "Cartão", balance: "-300.00", bank: null, kind: "CREDIT_CARD", created_at: "2026-09-01T00:00:00Z" },
+        { id: "a1", name: "Conta", balance: "1000.00", bank: null, kind: "ACCOUNT", created_at: "2026-09-01T00:00:00Z" },
+      ],
+    });
+    render(<Wallets />);
+    expect(await screen.findAllByRole("button", { name: "Pagar fatura" })).toHaveLength(1);
+  });
+
+  it("o aviso de excluir carteira cita as transferências que vão junto", async () => {
+    walletsApi.list.mockResolvedValue({
+      data: [{ id: "c1", name: "Cartão", balance: "0.00", bank: null, kind: "CREDIT_CARD", created_at: "2026-09-01T00:00:00Z" }],
+    });
+    transactionsApi.summary.mockResolvedValue({ data: { count: 2, income: "0", expenses: "300" } });
+    transfersApi.list.mockResolvedValue({ data: [{ id: "t1" }] });
+    render(<Wallets />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Excluir carteira", expanded: false }));
+    const dialog = await screen.findByRole("dialog");
+    expect(await within(dialog).findByText(/1 transferência/)).toBeInTheDocument();
   });
 });

@@ -1,12 +1,15 @@
 import { useCallback, useId, useRef, useState } from "react";
-import { Plus, Pencil, Trash2, Wallet } from "lucide-react";
+import { Plus, Pencil, Trash2, Wallet, ReceiptText } from "lucide-react";
 import { walletsApi } from "@/api/wallets";
 import { transactionsApi } from "@/api/transactions";
+import { transfersApi } from "@/api/transfers";
 import { apiErrorMessage, formatBRL, shadcnInputCls } from "@/lib/utils";
 import { OPCOES_BANCO, bancoDaCarteira } from "@/lib/bancos";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import Money from "@/components/shared/Money";
 import WalletMark from "@/components/shared/WalletMark";
+import PagarFaturaDialog from "@/components/wallets/PagarFaturaDialog";
+import PagamentosDialog from "@/components/wallets/PagamentosDialog";
 import { LoadError, LoadingCards } from "@/components/shared/LoadState";
 import { useLoad } from "@/lib/useLoad";
 import { usePlano } from "@/lib/plan";
@@ -15,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MoneyInput } from "@/components/ui/money-input";
 import { Select } from "@/components/ui/select";
+import { Segmented } from "@/components/ui/segmented";
 import {
   Dialog,
   DialogContent,
@@ -24,17 +28,31 @@ import {
 
 // O que sai junto com a carteira, dito em número. Sem o resumo (contando ou
 // falhou) fica "os lançamentos dela": melhor vago do que um zero inventado.
-function oQueVaiJunto(resumo, saldo) {
+// `transferencias` soma as transferências em que a carteira é origem ou
+// destino (ex.: pagamentos de fatura de um cartão), que o resumo de
+// transações não conta.
+function oQueVaiJunto(resumo, saldo, transferencias) {
   const valor = `o saldo de ${formatBRL(saldo)}`;
-  if (!resumo) return `os lançamentos dela e ${valor}`;
-  if (resumo.count === 0) return `${valor} (ela não tem lançamentos)`;
-  return `${resumo.count} ${resumo.count === 1 ? "lançamento" : "lançamentos"} e ${valor}`;
+  const extra = transferencias
+    ? ` e ${transferencias} ${transferencias === 1 ? "transferência" : "transferências"}`
+    : "";
+  if (!resumo) return `os lançamentos dela${extra} e ${valor}`;
+  if (resumo.count === 0) return `${valor}${extra} (ela não tem lançamentos)`;
+  return `${resumo.count} ${resumo.count === 1 ? "lançamento" : "lançamentos"}${extra} e ${valor}`;
 }
+
+const TIPOS = [
+  { value: "ACCOUNT", label: "Conta" },
+  { value: "CREDIT_CARD", label: "Cartão de crédito" },
+];
+
+const ehCartao = (w) => w.kind === "CREDIT_CARD";
 
 // Excluir carteira apaga o histórico dela. O diálogo busca o resumo ao abrir,
 // e não na carga da página, que custaria uma requisição por carteira.
 function ExcluirCarteira({ wallet, onConfirm, trigger }) {
   const [resumo, setResumo] = useState(null);
+  const [transferencias, setTransferencias] = useState(0);
 
   async function aoAbrir(aberto) {
     if (!aberto) return;
@@ -44,12 +62,18 @@ function ExcluirCarteira({ wallet, onConfirm, trigger }) {
     } catch {
       setResumo(null);
     }
+    setTransferencias(0);
+    try {
+      setTransferencias((await transfersApi.list({ wallet_id: wallet.id })).data.length);
+    } catch {
+      setTransferencias(0);
+    }
   }
 
   return (
     <ConfirmDialog
       title="Excluir esta carteira?"
-      description={`Excluir "${wallet.name}" leva junto ${oQueVaiJunto(resumo, wallet.balance)}. Não dá para desfazer.`}
+      description={`Excluir "${wallet.name}" leva junto ${oQueVaiJunto(resumo, wallet.balance, transferencias)}. Não dá para desfazer.`}
       confirmLabel="Excluir"
       errorFallback="Não foi possível excluir a carteira."
       onConfirm={onConfirm}
@@ -65,7 +89,7 @@ export default function Wallets() {
   const [editing, setEditing] = useState(null);
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ name: "", balance: "", bank: "" });
+  const [form, setForm] = useState({ name: "", balance: "", bank: "", kind: "ACCOUNT" });
   const nomeId = useId();
   const saldoId = useId();
   const bancoId = useId();
@@ -93,18 +117,23 @@ export default function Wallets() {
         // "sem banco" só existe na criação. Trocar de banco funciona.
         await walletsApi.update(editing.id, {
           name: form.name,
+          kind: form.kind,
           ...(form.bank ? { bank: form.bank } : {}),
         });
       } else {
+        const valor = form.balance === "" ? 0 : Number(form.balance);
         await walletsApi.create({
           name: form.name,
-          balance: form.balance === "" ? 0 : form.balance,
+          kind: form.kind,
+          // Cartão: o campo é a fatura em aberto, digitada positiva; o saldo
+          // guardado é o negativo dela (dívida).
+          balance: form.kind === "CREDIT_CARD" ? -valor : valor,
           ...(form.bank ? { bank: form.bank } : {}),
         });
       }
       setOpen(false);
       setEditing(null);
-      setForm({ name: "", balance: "", bank: "" });
+      setForm({ name: "", balance: "", bank: "", kind: "ACCOUNT" });
       load();
     } catch (err) {
       setError(apiErrorMessage(err, "Não foi possível salvar a carteira."));
@@ -122,7 +151,7 @@ export default function Wallets() {
     ultimoGatilho.current = e?.currentTarget ?? null;
     setEditing(null);
     setError(null);
-    setForm({ name: "", balance: "", bank: "" });
+    setForm({ name: "", balance: "", bank: "", kind: "ACCOUNT" });
     setOpen(true);
   }
 
@@ -131,7 +160,12 @@ export default function Wallets() {
     setEditing(wallet);
     // O banco que o card mostra, inclusive o deduzido do nome: o formulário
     // não pode discordar da tela, e salvar grava o que já se via.
-    setForm({ name: wallet.name, balance: wallet.balance, bank: bancoDaCarteira(wallet)?.slug ?? "" });
+    setForm({
+      name: wallet.name,
+      balance: wallet.balance,
+      bank: bancoDaCarteira(wallet)?.slug ?? "",
+      kind: wallet.kind ?? "ACCOUNT",
+    });
     setError(null);
     setOpen(true);
   }
@@ -189,8 +223,8 @@ export default function Wallets() {
             <DialogTitle>{editing ? "Editar carteira" : "Nova carteira"}</DialogTitle>
             <p className="text-xs text-content-2 mt-0.5">
               {editing
-                ? "Atualize o nome desta carteira"
-                : "Adicione uma conta para acompanhar"}
+                ? "Atualize o nome, o tipo e o banco desta carteira"
+                : "Adicione uma conta ou cartão para acompanhar"}
             </p>
           </DialogHeader>
 
@@ -208,6 +242,15 @@ export default function Wallets() {
               />
             </div>
             <div>
+              <span className="block text-xs font-medium text-content-2 mb-2">Tipo</span>
+              <Segmented
+                value={form.kind}
+                onChange={(v) => setForm({ ...form, kind: v })}
+                options={TIPOS}
+                ariaLabel="Tipo"
+              />
+            </div>
+            <div>
               <label htmlFor={bancoId} className="block text-xs font-medium text-content-2 mb-2">
                 Banco <span className="text-content-3">(opcional)</span>
               </label>
@@ -222,7 +265,7 @@ export default function Wallets() {
             {!editing && (
               <div>
                 <label htmlFor={saldoId} className="block text-xs font-medium text-content-2 mb-2">
-                  Saldo inicial
+                  {form.kind === "CREDIT_CARD" ? "Fatura em aberto" : "Saldo inicial"}
                 </label>
                 <div className="relative">
                   <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-content-3 pointer-events-none">
@@ -297,16 +340,63 @@ export default function Wallets() {
               <p className="relative text-sm text-content-2 mb-1">
                 {w.name}
               </p>
-              <Money
-                value={w.balance}
-                className="relative text-2xl font-semibold text-content tnum"
-              />
+              {ehCartao(w) ? (
+                <>
+                  <p className="relative text-[11px] uppercase tracking-wide text-content-3">
+                    {Number(w.balance) > 0 ? "Crédito no cartão" : "Fatura atual"}
+                  </p>
+                  <Money
+                    value={Math.abs(Number(w.balance))}
+                    className="relative text-2xl font-semibold text-content tnum"
+                  />
+                </>
+              ) : (
+                <Money
+                  value={w.balance}
+                  className="relative text-2xl font-semibold text-content tnum"
+                />
+              )}
 
-              <div className="relative flex items-center justify-between mt-auto pt-4 border-t border-line/[0.08]">
-                <span className="text-[11px] text-content-3">
-                  Criada em {new Date(w.created_at).toLocaleDateString("pt-BR")}
-                </span>
+              <div className="relative flex items-center justify-between gap-2 mt-auto pt-4 border-t border-line/[0.08]">
+                {/* Pagar fatura é a ação principal do cartão: diferente de
+                    Editar/Pagamentos/Excluir (secundárias, gerenciam a
+                    carteira), ela fica sempre visível, não escondida atrás do
+                    hover da barra de ações. Substitui a data de criação, que
+                    aqui é a informação de menor valor no card. */}
+                {ehCartao(w) ? (
+                  <PagarFaturaDialog
+                    cartao={w}
+                    contas={wallets.filter((c) => !ehCartao(c))}
+                    onDone={load}
+                    trigger={
+                      <Button size="sm" className="font-medium">
+                        Pagar fatura
+                      </Button>
+                    }
+                  />
+                ) : (
+                  <span className="text-[11px] text-content-3">
+                    Criada em {new Date(w.created_at).toLocaleDateString("pt-BR")}
+                  </span>
+                )}
                 <div className="flex items-center gap-1.5 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 focus-within:opacity-100">
+                  {ehCartao(w) && (
+                    <PagamentosDialog
+                      cartao={w}
+                      contas={wallets}
+                      onChange={load}
+                      trigger={
+                        <button
+                          type="button"
+                          title="Pagamentos"
+                          className="w-8 h-8 flex items-center justify-center rounded-lg border border-line/10 text-content-3 hover:text-content hover:border-line/20 transition-colors"
+                        >
+                          <ReceiptText size={14} />
+                          <span className="sr-only">Pagamentos da fatura</span>
+                        </button>
+                      }
+                    />
+                  )}
                   <button
                     type="button"
                     onClick={(e) => openEdit(w, e)}

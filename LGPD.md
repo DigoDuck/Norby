@@ -14,7 +14,7 @@ Controlador: **Norby** · Contato do titular: `privacidade@norby.com.br`
 | Senha (hash `bcrypt_sha256`; hashes `bcrypt` antigos migram no próximo login) | PostgreSQL `users.password_hash` | Autenticação | Execução de contrato (V) |
 | Aceite dos termos (timestamp) | PostgreSQL `users.privacy_accepted_at` | Prova do consentimento | Cumprimento de obrigação legal (II) |
 | Refresh tokens (hash) | PostgreSQL `refresh_tokens` | Manter sessão / segurança | Execução de contrato (V) + legítimo interesse na segurança (IX) |
-| Carteiras, transações, recorrentes, metas | PostgreSQL | Funcionalidade do organizador | Execução de contrato (V) |
+| Carteiras, transações, recorrentes, metas, transferências entre carteiras | PostgreSQL | Funcionalidade do organizador | Execução de contrato (V) |
 | Mensagens do chat e insights de IA | MongoDB `chat_history`, `ai_insights` | Gerar análises e responder no assistente | **Consentimento** (I) |
 
 Nenhum dado sensível (art. 5º, II) é tratado intencionalmente. O usuário não deve
@@ -46,7 +46,7 @@ Não há venda de dados nem uso para publicidade.
 
 A exclusão é **definitiva e real**: apaga de `ai_insights` e `chat_history` no
 MongoDB e do PostgreSQL (o `ondelete=CASCADE` em wallets/transactions/recurring/
-goals/refresh_tokens garante que nada fica órfão). Ver
+goals/transferências/refresh_tokens garante que nada fica órfão). Ver
 `backend/app/services/account_service.py`.
 
 ## 4. Retenção

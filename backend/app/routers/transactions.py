@@ -54,9 +54,12 @@ def _sem_acento(coluna):
 # O mesmo ciclo alcança `materialize_due_recurring` (services/recurring_service.py),
 # que desde 2026-08-15 também trava carteiras, na ordem em que os templates saem
 # do SELECT: um /recurring/run segurando a carteira A e querendo a B fecha o ciclo
-# com um update movendo transação de B para A.
-# Se isso aparecer em produção, ordenar os locks de carteira por UUID nos DOIS
-# caminhos — ordenar só aqui não desfaz o ciclo.
+# com um update movendo transação de B para A. `transfer_service.py` (rotas de
+# /transfers) é outro caminho no mesmo ciclo: ele já trava as duas carteiras por
+# UUID (`lock_order`), então uma transferência A→B correndo junto com uma
+# transação ou um /recurring/run travando B→A também pode deadlockar.
+# Se isso aparecer em produção, ordenar os locks de carteira por UUID nos
+# caminhos que ainda não ordenam — ordenar só aqui não desfaz o ciclo.
 async def _get_owned_transaction(transaction_id: UUID, user: User, db: AsyncSession) -> Transaction:
     """Transação do usuário, sempre com lock (FOR UPDATE).
 
