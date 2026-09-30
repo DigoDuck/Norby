@@ -5,6 +5,7 @@ import { transactionsApi } from "@/api/transactions";
 import { transfersApi } from "@/api/transfers";
 import { apiErrorMessage, formatBRL, shadcnInputCls } from "@/lib/utils";
 import { OPCOES_BANCO, bancoDaCarteira } from "@/lib/bancos";
+import { ehCartao, faturaDoCartao } from "@/lib/cartao";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import Money from "@/components/shared/Money";
 import WalletMark from "@/components/shared/WalletMark";
@@ -45,8 +46,6 @@ const TIPOS = [
   { value: "ACCOUNT", label: "Conta" },
   { value: "CREDIT_CARD", label: "Cartão de crédito" },
 ];
-
-const ehCartao = (w) => w.kind === "CREDIT_CARD";
 
 // Excluir carteira apaga o histórico dela. O diálogo busca o resumo ao abrir,
 // e não na carga da página, que custaria uma requisição por carteira.
@@ -342,11 +341,11 @@ export default function Wallets() {
               </p>
               {ehCartao(w) ? (
                 <>
-                  <p className="relative text-[11px] uppercase tracking-wide text-content-3">
-                    {Number(w.balance) > 0 ? "Crédito no cartão" : "Fatura atual"}
+                  <p className="relative microlabel">
+                    {faturaDoCartao(w).emCredito ? "Crédito no cartão" : "Fatura atual"}
                   </p>
                   <Money
-                    value={Math.abs(Number(w.balance))}
+                    value={faturaDoCartao(w).valor}
                     className="relative text-2xl font-semibold text-content tnum"
                   />
                 </>

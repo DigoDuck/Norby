@@ -325,3 +325,62 @@ describe("Dashboard, convites do Premium", () => {
     expect(aiApi.getInsight).not.toHaveBeenCalled();
   });
 });
+
+// Cartão guarda a fatura como saldo negativo (ADR 0005). No Dashboard ele tem
+// de ler igual à tela de Carteiras: "fatura" e o valor sem sinal de menos.
+describe("Dashboard, cartão de crédito", () => {
+  const CONTA = { id: "a1", name: "Conta corrente", balance: "3000.00", bank: "itau", kind: "ACCOUNT" };
+  const CARTAO = { id: "c1", name: "Cartão Nubank", balance: "-1200.50", bank: "nubank", kind: "CREDIT_CARD" };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    walletsApi.list.mockResolvedValue({ data: [CONTA, CARTAO] });
+    transactionsApi.list.mockResolvedValue({ data: [], headers: {} });
+    goalsApi.list.mockResolvedValue({ data: [] });
+    dashboardApi.summary.mockResolvedValue(resumo("0", "0"));
+    aiApi.getInsight.mockImplementation(recusaIa);
+  });
+
+  async function escolherCarteira(nome) {
+    fireEvent.click(await screen.findByRole("combobox", { name: "Carteira" }));
+    const opcao = await screen.findByRole("option", { name: nome });
+    fireEvent.mouseMove(opcao);
+    fireEvent.click(opcao);
+  }
+
+  it("na lista de carteiras, o cartão mostra a fatura sem sinal de menos", async () => {
+    renderDashboard();
+
+    const linha = (await screen.findByText("Cartão Nubank")).closest("li");
+    expect(linha).toHaveTextContent(/fatura/i);
+    expect(linha).toHaveTextContent("R$ 1.200,50");
+    expect(linha).not.toHaveTextContent("−");
+  });
+
+  it("cartão com saldo positivo aparece como crédito", async () => {
+    walletsApi.list.mockResolvedValue({ data: [CONTA, { ...CARTAO, balance: "30.00" }] });
+    renderDashboard();
+
+    const linha = (await screen.findByText("Cartão Nubank")).closest("li");
+    expect(linha).toHaveTextContent(/crédito/i);
+    expect(linha).toHaveTextContent("R$ 30,00");
+  });
+
+  it("filtrando o cartão, o título vira fatura atual e o valor perde o sinal", async () => {
+    renderDashboard();
+    await escolherCarteira("Cartão Nubank");
+
+    const titulo = await screen.findByRole("heading", { name: "Fatura atual" });
+    const card = titulo.closest("section");
+    expect(card).toHaveTextContent("R$ 1.200,50");
+    expect(card).not.toHaveTextContent("−");
+  });
+
+  it("todas as carteiras continua somando o patrimônio, com a dívida descontada", async () => {
+    renderDashboard();
+
+    const card = await screen.findByRole("region", { name: "Saldo total" });
+    // 3.000 na conta menos 1.200,50 de fatura.
+    expect(card).toHaveTextContent("R$ 1.799,50");
+  });
+});
