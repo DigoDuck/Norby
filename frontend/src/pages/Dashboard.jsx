@@ -38,6 +38,7 @@ import RitmoCard, { RITMO_MAX_WEEKS } from "@/components/dashboard/RitmoCard";
 import StatTile from "@/components/dashboard/StatTile";
 import Money from "@/components/shared/Money";
 import WalletMark from "@/components/shared/WalletMark";
+import { ehCartao, faturaDoCartao } from "@/lib/cartao";
 import { LoadError } from "@/components/shared/LoadState";
 import { usePlano } from "@/lib/plan";
 import { useAuthStore } from "@/store/authStore";
@@ -197,10 +198,17 @@ export default function Dashboard() {
 
   // Saldo = soma das carteiras (estado real) ou da carteira filtrada
   const totalBalance = wallets.reduce((s, w) => s + parseFloat(w.balance), 0);
+  const carteiraFiltrada = wallets.find((w) => w.id === selectedWallet);
+  // Filtrando um cartão, o card mostra a fatura sem sinal, como em Carteiras.
+  // "Todas" segue somando com sinal: é o patrimônio, conta menos dívida.
+  const cartaoFiltrado = ehCartao(carteiraFiltrada) ? faturaDoCartao(carteiraFiltrada) : null;
   const shownBalance =
     selectedWallet === "all"
       ? totalBalance
-      : parseFloat(wallets.find((w) => w.id === selectedWallet)?.balance ?? 0);
+      : cartaoFiltrado?.valor ?? parseFloat(carteiraFiltrada?.balance ?? 0);
+  const tituloSaldo = cartaoFiltrado
+    ? cartaoFiltrado.emCredito ? "Crédito no cartão" : "Fatura atual"
+    : "Saldo total";
 
   // KPIs, fluxo e categorias vêm agregados do backend (sobre TODAS as transações,
   // sem o cap de 200 da listagem). O front só formata para os gráficos.
@@ -419,11 +427,12 @@ export default function Dashboard() {
           style={{ "--i": 0 }}
         >
           <div className="flex items-center justify-between gap-3">
-            <h2 id="saldo-titulo" className="text-sm font-medium text-content-2">Saldo total</h2>
+            <h2 id="saldo-titulo" className="text-sm font-medium text-content-2">{tituloSaldo}</h2>
             {wallets.length > 1 && (
               <div className="w-44 shrink-0">
                 <Select
                   id="wallet-filter"
+                  ariaLabel="Carteira"
                   value={selectedWallet}
                   options={walletOptions}
                   onChange={(v) => setSelectedWallet(v || "all")}
@@ -495,8 +504,13 @@ export default function Dashboard() {
                   <li key={w.id} className="flex items-center gap-2.5 min-w-0">
                     <WalletMark wallet={w} className="size-7 rounded-lg text-[11px]" />
                     <span className="flex-1 truncate text-sm text-content-2">{w.name}</span>
+                    {ehCartao(w) && (
+                      <span className="microlabel">
+                        {faturaDoCartao(w).emCredito ? "crédito" : "fatura"}
+                      </span>
+                    )}
                     <span className="text-sm font-medium text-content tnum">
-                      {formatBRL(w.balance)}
+                      {formatBRL(ehCartao(w) ? faturaDoCartao(w).valor : w.balance)}
                     </span>
                   </li>
                 ))}
