@@ -14,7 +14,7 @@ from app.schemas.transaction import (
     TransactionUpdate,
 )
 from app.services.transaction_service import apply_delta, revert_delta
-from app.services.wallet_service import get_owned_wallet
+from app.services.wallet_service import get_owned_wallet, lock_order
 from app.services.goal_service import current_month_range
 
 router = APIRouter(prefix="/transactions", tags=["Transactions"])
@@ -48,18 +48,13 @@ def _sem_acento(coluna):
     return func.translate(func.lower(coluna), _ACENTOS, _SEM_ACENTO)
 
 
-# ponytail: locks são adquiridos na ordem transação → carteira antiga → carteira
-# nova. Duas transações DIFERENTES trocando as mesmas duas carteiras em sentidos
-# opostos ainda podem deadlockar (o Postgres detecta e aborta uma, virando 500).
-# O mesmo ciclo alcança `materialize_due_recurring` (services/recurring_service.py),
-# que desde 2026-08-15 também trava carteiras, na ordem em que os templates saem
-# do SELECT: um /recurring/run segurando a carteira A e querendo a B fecha o ciclo
-# com um update movendo transação de B para A. `transfer_service.py` (rotas de
-# /transfers) é outro caminho no mesmo ciclo: ele já trava as duas carteiras por
-# UUID (`lock_order`), então uma transferência A→B correndo junto com uma
-# transação ou um /recurring/run travando B→A também pode deadlockar.
-# Se isso aparecer em produção, ordenar os locks de carteira por UUID nos
-# caminhos que ainda não ordenam — ordenar só aqui não desfaz o ciclo.
+# Ordem dos locks: a linha própria do caminho primeiro (transação aqui, modelo
+# de recorrência no /recurring/run, transferência no DELETE /transfers), depois
+# as carteiras, SEMPRE em ordem crescente de id via `wallet_service.lock_order`.
+# Com os três caminhos na mesma ordem, dois deles disputando as mesmas carteiras
+# só esperam um pelo outro, em vez de fechar um ciclo que o Postgres abortaria
+# com deadlock (500). Caminho novo que trave mais de uma carteira passa pelo
+# `lock_order` também; `tests/test_wallet_lock_order.py` observa essa ordem.
 async def _get_owned_transaction(transaction_id: UUID, user: User, db: AsyncSession) -> Transaction:
     """Transação do usuário, sempre com lock (FOR UPDATE).
 
@@ -233,22 +228,33 @@ async def update_transaction(
     # permitido. Sem essa saída, quem virou free escolheria entre pagar e
     # destruir histórico, já que excluir carteira apaga as transações por cascade.
     mesma_carteira = new_wallet_id == transaction.wallet_id
-    old_wallet = await get_owned_wallet(
-        transaction.wallet_id,
-        current_user,
-        db,
-        for_update=True,
-        required=False,
-        for_write=mesma_carteira,
-    )
-
-    # Carteira de destino (pode ser a mesma). Destino é SEMPRE escrita.
     if mesma_carteira:
-        new_wallet = old_wallet
-    else:
-        new_wallet = await get_owned_wallet(
-            new_wallet_id, current_user, db, for_update=True, for_write=True
+        old_wallet = new_wallet = await get_owned_wallet(
+            transaction.wallet_id,
+            current_user,
+            db,
+            for_update=True,
+            required=False,
+            for_write=True,
         )
+    else:
+        # Duas carteiras: travadas em ordem de id (`lock_order`), não "antiga,
+        # depois nova". Senão uma troca no sentido oposto, ou uma transferência,
+        # fecha o ciclo e o Postgres aborta uma das duas com deadlock.
+        # Destino é SEMPRE escrita; origem só drena.
+        carteiras = {}
+        for wallet_id in lock_order(transaction.wallet_id, new_wallet_id):
+            destino = wallet_id == new_wallet_id
+            carteiras[wallet_id] = await get_owned_wallet(
+                wallet_id,
+                current_user,
+                db,
+                for_update=True,
+                required=destino,
+                for_write=destino,
+            )
+        old_wallet = carteiras[transaction.wallet_id]
+        new_wallet = carteiras[new_wallet_id]
 
     # 1) Reverte o efeito antigo (usa os valores AINDA não alterados da transação)
     if old_wallet:

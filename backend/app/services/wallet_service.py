@@ -57,6 +57,19 @@ def _anteriores_subquery():
     )
 
 
+def lock_order(*wallet_ids: UUID) -> list[UUID]:
+    """Ordem em que carteiras são travadas com FOR UPDATE: crescente por id.
+
+    Todo caminho que trava mais de uma carteira passa por aqui (transferência,
+    edição de transação, /recurring/run). Se um caminho travasse A e depois B
+    enquanto outro trava B e depois A, o Postgres abortaria um dos dois com
+    deadlock e a pessoa veria um 500. Na mesma ordem, o segundo só espera.
+    Repetidos saem: vários modelos de recorrência podem apontar para a mesma
+    carteira.
+    """
+    return sorted(set(wallet_ids))
+
+
 async def get_owned_wallet(
     wallet_id: UUID,
     user: User,
