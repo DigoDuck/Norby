@@ -20,16 +20,18 @@ const { useAuthStore } = await import("@/store/authStore");
 const axios = (await import("axios")).default;
 const { refreshAccessToken } = await import("./axios");
 
+// axios.create só é chamado uma vez, no import acima. O Vitest 5 limpa o
+// histórico dos mocks antes de CADA teste, então os argumentos são guardados
+// aqui, antes do primeiro teste rodar.
+const opcoesDaInstancia = axios.create.mock.calls[0]?.[0];
+
 const erro401 = (url = "/transactions/") => ({
   response: { status: 401 },
   config: { url, headers: {} },
 });
 
-// Roda ANTES do describe abaixo (a ordem de declaração é a ordem de
-// execução): axios.create só é chamado uma vez, no import do módulo lá em
-// cima, e o beforeEach do describe seguinte limpa o histórico dos mocks.
 it("cria a instância do axios com credenciais habilitadas", () => {
-  expect(axios.create).toHaveBeenCalledWith(expect.objectContaining({ withCredentials: true }));
+  expect(opcoesDaInstancia).toEqual(expect.objectContaining({ withCredentials: true }));
 });
 
 describe("interceptor de refresh", () => {
