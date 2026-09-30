@@ -9,7 +9,7 @@ from app.models.sql_models import (
 )
 from app.services.transaction_service import apply_delta
 from app.services.plan_service import PlanRefused
-from app.services.wallet_service import get_owned_wallet
+from app.services.wallet_service import get_owned_wallet, lock_order
 
 
 def add_one_month(d: datetime) -> datetime:
@@ -64,18 +64,29 @@ async def materialize_due_recurring(db: AsyncSession, user: User) -> Materializa
         ).with_for_update()
     )).scalars().all()
 
+    # Trava as carteiras antes do laço, em ordem de id (`lock_order`), e não na
+    # ordem em que os modelos saem do SELECT: senão esta rodada e uma
+    # transferência ou edição de transação no sentido oposto fecham o ciclo e
+    # o Postgres aborta uma delas com deadlock.
+    #
+    # Passa pelo helper do ADR 0002 em vez de reimplementar a regra: assim
+    # existe UM lugar decidindo o que é carteira bloqueada, e a recorrência
+    # não pode divergir das escritas manuais. `required=False` preserva a
+    # tolerância antiga a carteira sumida.
+    carteiras: dict = {}
+    recusas: dict = {}
+    for wallet_id in lock_order(*(tpl.wallet_id for tpl in templates)):
+        try:
+            carteiras[wallet_id] = await get_owned_wallet(
+                wallet_id, user, db, for_update=True, required=False, for_write=True
+            )
+        except PlanRefused as recusa:
+            recusas[wallet_id] = recusa
+
     generated = 0
     skipped: list[dict] = []
     for tpl in templates:
-        # Passa pelo helper do ADR 0002 em vez de reimplementar a regra: assim
-        # existe UM lugar decidindo o que é carteira bloqueada, e a recorrência
-        # não pode divergir das escritas manuais. `required=False` preserva a
-        # tolerância antiga a carteira sumida.
-        try:
-            wallet = await get_owned_wallet(
-                tpl.wallet_id, user, db, for_update=True, required=False, for_write=True
-            )
-        except PlanRefused as recusa:
+        if tpl.wallet_id in recusas:
             # O template NÃO é desativado nem apagado. Quem assinar, ou drenar e
             # apagar uma carteira, volta a materializar sozinho — e as ocorrências
             # puladas entram na próxima rodada, porque a materialização é guiada
@@ -84,10 +95,11 @@ async def materialize_due_recurring(db: AsyncSession, user: User) -> Materializa
                 {
                     "recurring_id": str(tpl.id),
                     "wallet_id": str(tpl.wallet_id),
-                    "code": recusa.code,
+                    "code": recusas[tpl.wallet_id].code,
                 }
             )
             continue
+        wallet = carteiras[tpl.wallet_id]
 
         while tpl.next_run_date <= now:
             db.add(Transaction(

@@ -13,7 +13,7 @@ from sqlalchemy import select
 from app.config import get_settings
 from app.models.sql_models import User, Wallet
 from app.services.goal_service import current_month_range
-from app.services.transfer_service import lock_order
+from app.services.wallet_service import lock_order
 
 HOJE = current_month_range()[0].isoformat()
 

@@ -10,13 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.sql_models import Transfer, User, Wallet
 from app.schemas.transfer import TransferCreate
-from app.services.wallet_service import get_owned_wallet
-
-
-def lock_order(a: UUID, b: UUID) -> list[UUID]:
-    """Ordem fixa de travamento. A→B e B→A simultâneas travando em ordens
-    opostas dariam deadlock; ordenar por id faz as duas esperarem na mesma fila."""
-    return sorted([a, b])
+from app.services.wallet_service import get_owned_wallet, lock_order
 
 
 async def _travar(
