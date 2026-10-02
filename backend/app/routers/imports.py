@@ -1,13 +1,13 @@
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.dependencies import get_db, require_ai_access
+from app.dependencies import get_current_user, get_db, require_ai_access
 from app.limiter import limiter, user_key
 from app.models.sql_models import User
-from app.schemas.imports import ImportPreview
-from app.services.import_service import ArquivoInvalido, ExtracaoFalhou, ler_arquivo
+from app.schemas.imports import ImportConfirm, ImportPreview, ImportResult
+from app.services.import_service import ArquivoInvalido, ExtracaoFalhou, confirmar, ler_arquivo
 from app.services.plan_service import PlanRefused
 
 logger = logging.getLogger(__name__)
@@ -53,3 +53,19 @@ async def preview_statement(
             status_code=503,
             detail="Não consegui ler o arquivo agora. Tente novamente em instantes.",
         )
+
+
+@router.post(
+    "/statement/confirm",
+    response_model=ImportResult,
+    status_code=status.HTTP_201_CREATED,
+)
+# Não chama a IA: fica fora do portão de IA e passa só pelo de carteira.
+@limiter.limit("30/minute", key_func=user_key)
+async def confirm_statement(
+    request: Request,
+    payload: ImportConfirm,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await confirmar(db, current_user, payload)

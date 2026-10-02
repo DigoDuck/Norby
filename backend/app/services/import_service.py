@@ -13,10 +13,14 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.categories import EXPENSE_CATEGORIES, INCOME_CATEGORIES
-from app.models.sql_models import User, Wallet, WalletKind, Transaction, Transfer
+from app.models.sql_models import (
+    Transaction, TransactionType, Transfer, User, Wallet, WalletKind,
+)
 from app.schemas.common import MAX_MONEY
-from app.schemas.imports import MAX_LINHAS
+from app.schemas.imports import MAX_LINHAS, ImportConfirm
 from app.services import ai_service
+from app.services.transaction_service import apply_delta
+from app.services.wallet_service import get_owned_wallet, lock_order
 
 # Teste com 126 lançamentos usou 14,6 mil tokens de saída; folga para o teto
 # de 300 linhas. O teto do insight (512) cortaria a lista no meio.
@@ -270,3 +274,49 @@ async def ler_arquivo(db: AsyncSession, user: User, conteudo: bytes) -> dict:
         "default_card_id": cartao,
         "items": itens,
     }
+
+
+async def confirmar(db: AsyncSession, user: User, payload: ImportConfirm) -> dict:
+    """Grava as linhas revisadas numa única transação do banco: tudo ou nada.
+
+    Todas as carteiras envolvidas são travadas antes de qualquer escrita, em
+    `lock_order` (o mesmo de transferência, edição e recorrência). Dono errado
+    (404) ou carteira bloqueada (403) estouram nesse laço, antes de gravar.
+    Todas são escrita (`for_write`): recebem linhas novas, mesmo quando o saldo
+    não muda.
+    """
+    destinos = (i.transfer_wallet_id for i in payload.items if i.launch_as == "TRANSFER")
+    carteiras = {}
+    for wallet_id in lock_order(payload.wallet_id, *destinos):
+        carteiras[wallet_id] = await get_owned_wallet(
+            wallet_id, user, db, for_update=True, for_write=True
+        )
+    alvo = carteiras[payload.wallet_id]
+    # "Já no saldo": o histórico entra, o saldo fica (spec B, seção Saldo).
+    mexe_no_saldo = not payload.already_in_balance
+
+    transacoes = transferencias = 0
+    for linha in payload.items:
+        if linha.launch_as == "TRANSFER":
+            outra = carteiras[linha.transfer_wallet_id]
+            origem, destino = (alvo, outra) if linha.direction == "OUT" else (outra, alvo)
+            if mexe_no_saldo:
+                origem.balance -= linha.amount
+                destino.balance += linha.amount
+            db.add(Transfer(
+                user_id=user.id, from_wallet_id=origem.id, to_wallet_id=destino.id,
+                amount=linha.amount, date=linha.date, description=linha.description,
+            ))
+            transferencias += 1
+        else:
+            tipo = TransactionType.EXPENSE if linha.launch_as == "EXPENSE" else TransactionType.INCOME
+            if mexe_no_saldo:
+                apply_delta(alvo, tipo, linha.amount)
+            db.add(Transaction(
+                user_id=user.id, wallet_id=alvo.id, type=tipo, amount=linha.amount,
+                category=linha.category, description=linha.description, date=linha.date,
+            ))
+            transacoes += 1
+
+    await db.commit()
+    return {"transactions": transacoes, "transfers": transferencias}
