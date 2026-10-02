@@ -32,7 +32,8 @@ significa "aceite não registrado", nunca "aceitou"**.
   **consentimento**.
   Também recebe o arquivo de fatura ou extrato que a pessoa anexa no chat, só
   para ler os lançamentos. O arquivo não é guardado pelo Norby nem entra no
-  histórico da conversa.
+  histórico da conversa. Junto vai o nome cadastrado do titular da conta, só
+  para distinguir transferências entre contas próprias.
 - **Infraestrutura de hospedagem** (banco e backend): processamento necessário à
   prestação do serviço.
 
