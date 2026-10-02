@@ -232,3 +232,37 @@ async def test_truncated_ai_reply_asks_to_split_and_still_debits_the_quota(make_
         select(AiUsageDaily).where(AiUsageDaily.user_id == user_id, AiUsageDaily.day == ai.dia_da_cota())
     )).scalar_one()
     assert (uso.tokens, uso.calls) == (30_000, 1)
+
+
+@pytest.mark.asyncio
+async def test_reimporting_the_same_lines_marks_them_duplicate(make_auth_client, ia_devolve):
+    ac = await make_auth_client()
+    conta = (await ac.post("/wallets/", json={"name": "Conta", "balance": "100.00"})).json()
+    outra = (await ac.post("/wallets/", json={"name": "Outra", "balance": "100.00"})).json()
+    await ac.post("/transactions/", json={
+        "wallet_id": conta["id"], "type": "EXPENSE", "amount": "52.30",
+        "category": "Alimentação", "description": "Mercado", "date": "2026-08-10",
+    })
+    ia_devolve(items=[_item(), _item(description="Padaria")])
+
+    itens = (await _enviar(ac)).json()["items"]
+
+    assert itens[0]["duplicate_in"] == [conta["id"]]
+    assert outra["id"] not in itens[0]["duplicate_in"]
+    assert itens[1]["duplicate_in"] == []
+
+
+@pytest.mark.asyncio
+async def test_invoice_payment_already_registered_is_duplicate(make_auth_client, ia_devolve):
+    ac = await make_auth_client()
+    conta = (await ac.post("/wallets/", json={"name": "Conta", "balance": "1000.00"})).json()
+    cartao = (await ac.post("/wallets/", json={"name": "Cartão", "kind": "CREDIT_CARD"})).json()
+    await ac.post("/transfers/", json={
+        "from_wallet_id": conta["id"], "to_wallet_id": cartao["id"],
+        "amount": "300.00", "date": "2026-08-15",
+    })
+    ia_devolve(items=[_item(kind="CARD_PAYMENT", amount=300, date="2026-08-15", description="Pagamento de fatura")])
+
+    itens = (await _enviar(ac)).json()["items"]
+
+    assert conta["id"] in itens[0]["duplicate_in"]

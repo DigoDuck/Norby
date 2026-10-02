@@ -13,7 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.categories import EXPENSE_CATEGORIES, INCOME_CATEGORIES
-from app.models.sql_models import User, Wallet, WalletKind
+from app.models.sql_models import User, Wallet, WalletKind, Transaction, Transfer
 from app.schemas.common import MAX_MONEY
 from app.schemas.imports import MAX_LINHAS
 from app.services import ai_service
@@ -171,6 +171,39 @@ def normalizar(bruto: dict) -> tuple[str, list[dict], int]:
     return tipo, itens, ignorados
 
 
+async def marcar_duplicatas(db: AsyncSession, user: User, itens: list[dict]) -> None:
+    """Carteiras onde cada linha já existe. A revisão desmarca a linha quando a
+    carteira escolhida em "Lançar em" está na lista.
+
+    Transação: mesma data, valor e descrição (reimportar o mesmo arquivo).
+    Pagamento de fatura: transferência com mesma data e valor (pago antes pelo
+    botão "Pagar fatura", cuja descrição é outra).
+    """
+    datas = {i["date"] for i in itens}
+    transacoes = (await db.execute(
+        select(Transaction.wallet_id, Transaction.date, Transaction.amount, Transaction.description)
+        .where(Transaction.user_id == user.id, Transaction.date.in_(datas))
+    )).all()
+    por_transacao: dict[tuple, set] = {}
+    for t in transacoes:
+        por_transacao.setdefault((t.date, t.amount, t.description), set()).add(t.wallet_id)
+
+    transferencias = (await db.execute(
+        select(Transfer.from_wallet_id, Transfer.to_wallet_id, Transfer.date, Transfer.amount)
+        .where(Transfer.user_id == user.id, Transfer.date.in_(datas))
+    )).all()
+    por_transferencia: dict[tuple, set] = {}
+    for t in transferencias:
+        por_transferencia.setdefault((t.date, t.amount), set()).update({t.from_wallet_id, t.to_wallet_id})
+
+    for item in itens:
+        if item["kind"] == "CARD_PAYMENT":
+            achadas = por_transferencia.get((item["date"], item["amount"]), set())
+        else:
+            achadas = por_transacao.get((item["date"], item["amount"], item["description"]), set())
+        item["duplicate_in"] = sorted(achadas, key=str)
+
+
 async def _extrair(parte: types.Part) -> tuple[str | None, int]:
     """Saída de rede da importação. É ela que os testes stubam."""
     resposta = await ai_service.client.aio.models.generate_content(
@@ -227,6 +260,7 @@ async def ler_arquivo(db: AsyncSession, user: User, conteudo: bytes) -> dict:
     if not isinstance(bruto, dict):
         raise ExtracaoFalhou()
     tipo, itens, ignorados = normalizar(bruto)
+    await marcar_duplicatas(db, user, itens)
     padrao, cartao = await carteiras_padrao(db, user, tipo)
     return {
         "document_type": tipo,
