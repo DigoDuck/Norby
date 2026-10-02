@@ -39,7 +39,7 @@ Resolvido pelo [ADR 0002](docs/adr/0002-onde-o-paywall-e-aplicado.md) (issue #20
 |---|---|
 | **carteira bloqueada** | Carteira acima do teto. Visível e legível, mas não recebe escrita. As 2 mais antigas (`order by created_at, id`) nunca são bloqueadas |
 | **drenar** | Tirar valor de uma carteira bloqueada — mover transação para fora, ou excluí-la. **Permitido**, porque a alternativa seria escolher entre pagar e destruir histórico |
-| **gerar** (IA) | `GET /ai/insight` e `POST /ai/chat`, as duas rotas que custam token. São as únicas bloqueadas; ler histórico não é |
+| **gerar** (IA) | `GET /ai/insight`, `POST /ai/chat` e `POST /imports/statement`, as rotas que custam token. São as únicas bloqueadas; ler histórico não é |
 | **`paywall_enabled`** | Flag de rollout. Desligado, o app se comporta como antes da v2 **e os booleanos do `plan` reportam liberado** |
 | **`plan`** | Objeto aninhado no `UserResponse`. `ai_allowed` e `wallet_cap_applies` são a autoridade; o resto é exibição |
 
@@ -92,3 +92,11 @@ Resolvido pelo [ADR 0005](docs/adr/0005-cartao-de-credito-e-transferencia.md).
 |---|---|---|
 | "despesa de pagamento de fatura" | pagar a fatura (transferência) | Lançar o pagamento como despesa conta o mesmo gasto duas vezes |
 | `TRANSFER` como tipo de transação | `transfers` | Toda agregação lê `transactions`; tabela separada fica fora delas por construção |
+
+## Importação de fatura e extrato
+
+| Termo | Significa | Como se mede |
+|---|---|---|
+| **prévia** | O que a IA leu do arquivo, já validado e com o "Lançar como" sugerido. Nada gravado | resposta de `POST /imports/statement` |
+| **Lançar como** | O destino de cada linha: despesa, receita, transferência para outra carteira, ou ignorar | `launch_as` |
+| **já no saldo** | Os lançamentos do arquivo já estão no saldo atual da carteira; entram no Extrato sem mexer no saldo | `already_in_balance` |
