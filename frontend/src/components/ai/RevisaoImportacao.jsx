@@ -192,7 +192,7 @@ export default function RevisaoImportacao({ previa, carteiras }) {
         </div>
       )}
 
-      {erro && <p className="mt-2 text-xs text-danger">{erro}</p>}
+      {erro && <p role="alert" className="mt-2 text-xs text-danger">{erro}</p>}
 
       <Button
         className="mt-3 font-medium"
