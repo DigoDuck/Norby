@@ -1,10 +1,13 @@
 from datetime import date
 from decimal import Decimal
+from types import SimpleNamespace
 
 import pytest
+from google.genai import types
 
+from app.services import import_service
 from app.services.import_service import (
-    ArquivoInvalido, detectar_formato, montar_prompt, normalizar, sugerir,
+    ArquivoInvalido, _extrair, detectar_formato, montar_prompt, normalizar, sugerir,
 )
 
 
@@ -40,8 +43,10 @@ def test_empty_or_binary_files_are_rejected():
         ("ACCOUNT_STATEMENT", "CARD_PAYMENT", "OUT", "TRANSFER"),
         ("CARD_INVOICE", "CARD_PAYMENT", "IN", "IGNORE"),
         ("ACCOUNT_STATEMENT", "TRANSFER", "OUT", "IGNORE"),
-        # Incoerência da IA (compra entrando): vale a direção.
+        # Incoerência da IA (compra entrando): no extrato vale a direção; na
+        # fatura "crédito" é ambíguo, então compra é sempre despesa.
         ("ACCOUNT_STATEMENT", "PURCHASE", "IN", "INCOME"),
+        ("CARD_INVOICE", "PURCHASE", "IN", "EXPENSE"),
     ],
 )
 def test_prefill_rules(doc, kind, direction, esperado):
@@ -118,3 +123,28 @@ def test_prompt_names_the_holder_and_restricts_transfer():
     prompt = montar_prompt("Diogo Ribeiro")
     assert "Diogo Ribeiro" in prompt
     assert "TRANSFER" in prompt
+
+
+def _cliente_falso(monkeypatch, finish_reason):
+    async def _gerar(**_kwargs):
+        return SimpleNamespace(
+            text='{"partial', usage_metadata=SimpleNamespace(total_token_count=31000),
+            candidates=[SimpleNamespace(finish_reason=finish_reason)],
+        )
+
+    cliente = SimpleNamespace(aio=SimpleNamespace(models=SimpleNamespace(generate_content=_gerar)))
+    monkeypatch.setattr(import_service.ai_service, "client", cliente)
+
+
+@pytest.mark.asyncio
+async def test_extrair_returns_none_when_cut_by_max_tokens(monkeypatch):
+    _cliente_falso(monkeypatch, types.FinishReason.MAX_TOKENS)
+    parte = types.Part.from_text(text="x")
+    assert await _extrair(parte, "prompt") == (None, 31000)
+
+
+@pytest.mark.asyncio
+async def test_extrair_returns_the_text_when_finished(monkeypatch):
+    _cliente_falso(monkeypatch, types.FinishReason.STOP)
+    parte = types.Part.from_text(text="x")
+    assert await _extrair(parte, "prompt") == ('{"partial', 31000)

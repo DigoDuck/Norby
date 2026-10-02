@@ -61,7 +61,9 @@ async def preview_statement(
     status_code=status.HTTP_201_CREATED,
 )
 # Não chama a IA: fica fora do portão de IA e passa só pelo de carteira.
-@limiter.limit("30/minute", key_func=user_key)
+# 5/min: o uso real é uma confirmação por prévia; 30 x 300 linhas/min furaria o
+# teto de 120 escritas/min (#158).
+@limiter.limit("5/minute", key_func=user_key)
 async def confirm_statement(
     request: Request,
     payload: ImportConfirm,

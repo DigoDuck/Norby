@@ -282,3 +282,36 @@ async def test_invoice_payment_already_registered_is_duplicate(make_auth_client,
     itens = (await _enviar(ac)).json()["items"]
 
     assert conta["id"] in itens[0]["duplicate_in"]
+
+
+@pytest.mark.asyncio
+async def test_transfer_with_same_date_amount_and_description_is_duplicate(make_auth_client, ia_devolve):
+    ac = await make_auth_client()
+    conta = (await ac.post("/wallets/", json={"name": "Conta", "balance": "1000.00"})).json()
+    reserva = (await ac.post("/wallets/", json={"name": "Reserva", "balance": "0.00"})).json()
+    await ac.post("/transfers/", json={
+        "from_wallet_id": conta["id"], "to_wallet_id": reserva["id"],
+        "amount": "200.00", "date": "2026-08-12", "description": "Resgate",
+    })
+    ia_devolve(items=[_item(kind="INCOME", direction="IN", amount=200, date="2026-08-12", description="Resgate")])
+
+    itens = (await _enviar(ac)).json()["items"]
+
+    assert {conta["id"], reserva["id"]} <= set(itens[0]["duplicate_in"])
+
+
+@pytest.mark.asyncio
+async def test_another_users_identical_transaction_is_not_a_duplicate(make_auth_client, ia_devolve):
+    alice = await make_auth_client("Alice")
+    bob = await make_auth_client("Bob")
+    do_bob = (await bob.post("/wallets/", json={"name": "Conta", "balance": "100.00"})).json()
+    await bob.post("/transactions/", json={
+        "wallet_id": do_bob["id"], "type": "EXPENSE", "amount": "52.30",
+        "category": "Alimentação", "description": "Mercado", "date": "2026-08-10",
+    })
+    await alice.post("/wallets/", json={"name": "Conta", "balance": "100.00"})
+    ia_devolve(items=[_item()])
+
+    itens = (await _enviar(alice)).json()["items"]
+
+    assert itens[0]["duplicate_in"] == []

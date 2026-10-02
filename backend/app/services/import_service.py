@@ -119,7 +119,10 @@ def sugerir(document_type: str, kind: str, direction: str) -> str:
         return "IGNORE"
     if kind == "REFUND":
         return "INCOME"
-    # PURCHASE e INCOME: a direção manda, para a IA não lançar compra como entrada.
+    if document_type == "CARD_INVOICE" and kind == "PURCHASE":
+        # Na fatura o modelo lê "crédito" de forma ambígua: compra é sempre despesa.
+        return "EXPENSE"
+    # Extrato (PURCHASE e INCOME): a direção manda, para a IA não lançar compra como entrada.
     return "INCOME" if direction == "IN" else "EXPENSE"
 
 
@@ -206,18 +209,23 @@ async def marcar_duplicatas(db: AsyncSession, user: User, itens: list[dict]) -> 
         por_transacao.setdefault((t.date, t.amount, t.description), set()).add(t.wallet_id)
 
     transferencias = (await db.execute(
-        select(Transfer.from_wallet_id, Transfer.to_wallet_id, Transfer.date, Transfer.amount)
+        select(Transfer.from_wallet_id, Transfer.to_wallet_id, Transfer.date, Transfer.amount, Transfer.description)
         .where(Transfer.user_id == user.id, Transfer.date.in_(datas))
     )).all()
     por_transferencia: dict[tuple, set] = {}
+    por_transf_desc: dict[tuple, set] = {}
     for t in transferencias:
-        por_transferencia.setdefault((t.date, t.amount), set()).update({t.from_wallet_id, t.to_wallet_id})
+        carteiras = {t.from_wallet_id, t.to_wallet_id}
+        por_transferencia.setdefault((t.date, t.amount), set()).update(carteiras)
+        por_transf_desc.setdefault((t.date, t.amount, t.description), set()).update(carteiras)
 
     for item in itens:
+        chave = (item["date"], item["amount"], item["description"])
+        # Linha trocada para "Transferência" numa importação anterior vira Transfer
+        # com a mesma descrição: vale para qualquer kind.
+        achadas = por_transacao.get(chave, set()) | por_transf_desc.get(chave, set())
         if item["kind"] == "CARD_PAYMENT":
-            achadas = por_transferencia.get((item["date"], item["amount"]), set())
-        else:
-            achadas = por_transacao.get((item["date"], item["amount"], item["description"]), set())
+            achadas = achadas | por_transferencia.get((item["date"], item["amount"]), set())
         item["duplicate_in"] = sorted(achadas, key=str)
 
 
