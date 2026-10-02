@@ -4,7 +4,7 @@ from decimal import Decimal
 import pytest
 
 from app.services.import_service import (
-    ArquivoInvalido, detectar_formato, normalizar, sugerir,
+    ArquivoInvalido, detectar_formato, montar_prompt, normalizar, sugerir,
 )
 
 
@@ -112,3 +112,9 @@ def test_non_list_items_is_rejected(itens):
 def test_more_than_300_lines_is_rejected_with_a_clear_message():
     with pytest.raises(ArquivoInvalido, match="Divida"):
         normalizar({"document_type": "ACCOUNT_STATEMENT", "items": [_item()] * 301})
+
+
+def test_prompt_names_the_holder_and_restricts_transfer():
+    prompt = montar_prompt("Diogo Ribeiro")
+    assert "Diogo Ribeiro" in prompt
+    assert "TRANSFER" in prompt

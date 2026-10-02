@@ -56,17 +56,30 @@ SCHEMA = {
     "required": ["document_type", "items"],
 }
 
-PROMPT = """Você recebe um extrato bancário ou uma fatura de cartão de crédito brasileira.
+_PROMPT_BASE = """Você recebe um extrato bancário ou uma fatura de cartão de crédito brasileira.
 Extraia TODOS os lançamentos, um item por lançamento, sem pular nenhum e sem inventar.
 - document_type: CARD_INVOICE para fatura de cartão, ACCOUNT_STATEMENT para extrato de conta.
 - amount: valor absoluto em reais (positivo), exatamente como no documento.
 - direction: IN para dinheiro entrando na conta ou crédito na fatura, OUT para saindo.
 - kind: PURCHASE (compra ou débito comum), INCOME (salário, Pix recebido de terceiros),
   REFUND (estorno), CARD_PAYMENT (pagamento de fatura de cartão),
-  TRANSFER (transferência entre contas do próprio titular, aplicação ou resgate).
+  TRANSFER (veja a regra do titular abaixo).
 - category: a mais próxima da lista; use "Outros" se nenhuma servir.
 - date: data do lançamento em YYYY-MM-DD.
 Não inclua linhas de saldo, totais ou cabeçalhos."""
+
+
+def montar_prompt(titular: str) -> str:
+    """Instruções fixas + quem é o titular, que o modelo não tem como adivinhar."""
+    return (
+        f"{_PROMPT_BASE}\n"
+        f"O titular da conta ou do cartão se chama {titular}.\n"
+        "- TRANSFER SOMENTE quando a outra ponta é o próprio titular (mesmo nome, "
+        "por exemplo Pix ou TED de ou para outra conta dele) ou quando for "
+        "movimentação de investimento (aplicação, resgate, caixinha, CDB, RDB, poupança).\n"
+        "- Pix, TED ou boleto de ou para QUALQUER OUTRA pessoa ou empresa NÃO é TRANSFER: "
+        "use PURCHASE quando o dinheiro sai e INCOME quando entra."
+    )
 
 
 class ArquivoInvalido(Exception):
@@ -208,11 +221,11 @@ async def marcar_duplicatas(db: AsyncSession, user: User, itens: list[dict]) -> 
         item["duplicate_in"] = sorted(achadas, key=str)
 
 
-async def _extrair(parte: types.Part) -> tuple[str | None, int]:
+async def _extrair(parte: types.Part, prompt: str) -> tuple[str | None, int]:
     """Saída de rede da importação. É ela que os testes stubam."""
     resposta = await ai_service.client.aio.models.generate_content(
         model=ai_service.MODELO,
-        contents=[parte, PROMPT],
+        contents=[parte, prompt],
         config=types.GenerateContentConfig(
             response_mime_type="application/json",
             response_schema=SCHEMA,
@@ -250,9 +263,10 @@ async def carteiras_padrao(db: AsyncSession, user: User, tipo: str):
 
 async def ler_arquivo(db: AsyncSession, user: User, conteudo: bytes) -> dict:
     formato, parte = detectar_formato(conteudo)
+    prompt = montar_prompt(user.name)
     # `_com_cota` exige a cota antes e debita depois. A lambda resolve
     # `_extrair` na hora da chamada, então o stub do teste vale.
-    texto = await ai_service._com_cota(db, str(user.id), lambda: _extrair(parte))
+    texto = await ai_service._com_cota(db, str(user.id), lambda: _extrair(parte, prompt))
     if texto is None:
         raise ArquivoInvalido(
             "O arquivo tem lançamentos demais para ler de uma vez. Divida por período e envie em partes."

@@ -25,17 +25,24 @@ def _item(**extra):
     return {**base, **extra}
 
 
+class _Chamadas(list):
+    """Lista das partes enviadas; `.prompts` guarda os prompts na mesma ordem."""
+
+
 @pytest.fixture
 def ia_devolve(monkeypatch):
-    chamadas = []
+    chamadas = _Chamadas()
+    prompts = []
 
     def _configurar(document_type="ACCOUNT_STATEMENT", items=None, tokens=1000, erro=None):
-        async def _falso(parte):
+        async def _falso(parte, prompt):
             chamadas.append(parte)
+            prompts.append(prompt)
             if erro:
                 raise erro
             return json.dumps({"document_type": document_type, "items": items or [_item()]}), tokens
         monkeypatch.setattr(import_service, "_extrair", _falso)
+        chamadas.prompts = prompts
         return chamadas
     return _configurar
 
@@ -72,6 +79,15 @@ async def test_preview_returns_the_lines_and_writes_nothing(make_auth_client, db
     assert [i["launch_as"] for i in corpo["items"]] == ["EXPENSE", "INCOME"]
     total = await db_session.scalar(select(func.count()).select_from(Transaction))
     assert total == 0
+
+
+@pytest.mark.asyncio
+async def test_the_prompt_sent_to_the_ai_names_the_account_holder(make_auth_client, ia_devolve):
+    ac = await make_auth_client("Alice")
+    chamadas = ia_devolve()
+
+    assert (await _enviar(ac)).status_code == 200
+    assert "Alice" in chamadas.prompts[0]
 
 
 @pytest.mark.asyncio
@@ -163,7 +179,7 @@ async def test_ai_failure_returns_503(make_auth_client, ia_devolve):
 async def test_broken_json_from_the_ai_returns_503(make_auth_client, monkeypatch):
     ac = await make_auth_client()
 
-    async def _quebrado(_parte):
+    async def _quebrado(_parte, _prompt):
         return "isto não é json", 500
     monkeypatch.setattr(import_service, "_extrair", _quebrado)
 
@@ -218,7 +234,7 @@ async def test_free_user_past_the_trial_cannot_import(make_auth_client, db_sessi
 async def test_truncated_ai_reply_asks_to_split_and_still_debits_the_quota(make_auth_client, db_session, monkeypatch):
     ac = await make_auth_client()
 
-    async def _cortado(_parte):
+    async def _cortado(_parte, _prompt):
         return None, 30_000
     monkeypatch.setattr(import_service, "_extrair", _cortado)
 
