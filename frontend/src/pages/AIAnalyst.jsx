@@ -72,7 +72,9 @@ export default function AIAnalyst() {
       return;
     }
     try {
-      const [previa, carteiras] = await Promise.all([importsApi.preview(arquivo), walletsApi.list()]);
+      // Carteiras antes da leitura paga: se falhar, nada foi gasto.
+      const carteiras = await walletsApi.list();
+      const previa = await importsApi.preview(arquivo);
       atualizarMensagem(id, { estado: "previa", previa: previa.data, carteiras: carteiras.data });
     } catch (err) {
       atualizarMensagem(id, {
@@ -95,7 +97,7 @@ export default function AIAnalyst() {
   }, [messages]);
 
   function newConversation() {
-    if (loading) return;
+    if (loading || lendoArquivo) return;
     setMessages([WELCOME]);
     setSessionId(null);
   }
@@ -132,7 +134,7 @@ export default function AIAnalyst() {
   }
 
   async function openSession(id) {
-    if (id === sessionId || loading) return;
+    if (id === sessionId || loading || lendoArquivo) return;
     setLoading(true);
     try {
       const res = await aiApi.getSession(id);
@@ -289,6 +291,7 @@ export default function AIAnalyst() {
                   </div>
                 ) : (
                   <div
+                    role={msg.kind === "importacao" ? (msg.estado === "lendo" ? "status" : "alert") : undefined}
                     className={`inset-panel max-w-[86%] px-4 py-3 text-[14px] leading-relaxed sm:max-w-[78%] ${
                       msg.role === "user"
                         ? "rounded-tr-md border-accent/20 bg-accent/10 text-content"

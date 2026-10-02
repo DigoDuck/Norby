@@ -35,6 +35,17 @@ export default function RevisaoImportacao({ previa, carteiras }) {
   const [resultado, setResultado] = useState(null);
 
   const lancaveis = linhas.filter((l) => l.marcada && l.launch_as !== "IGNORE").length;
+  const motivoId = useId();
+  const semDestino = linhas.filter(
+    (l) => l.marcada && l.launch_as === "TRANSFER" && (!l.transfer_wallet_id || l.transfer_wallet_id === walletId),
+  ).length;
+  const motivo = !walletId
+    ? "Escolha onde lançar."
+    : semDestino > 0
+      ? `Escolha a carteira de destino de ${semDestino} ${semDestino === 1 ? "transferência" : "transferências"}.`
+      : lancaveis === 0
+        ? "Marque ao menos um lançamento."
+        : null;
   const { entradas, saidas } = totais(linhas);
   const doArquivo = totaisDoArquivo(linhas);
 
@@ -74,7 +85,7 @@ export default function RevisaoImportacao({ previa, carteiras }) {
   if (resultado) {
     const total = resultado.transactions + resultado.transfers;
     return (
-      <div className="inset-panel rounded-tl-md px-4 py-3 text-[14px] text-content">
+      <div role="status" className="inset-panel rounded-tl-md px-4 py-3 text-[14px] text-content">
         <p>
           {total} {total === 1 ? "lançamento" : "lançamentos"} na {carteira?.name}.{" "}
           <Link to="/transactions" className="font-medium text-accent underline-offset-2 hover:underline">
@@ -207,9 +218,13 @@ export default function RevisaoImportacao({ previa, carteiras }) {
         className="mt-3 font-medium"
         disabled={enviando || !prontaParaLancar(walletId, linhas)}
         onClick={lancar}
+        aria-describedby={motivo && !enviando ? motivoId : undefined}
       >
         {enviando ? "Lançando…" : `Lançar ${lancaveis} ${lancaveis === 1 ? "lançamento" : "lançamentos"}`}
       </Button>
+      {motivo && !enviando && (
+        <p id={motivoId} className="mt-1.5 text-xs text-content-2">{motivo}</p>
+      )}
     </div>
   );
 }

@@ -80,7 +80,7 @@ describe("RevisaoImportacao", () => {
     expect(enviado.already_in_balance).toBe(false);
     expect(enviado.items).toHaveLength(3);
     expect(enviado.items[2]).toMatchObject({ launch_as: "TRANSFER", transfer_wallet_id: "cartao" });
-    expect(await screen.findByText(/3 lançamentos na Conta corrente/)).toBeInTheDocument();
+    expect(await screen.findByRole("status")).toHaveTextContent(/3 lançamentos na Conta corrente/);
     expect(screen.getByRole("link", { name: "Ver no Extrato" })).toHaveAttribute("href", "/transactions");
   });
 
@@ -109,7 +109,10 @@ describe("RevisaoImportacao", () => {
 
   it("não deixa lançar transferência sem destino", () => {
     renderizar({ ...PREVIA, default_card_id: null });
-    expect(screen.getByRole("button", { name: /Lançar/ })).toBeDisabled();
+    const botao = screen.getByRole("button", { name: /Lançar/ });
+    expect(botao).toBeDisabled();
+    expect(screen.getByText("Escolha a carteira de destino de 1 transferência.")).toBeInTheDocument();
+    expect(botao).toHaveAccessibleDescription("Escolha a carteira de destino de 1 transferência.");
   });
 
   it("erro ao lançar aparece e permite tentar de novo", async () => {

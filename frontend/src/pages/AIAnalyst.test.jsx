@@ -77,7 +77,7 @@ describe("AIAnalyst, anexo de fatura ou extrato", () => {
 
     fireEvent.change(anexo(), { target: { files: [new File(["x"], "a.csv")] } });
 
-    expect(await screen.findByText("Não encontrei lançamentos neste arquivo.")).toBeInTheDocument();
+    expect(await screen.findByRole("alert")).toHaveTextContent("Não encontrei lançamentos neste arquivo.");
   });
 
   it("enquanto lê, mostra o aviso de espera e trava um segundo anexo", async () => {
@@ -87,8 +87,11 @@ describe("AIAnalyst, anexo de fatura ou extrato", () => {
 
     fireEvent.change(anexo(), { target: { files: [new File(["x"], "a.csv")] } });
 
-    expect(await screen.findByText(/Lendo seu arquivo/)).toBeInTheDocument();
+    expect(await screen.findByRole("status")).toHaveTextContent(/Lendo seu arquivo/);
     expect(screen.getByRole("button", { name: "Anexar fatura ou extrato" })).toBeDisabled();
+    // Nova conversa não descarta a leitura em andamento (já foi paga).
+    fireEvent.click(screen.getAllByRole("button", { name: /Nova conversa/ })[0]);
+    expect(screen.getByText(/Lendo seu arquivo/)).toBeInTheDocument();
     terminar({ data: PREVIA });
     await waitFor(() => expect(screen.getByRole("button", { name: "Anexar fatura ou extrato" })).toBeEnabled());
   });
