@@ -7,7 +7,7 @@ from app.dependencies import get_db, require_ai_access
 from app.limiter import limiter, user_key
 from app.models.sql_models import User
 from app.schemas.imports import ImportPreview
-from app.services.import_service import ArquivoInvalido, ler_arquivo
+from app.services.import_service import ArquivoInvalido, ExtracaoFalhou, ler_arquivo
 from app.services.plan_service import PlanRefused
 
 logger = logging.getLogger(__name__)
@@ -42,6 +42,11 @@ async def preview_statement(
     except PlanRefused:
         # Cota diária: sobe até o handler do main (403 com o código).
         raise
+    except ExtracaoFalhou:
+        raise HTTPException(
+            status_code=503,
+            detail="Não consegui ler o arquivo agora. Tente novamente em instantes.",
+        )
     except Exception:
         logger.exception("Falha ao ler arquivo de importação (user=%s)", current_user.id)
         raise HTTPException(

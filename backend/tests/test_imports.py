@@ -212,3 +212,23 @@ async def test_free_user_past_the_trial_cannot_import(make_auth_client, db_sessi
 
     assert res.status_code == 403
     assert res.json()["detail"]["code"] == "AI_REQUIRES_PREMIUM"
+
+
+@pytest.mark.asyncio
+async def test_truncated_ai_reply_asks_to_split_and_still_debits_the_quota(make_auth_client, db_session, monkeypatch):
+    ac = await make_auth_client()
+
+    async def _cortado(_parte):
+        return None, 30_000
+    monkeypatch.setattr(import_service, "_extrair", _cortado)
+
+    res = await _enviar(ac)
+
+    assert res.status_code == 422
+    assert "Divida por período" in res.json()["detail"]
+    user_id = (await _usuario(ac, db_session)).id
+    db_session.expire_all()
+    uso = (await db_session.execute(
+        select(AiUsageDaily).where(AiUsageDaily.user_id == user_id, AiUsageDaily.day == ai.dia_da_cota())
+    )).scalar_one()
+    assert (uso.tokens, uso.calls) == (30_000, 1)

@@ -138,7 +138,8 @@ def normalizar(bruto: dict) -> tuple[str, list[dict], int]:
         raise ArquivoInvalido("Não reconheci uma fatura ou um extrato neste arquivo.")
     itens: list[dict] = []
     ignorados = 0
-    for item in bruto.get("items") or []:
+    lista = bruto.get("items")
+    for item in lista if isinstance(lista, list) else []:
         if not isinstance(item, dict):
             ignorados += 1
             continue
@@ -170,7 +171,7 @@ def normalizar(bruto: dict) -> tuple[str, list[dict], int]:
     return tipo, itens, ignorados
 
 
-async def _extrair(parte: types.Part) -> tuple[str, int]:
+async def _extrair(parte: types.Part) -> tuple[str | None, int]:
     """Saída de rede da importação. É ela que os testes stubam."""
     resposta = await ai_service.client.aio.models.generate_content(
         model=ai_service.MODELO,
@@ -182,6 +183,13 @@ async def _extrair(parte: types.Part) -> tuple[str, int]:
             max_output_tokens=MAX_TOKENS_IMPORTACAO,
         ),
     )
+    candidatos = getattr(resposta, "candidates", None) or [None]
+    motivo = getattr(candidatos[0], "finish_reason", None)
+    # Corte por limite de tokens vira RETORNO (None), não exceção: uma exceção
+    # dentro da `chamada` pularia o débito da cota em `_com_cota`, e esta
+    # chamada já custou os tokens.
+    if motivo == types.FinishReason.MAX_TOKENS:
+        return None, ai_service._tokens_usados(resposta)
     return resposta.text or "", ai_service._tokens_usados(resposta)
 
 
@@ -208,6 +216,10 @@ async def ler_arquivo(db: AsyncSession, user: User, conteudo: bytes) -> dict:
     # `_com_cota` exige a cota antes e debita depois. A lambda resolve
     # `_extrair` na hora da chamada, então o stub do teste vale.
     texto = await ai_service._com_cota(db, str(user.id), lambda: _extrair(parte))
+    if texto is None:
+        raise ArquivoInvalido(
+            "O arquivo tem lançamentos demais para ler de uma vez. Divida por período e envie em partes."
+        )
     try:
         bruto = json.loads(texto)
     except json.JSONDecodeError as erro:

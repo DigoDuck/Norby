@@ -103,6 +103,12 @@ def test_unknown_document_or_no_valid_lines_is_rejected():
         normalizar({"document_type": "ACCOUNT_STATEMENT", "items": [_item(amount=-5)]})
 
 
+@pytest.mark.parametrize("itens", ["texto", 5])
+def test_non_list_items_is_rejected(itens):
+    with pytest.raises(ArquivoInvalido):
+        normalizar({"document_type": "ACCOUNT_STATEMENT", "items": itens})
+
+
 def test_more_than_300_lines_is_rejected_with_a_clear_message():
     with pytest.raises(ArquivoInvalido, match="Divida"):
         normalizar({"document_type": "ACCOUNT_STATEMENT", "items": [_item()] * 301})
