@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   categoriaPara, duplicada, efeitoNoSaldo, jaNoSaldoPorPadrao, linhasIniciais,
-  montarConfirmacao, prontaParaLancar, totais,
+  montarConfirmacao, prontaParaLancar, totais, totaisDoArquivo,
 } from "./importacao";
 
 const item = (extra = {}) => ({
@@ -60,6 +60,10 @@ describe("totais e saldo", () => {
   it("soma entradas e saídas separadas, em centavos, só do que vai ser lançado", () => {
     // 0,10 + 0,20 em float daria 0,30000000000000004.
     expect(totais(linhas)).toEqual({ entradas: 1000, saidas: 300.3 });
+  });
+
+  it("totaisDoArquivo soma todas as linhas, marcadas ou ignoradas", () => {
+    expect(totaisDoArquivo(linhas)).toEqual({ entradas: 1000, saidas: 300.3 + 999 + 50 + 0 });
   });
 
   it("efeito no saldo: despesa e transferência de saída descem, receita sobe", () => {

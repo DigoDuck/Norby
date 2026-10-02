@@ -40,17 +40,20 @@ describe("RevisaoImportacao", () => {
 
   it("mostra entradas e saídas separadas e as linhas ignoradas pela leitura", () => {
     renderizar();
-    const resumo = screen.getByRole("group", { name: "Totais da importação" });
-    expect(within(resumo).getByText(/R\$ 3\.000,00/)).toBeInTheDocument();
+    const entram = screen.getByRole("group", { name: "Vão entrar" });
+    expect(within(entram).getByText(/R\$ 3\.000,00/)).toBeInTheDocument();
     // 52,30 + 300,00 (a caixinha vem como Ignorar).
-    expect(within(resumo).getByText(/R\$ 352,30/)).toBeInTheDocument();
+    expect(within(entram).getByText(/R\$ 352,30/)).toBeInTheDocument();
+    // No arquivo entra tudo, inclusive a caixinha ignorada: 352,30 + 100,00.
+    const arquivo = screen.getByRole("group", { name: "No arquivo" });
+    expect(within(arquivo).getByText(/R\$ 452,30/)).toBeInTheDocument();
     expect(screen.getByText(/2 linhas não puderam ser lidas/)).toBeInTheDocument();
   });
 
   it("desmarcar uma linha atualiza os totais", () => {
     renderizar();
     fireEvent.click(screen.getByRole("checkbox", { name: "Incluir Mercado" }));
-    const resumo = screen.getByRole("group", { name: "Totais da importação" });
+    const resumo = screen.getByRole("group", { name: "Vão entrar" });
     expect(within(resumo).getByText(/R\$ 300,00/)).toBeInTheDocument();
   });
 
@@ -99,7 +102,7 @@ describe("RevisaoImportacao", () => {
       target: { value: "EXPENSE" },
     });
     expect(screen.getByRole("combobox", { name: "Categoria: Caixinha" })).toHaveValue("Outros");
-    const resumo = screen.getByRole("group", { name: "Totais da importação" });
+    const resumo = screen.getByRole("group", { name: "Vão entrar" });
     // 52,30 + 300,00 + 100,00 da caixinha, agora lançada.
     expect(within(resumo).getByText(/R\$ 452,30/)).toBeInTheDocument();
   });

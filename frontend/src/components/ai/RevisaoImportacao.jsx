@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from "@/lib/categories";
 import {
   categoriaPara, duplicada, efeitoNoSaldo, jaNoSaldoPorPadrao, linhasIniciais,
-  montarConfirmacao, prontaParaLancar, totais,
+  montarConfirmacao, prontaParaLancar, totais, totaisDoArquivo,
 } from "@/lib/importacao";
 import { apiErrorMessage, formatBRL, formatDateBR, formatSinal, inputCls } from "@/lib/utils";
 
@@ -36,6 +36,7 @@ export default function RevisaoImportacao({ previa, carteiras }) {
 
   const lancaveis = linhas.filter((l) => l.marcada && l.launch_as !== "IGNORE").length;
   const { entradas, saidas } = totais(linhas);
+  const doArquivo = totaisDoArquivo(linhas);
 
   function trocarCarteira(id) {
     const novas = linhasIniciais(previa, id);
@@ -173,9 +174,17 @@ export default function RevisaoImportacao({ previa, carteiras }) {
         ))}
       </ul>
 
-      <div role="group" aria-label="Totais da importação" className="mt-3 flex flex-wrap gap-x-4 text-sm">
-        <span>Entradas <strong className="tnum">{formatBRL(entradas)}</strong></span>
-        <span>Saídas <strong className="tnum">{formatBRL(saidas)}</strong></span>
+      <div role="group" aria-label="Totais da importação" className="mt-3 space-y-1 text-sm">
+        <div role="group" aria-label="No arquivo" className="flex flex-wrap gap-x-4">
+          <span className="text-content-2">No arquivo</span>
+          <span>Entradas <strong className="tnum">{formatBRL(doArquivo.entradas)}</strong></span>
+          <span>Saídas <strong className="tnum">{formatBRL(doArquivo.saidas)}</strong></span>
+        </div>
+        <div role="group" aria-label="Vão entrar" className="flex flex-wrap gap-x-4">
+          <span className="text-content-2">Vão entrar</span>
+          <span>Entradas <strong className="tnum">{formatBRL(entradas)}</strong></span>
+          <span>Saídas <strong className="tnum">{formatBRL(saidas)}</strong></span>
+        </div>
       </div>
 
       {carteira && (

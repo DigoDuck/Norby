@@ -39,6 +39,17 @@ export function totais(linhas) {
   return { entradas: entradas / 100, saidas: saidas / 100 };
 }
 
+// Todas as linhas da prévia, marcadas ou não: é o número para conferir com o banco.
+export function totaisDoArquivo(linhas) {
+  let entradas = 0;
+  let saidas = 0;
+  for (const linha of linhas) {
+    if (linha.direction === "IN") entradas += centavos(linha.amount);
+    else saidas += centavos(linha.amount);
+  }
+  return { entradas: entradas / 100, saidas: saidas / 100 };
+}
+
 export function efeitoNoSaldo(linhas) {
   let total = 0;
   for (const linha of linhas) {
