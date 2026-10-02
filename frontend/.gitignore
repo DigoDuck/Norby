@@ -10,6 +10,8 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+# Vitest 5 report output
+.vitest/
 *.local
 
 # Explicitly track src/lib (root .gitignore has lib/ for Python, but we need this)
