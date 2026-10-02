@@ -1,0 +1,21 @@
+{
+  "expense": [
+    "Alimentação",
+    "Moradia",
+    "Transporte",
+    "Saúde",
+    "Educação",
+    "Lazer",
+    "Compras",
+    "Contas & Serviços",
+    "Outros"
+  ],
+  "income": [
+    "Salário",
+    "Freelance/Extra",
+    "Investimentos",
+    "Reembolso",
+    "Presente",
+    "Outros"
+  ]
+}
