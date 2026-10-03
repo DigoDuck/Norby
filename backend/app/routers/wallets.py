@@ -85,6 +85,8 @@ async def delete_wallet(
         .where(or_(Transfer.from_wallet_id == wallet.id, Transfer.to_wallet_id == wallet.id))
         .order_by(Transfer.id).with_for_update()
     )
+    # Redundante em runtime (o DELETE já trava a carteira), mas documenta e o
+    # teste de ordem observa: não "limpar".
     await db.execute(select(Wallet.id).where(Wallet.id == wallet.id).with_for_update())
 
     await db.delete(wallet)

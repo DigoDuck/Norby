@@ -171,3 +171,37 @@ async def test_deleting_a_wallet_locks_its_children_before_the_wallet(make_auth_
     assert ordem.index("wallets") > max(
         ordem.index(t) for t in ("recurring_transactions", "transactions", "transfers")
     )
+
+
+@pytest.mark.asyncio
+async def test_recurring_run_locks_due_templates_in_id_order(db_session):
+    # Mesma ordem do delete_wallet (templates por id); sem ORDER BY o lock
+    # segue a ordem do heap e pode fechar ciclo com a exclusão da carteira.
+    user = User(name="Al", email=f"al_{uuid.uuid4().hex[:8]}@t.com", password_hash="x")
+    db_session.add(user)
+    await db_session.flush()
+    carteira = Wallet(user_id=user.id, name="Uma", balance=Decimal("100.00"))
+    db_session.add(carteira)
+    await db_session.flush()
+    vencido = datetime.now(timezone.utc) - timedelta(days=1)
+    for _ in range(3):
+        db_session.add(RecurringTransaction(
+            user_id=user.id, wallet_id=carteira.id, type=TransactionType.EXPENSE,
+            amount=Decimal("10.00"), category="Sub", frequency=RecurrenceFrequency.WEEKLY,
+            weekday=0, next_run_date=vencido, active=True,
+        ))
+    await db_session.commit()
+
+    sqls = []
+
+    def ouvir(conn, cursor, statement, parameters, context, executemany):
+        if "FOR UPDATE" in statement and "FROM recurring_transactions" in statement:
+            sqls.append(statement)
+
+    event.listen(test_engine.sync_engine, "before_cursor_execute", ouvir)
+    try:
+        await materialize_due_recurring(db_session, user)
+    finally:
+        event.remove(test_engine.sync_engine, "before_cursor_execute", ouvir)
+
+    assert sqls and "ORDER BY recurring_transactions.id" in sqls[0]
