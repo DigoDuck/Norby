@@ -29,6 +29,10 @@ class ItemPrevia(BaseModel):
     # Carteiras onde este lançamento já existe (duplicata depende da carteira
     # escolhida em "Lançar em", que só a revisão conhece).
     duplicate_in: list[UUID]
+    # Transferências existentes que esta linha consome, como (origem, destino).
+    # A revisão compara com a carteira e o destino escolhidos (Task 2 do plano
+    # de 2026-10-03): o servidor não sabe qual será.
+    duplicate_pairs: list[tuple[UUID, UUID]]
 
 
 class ImportPreview(BaseModel):
@@ -66,6 +70,9 @@ class ImportConfirm(BaseModel):
     wallet_id: UUID
     already_in_balance: bool
     items: list[LinhaConfirmada] = Field(min_length=1, max_length=MAX_LINHAS)
+    # Gerada pela revisão uma vez por prévia. Opcional só para não quebrar um
+    # cliente antigo durante o deploy; o front atual sempre manda.
+    idempotency_key: UUID | None = None
 
     @model_validator(mode="after")
     def _transferencia_para_outra_carteira(self):

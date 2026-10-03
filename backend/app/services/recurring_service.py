@@ -61,7 +61,8 @@ async def materialize_due_recurring(db: AsyncSession, user: User) -> Materializa
             RecurringTransaction.user_id == user.id,
             RecurringTransaction.active.is_(True),
             RecurringTransaction.next_run_date <= now,
-        ).with_for_update()
+        # Por id: mesma ordem do delete_wallet, senão os dois podem se travar.
+        ).order_by(RecurringTransaction.id).with_for_update()
     )).scalars().all()
 
     # Trava as carteiras antes do laço, em ordem de id (`lock_order`), e não na

@@ -5,16 +5,19 @@ gravado) e `confirmar` grava as linhas que a pessoa revisou. O arquivo nunca é
 salvo e não entra no histórico do chat.
 """
 import json
+import uuid
+from collections import Counter
 from datetime import date
 from decimal import Decimal, InvalidOperation
 
 from google.genai import types
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.categories import EXPENSE_CATEGORIES, INCOME_CATEGORIES
 from app.models.sql_models import (
-    Transaction, TransactionType, Transfer, User, Wallet, WalletKind,
+    ImportBatch, Transaction, TransactionType, Transfer, User, Wallet, WalletKind,
 )
 from app.schemas.common import MAX_MONEY
 from app.schemas.imports import MAX_LINHAS, ImportConfirm
@@ -181,6 +184,7 @@ def normalizar(bruto: dict) -> tuple[str, list[dict], int]:
             "launch_as": launch_as,
             "category": _categoria(launch_as, kind, item.get("category")),
             "duplicate_in": [],
+            "duplicate_pairs": [],
         })
     if not itens:
         raise ArquivoInvalido("Não encontrei lançamentos neste arquivo.")
@@ -192,41 +196,66 @@ def normalizar(bruto: dict) -> tuple[str, list[dict], int]:
 
 
 async def marcar_duplicatas(db: AsyncSession, user: User, itens: list[dict]) -> None:
-    """Carteiras onde cada linha já existe. A revisão desmarca a linha quando a
-    carteira escolhida em "Lançar em" está na lista.
+    """Onde cada linha já existe. Cada registro existente casa com UMA linha só.
 
-    Transação: mesma data, valor e descrição (reimportar o mesmo arquivo).
-    Pagamento de fatura: transferência com mesma data e valor (pago antes pelo
-    botão "Pagar fatura", cuja descrição é outra).
+    Sem a contagem, uma corrida de R$ 5,20 já lançada desmarcava todas as
+    corridas iguais do arquivo (revisão do Codex, 2026-10-03).
+
+    - Transação: mesma data, valor e descrição, por carteira (`duplicate_in`).
+    - Transferência: primeiro mesma data, valor e descrição (linha trocada para
+      Transferência numa importação anterior), para todas as linhas; depois, para
+      pagamento de fatura ainda sem par, mesma data e valor SÓ quando o destino
+      é um cartão. Volta como par
+      (origem, destino) em `duplicate_pairs`: a revisão compara com a carteira
+      e o destino escolhidos, e uma transferência para a reserva não esconde
+      mais um pagamento de fatura.
     """
     datas = {i["date"] for i in itens}
     transacoes = (await db.execute(
         select(Transaction.wallet_id, Transaction.date, Transaction.amount, Transaction.description)
         .where(Transaction.user_id == user.id, Transaction.date.in_(datas))
     )).all()
-    por_transacao: dict[tuple, set] = {}
-    for t in transacoes:
-        por_transacao.setdefault((t.date, t.amount, t.description), set()).add(t.wallet_id)
+    restantes = Counter((t.date, t.amount, t.description, t.wallet_id) for t in transacoes)
 
+    cartoes = set((await db.execute(
+        select(Wallet.id).where(Wallet.user_id == user.id, Wallet.kind == WalletKind.CREDIT_CARD)
+    )).scalars().all())
     transferencias = (await db.execute(
-        select(Transfer.from_wallet_id, Transfer.to_wallet_id, Transfer.date, Transfer.amount, Transfer.description)
+        select(Transfer.id, Transfer.from_wallet_id, Transfer.to_wallet_id,
+               Transfer.date, Transfer.amount, Transfer.description)
         .where(Transfer.user_id == user.id, Transfer.date.in_(datas))
+        .order_by(Transfer.created_at, Transfer.id)
     )).all()
-    por_transferencia: dict[tuple, set] = {}
-    por_transf_desc: dict[tuple, set] = {}
-    for t in transferencias:
-        carteiras = {t.from_wallet_id, t.to_wallet_id}
-        por_transferencia.setdefault((t.date, t.amount), set()).update(carteiras)
-        por_transf_desc.setdefault((t.date, t.amount, t.description), set()).update(carteiras)
+    usadas: set = set()
+    por_linha: list[list] = [[] for _ in itens]
 
-    for item in itens:
+    def consumir(idx: int, item: dict, casa) -> None:
+        for t in transferencias:
+            if t.id not in usadas and t.date == item["date"] and t.amount == item["amount"] and casa(t, item):
+                usadas.add(t.id)
+                por_linha[idx].append((t.from_wallet_id, t.to_wallet_id))
+                return
+
+    # Passada 1: descrição igual, para todas as linhas. Passada 2: pagamento de
+    # fatura sem par, só com transferência que sobrou e vai para um cartão. Em
+    # duas passadas o fallback nunca rouba a transferência de uma linha que a
+    # casaria pela descrição.
+    for idx, item in enumerate(itens):
+        consumir(idx, item, lambda t, i: t.description == i["description"])
+    for idx, item in enumerate(itens):
+        if item["kind"] == "CARD_PAYMENT" and not por_linha[idx]:
+            consumir(idx, item, lambda t, i: t.to_wallet_id in cartoes)
+
+    for idx, item in enumerate(itens):
         chave = (item["date"], item["amount"], item["description"])
-        # Linha trocada para "Transferência" numa importação anterior vira Transfer
-        # com a mesma descrição: vale para qualquer kind.
-        achadas = por_transacao.get(chave, set()) | por_transf_desc.get(chave, set())
-        if item["kind"] == "CARD_PAYMENT":
-            achadas = achadas | por_transferencia.get((item["date"], item["amount"]), set())
-        item["duplicate_in"] = sorted(achadas, key=str)
+        duplicate_in = []
+        for (data_, valor, descricao, wallet_id), quantos in restantes.items():
+            if quantos > 0 and (data_, valor, descricao) == chave:
+                duplicate_in.append(wallet_id)
+        for wallet_id in duplicate_in:
+            restantes[(*chave, wallet_id)] -= 1
+        item["duplicate_in"] = sorted(duplicate_in, key=str)
+        item["duplicate_pairs"] = por_linha[idx]
 
 
 async def _extrair(parte: types.Part, prompt: str) -> tuple[str | None, int]:
@@ -298,6 +327,13 @@ async def ler_arquivo(db: AsyncSession, user: User, conteudo: bytes) -> dict:
     }
 
 
+async def _lote_gravado(db: AsyncSession, user_id: uuid.UUID, chave: uuid.UUID) -> dict | None:
+    lote = await db.scalar(
+        select(ImportBatch).where(ImportBatch.user_id == user_id, ImportBatch.idempotency_key == chave)
+    )
+    return {"transactions": lote.transactions, "transfers": lote.transfers} if lote else None
+
+
 async def confirmar(db: AsyncSession, user: User, payload: ImportConfirm) -> dict:
     """Grava as linhas revisadas numa única transação do banco: tudo ou nada.
 
@@ -306,13 +342,29 @@ async def confirmar(db: AsyncSession, user: User, payload: ImportConfirm) -> dic
     (404) ou carteira bloqueada (403) estouram nesse laço, antes de gravar.
     Todas são escrita (`for_write`): recebem linhas novas, mesmo quando o saldo
     não muda.
+
+    Com `idempotency_key`, repetir a chave devolve o resultado gravado e não
+    escreve nada; o lote é gravado no mesmo commit das linhas.
     """
+    # Capturado antes: depois de um rollback `user` expira e ler `.id` estoura
+    # (MissingGreenlet), como em admin_service.
+    user_id = user.id
+    if payload.idempotency_key:
+        anterior = await _lote_gravado(db, user_id, payload.idempotency_key)
+        if anterior is not None:
+            return anterior
     destinos = (i.transfer_wallet_id for i in payload.items if i.launch_as == "TRANSFER")
     carteiras = {}
     for wallet_id in lock_order(payload.wallet_id, *destinos):
         carteiras[wallet_id] = await get_owned_wallet(
             wallet_id, user, db, for_update=True, for_write=True
         )
+    # Segunda conferência já com as carteiras travadas: a confirmação
+    # concorrente espera aqui e então enxerga o lote da primeira.
+    if payload.idempotency_key:
+        anterior = await _lote_gravado(db, user_id, payload.idempotency_key)
+        if anterior is not None:
+            return anterior
     alvo = carteiras[payload.wallet_id]
     # "Já no saldo": o histórico entra, o saldo fica (spec B, seção Saldo).
     mexe_no_saldo = not payload.already_in_balance
@@ -326,7 +378,7 @@ async def confirmar(db: AsyncSession, user: User, payload: ImportConfirm) -> dic
                 origem.balance -= linha.amount
                 destino.balance += linha.amount
             db.add(Transfer(
-                user_id=user.id, from_wallet_id=origem.id, to_wallet_id=destino.id,
+                user_id=user_id, from_wallet_id=origem.id, to_wallet_id=destino.id,
                 amount=linha.amount, date=linha.date, description=linha.description,
             ))
             transferencias += 1
@@ -335,10 +387,25 @@ async def confirmar(db: AsyncSession, user: User, payload: ImportConfirm) -> dic
             if mexe_no_saldo:
                 apply_delta(alvo, tipo, linha.amount)
             db.add(Transaction(
-                user_id=user.id, wallet_id=alvo.id, type=tipo, amount=linha.amount,
+                user_id=user_id, wallet_id=alvo.id, type=tipo, amount=linha.amount,
                 category=linha.category, description=linha.description, date=linha.date,
             ))
             transacoes += 1
 
-    await db.commit()
-    return {"transactions": transacoes, "transfers": transferencias}
+    resultado = {"transactions": transacoes, "transfers": transferencias}
+    if payload.idempotency_key:
+        db.add(ImportBatch(user_id=user_id, idempotency_key=payload.idempotency_key, **resultado))
+    try:
+        await db.commit()
+    except IntegrityError:
+        # Duas confirmações simultâneas com a mesma chave: a outra gravou
+        # primeiro. Nada desta foi gravado; devolve o resultado da outra.
+        # Sem chave, o conflito é outro (CHECK, FK) e sobe como antes.
+        await db.rollback()
+        if not payload.idempotency_key:
+            raise
+        anterior = await _lote_gravado(db, user_id, payload.idempotency_key)
+        if anterior is None:
+            raise
+        return anterior
+    return resultado

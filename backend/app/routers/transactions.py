@@ -55,6 +55,7 @@ def _sem_acento(coluna):
 # só esperam um pelo outro, em vez de fechar um ciclo que o Postgres abortaria
 # com deadlock (500). Caminho novo que trave mais de uma carteira passa pelo
 # `lock_order` também; `tests/test_wallet_lock_order.py` observa essa ordem.
+# Excluir carteira também segue "filhos, depois carteira" (DELETE /wallets).
 async def _get_owned_transaction(transaction_id: UUID, user: User, db: AsyncSession) -> Transaction:
     """Transação do usuário, sempre com lock (FOR UPDATE).
 

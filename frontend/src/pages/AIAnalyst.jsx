@@ -57,7 +57,9 @@ export default function AIAnalyst() {
   // A leitura roda no evento, não num efeito: com StrictMode o efeito rodaria
   // duas vezes em desenvolvimento, e cada leitura gasta cota de IA.
   async function enviarArquivo(arquivo) {
-    if (!arquivo || lendoArquivo) return;
+    // Bloqueado enquanto o histórico carrega: setMessages trocaria a lista e
+    // apagaria a leitura em andamento, que já gastou cota.
+    if (!arquivo || lendoArquivo || loading) return;
     const id = crypto.randomUUID();
     setMessages((prev) => [
       ...prev,
@@ -340,7 +342,7 @@ export default function AIAnalyst() {
                 variant="ghost"
                 size="icon-lg"
                 title="Anexar fatura ou extrato. CSV ou OFX são mais precisos que PDF."
-                disabled={lendoArquivo}
+                disabled={lendoArquivo || loading}
                 onClick={() => arquivoRef.current?.click()}
                 className="shrink-0 rounded-xl text-content-2 hover:text-content"
               >

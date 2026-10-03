@@ -63,7 +63,7 @@ function ExcluirCarteira({ wallet, onConfirm, trigger }) {
     }
     setTransferencias(0);
     try {
-      setTransferencias((await transfersApi.list({ wallet_id: wallet.id })).data.length);
+      setTransferencias((await transfersApi.summary({ wallet_id: wallet.id })).data.count);
     } catch {
       setTransferencias(0);
     }

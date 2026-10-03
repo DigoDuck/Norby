@@ -180,3 +180,81 @@ async def test_blocked_wallet_is_refused_and_nothing_is_written(make_auth_client
     ])
     assert res.status_code == 403
     assert await _contagem(db_session, Transaction) == 0
+
+
+@pytest.mark.asyncio
+async def test_same_key_twice_writes_once(make_auth_client, db_session):
+    # Repro do Codex: o mesmo payload duas vezes criava duas despesas e
+    # descia o saldo duas vezes. Com a chave, o retry devolve o mesmo resultado.
+    ac = await make_auth_client()
+    conta = await _carteira(ac, "Conta", "100.00")
+    corpo = {
+        "wallet_id": conta["id"], "already_in_balance": False,
+        "idempotency_key": "4f1c2a8e-6b0d-4c3e-9a51-0d7e8b2f6a11",
+        "items": [_linha(amount="10.00")],
+    }
+
+    primeiro = await ac.post("/imports/statement/confirm", json=corpo)
+    segundo = await ac.post("/imports/statement/confirm", json=corpo)
+
+    assert primeiro.status_code == segundo.status_code == 201
+    assert primeiro.json() == segundo.json() == {"transactions": 1, "transfers": 0}
+    assert await _contagem(db_session, Transaction) == 1
+    assert await _saldo(ac, conta["id"]) == 90.0
+
+
+@pytest.mark.asyncio
+async def test_the_same_key_from_another_user_is_independent(make_auth_client, db_session):
+    alice = await make_auth_client("Alice")
+    bob = await make_auth_client("Bob")
+    chave = "0b6d5e7a-1c2f-4a3b-8d9e-7f6a5b4c3d2e"
+    for ac in (alice, bob):
+        conta = await _carteira(ac, "Conta", "100.00")
+        res = await ac.post("/imports/statement/confirm", json={
+            "wallet_id": conta["id"], "already_in_balance": False,
+            "idempotency_key": chave, "items": [_linha()],
+        })
+        assert res.status_code == 201
+    assert await _contagem(db_session, Transaction) == 2
+
+
+@pytest.mark.asyncio
+async def test_without_a_key_each_call_writes(make_auth_client, db_session):
+    ac = await make_auth_client()
+    conta = await _carteira(ac, "Conta", "100.00")
+    for _ in range(2):
+        await _confirmar(ac, conta["id"], [_linha()])
+    assert await _contagem(db_session, Transaction) == 2
+
+
+@pytest.mark.asyncio
+async def test_concurrent_duplicate_answers_with_the_stored_result(make_auth_client, db_session, monkeypatch):
+    # A outra confirmação já gravou o lote; as duas conferências prévias não o
+    # enxergam (corrida), então só o IntegrityError do commit resolve.
+    from app.models.sql_models import ImportBatch
+    from app.services import import_service
+
+    ac = await make_auth_client()
+    conta = await _carteira(ac, "Conta", "100.00")
+    chave = "7c9e6679-7425-40de-944b-e07fc1f90ae7"
+    uid = (await ac.get("/auth/me")).json()["id"]
+    db_session.add(ImportBatch(user_id=uid, idempotency_key=chave, transactions=7, transfers=0))
+    await db_session.commit()
+
+    real, chamadas = import_service._lote_gravado, []
+
+    async def cego_nas_duas_primeiras(db, user_id, k):
+        chamadas.append(1)
+        return None if len(chamadas) <= 2 else await real(db, user_id, k)
+
+    monkeypatch.setattr(import_service, "_lote_gravado", cego_nas_duas_primeiras)
+
+    res = await ac.post("/imports/statement/confirm", json={
+        "wallet_id": conta["id"], "already_in_balance": False,
+        "idempotency_key": chave, "items": [_linha()],
+    })
+
+    assert res.status_code == 201, res.text
+    assert res.json() == {"transactions": 7, "transfers": 0}
+    assert await _contagem(db_session, Transaction) == 0
+    assert await _saldo(ac, conta["id"]) == 100.0

@@ -9,5 +9,6 @@ export const importsApi = {
       headers: { "Content-Type": arquivo.type || "application/octet-stream" },
       timeout: 180_000,
     }),
-  confirm: (dados) => api.post("/imports/statement/confirm", dados),
+  // Com a chave de idempotência, cortar uma confirmação lenta e tentar de novo não grava duas vezes.
+  confirm: (dados) => api.post("/imports/statement/confirm", dados, { timeout: 60_000 }),
 };

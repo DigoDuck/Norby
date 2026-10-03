@@ -77,7 +77,7 @@ def test_normalize_keeps_valid_lines_and_counts_the_rest():
     assert itens == [{
         "date": date(2026, 8, 10), "description": "Mercado", "amount": Decimal("52.30"),
         "direction": "OUT", "kind": "PURCHASE", "launch_as": "EXPENSE",
-        "category": "Alimentação", "duplicate_in": [],
+        "category": "Alimentação", "duplicate_in": [], "duplicate_pairs": [],
     }]
 
 
