@@ -7,7 +7,7 @@ import {
 
 const item = (extra = {}) => ({
   date: "2026-08-10", description: "Mercado", amount: "52.30", direction: "OUT",
-  kind: "PURCHASE", launch_as: "EXPENSE", category: "Alimentação", duplicate_in: [],
+  kind: "PURCHASE", launch_as: "EXPENSE", category: "Alimentação", duplicate_in: [], duplicate_pairs: [],
   ...extra,
 });
 
@@ -35,10 +35,35 @@ describe("linhasIniciais", () => {
   });
 });
 
+describe("duplicada", () => {
+  it("transferência só é duplicada no mesmo par de carteiras e direção", () => {
+    const saida = { ...item({ launch_as: "TRANSFER", direction: "OUT" }), duplicate_pairs: [["conta", "cartaoA"]] };
+    expect(duplicada({ ...saida, transfer_wallet_id: "cartaoA" }, "conta")).toBe(true);
+    expect(duplicada({ ...saida, transfer_wallet_id: "cartaoB" }, "conta")).toBe(false);
+    expect(duplicada({ ...saida, transfer_wallet_id: "cartaoA" }, "outra")).toBe(false);
+    const entrada = { ...item({ launch_as: "TRANSFER", direction: "IN" }), duplicate_pairs: [["reserva", "conta"]] };
+    expect(duplicada({ ...entrada, transfer_wallet_id: "reserva" }, "conta")).toBe(true);
+  });
+
+  it("linha que não é transferência vale por duplicate_in ou por par com a carteira", () => {
+    expect(duplicada(item({ duplicate_in: ["conta"] }), "conta")).toBe(true);
+    expect(duplicada({ ...item(), duplicate_pairs: [["reserva", "conta"]] }, "conta")).toBe(true);
+    expect(duplicada(item({ duplicate_in: ["outra"] }), "conta")).toBe(false);
+  });
+});
+
 it("duplicada depende da carteira escolhida", () => {
   const linha = item({ duplicate_in: ["conta"] });
   expect(duplicada(linha, "conta")).toBe(true);
   expect(duplicada(linha, "outra")).toBe(false);
+});
+
+it("linhasIniciais desmarca o pagamento já registrado para o cartão padrão", () => {
+  const [linha] = linhasIniciais(previa([
+    { ...item({ kind: "CARD_PAYMENT", launch_as: "TRANSFER", category: null }), duplicate_pairs: [["conta", "cartao"]] },
+  ]), "conta");
+  expect(linha.transfer_wallet_id).toBe("cartao");
+  expect(linha.marcada).toBe(false);
 });
 
 it("categoriaPara mantém a categoria válida e cai em Outros", () => {
@@ -93,9 +118,10 @@ describe("montarConfirmacao e prontaParaLancar", () => {
   ];
 
   it("manda só as marcadas e não ignoradas, com categoria ou destino", () => {
-    expect(montarConfirmacao("conta", true, linhas)).toEqual({
+    expect(montarConfirmacao("conta", true, linhas, "chave-1")).toEqual({
       wallet_id: "conta",
       already_in_balance: true,
+      idempotency_key: "chave-1",
       items: [
         { date: "2026-08-10", description: "Mercado", amount: "52.30", direction: "OUT",
           launch_as: "EXPENSE", category: "Alimentação" },

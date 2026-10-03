@@ -95,4 +95,21 @@ describe("AIAnalyst, anexo de fatura ou extrato", () => {
     terminar({ data: PREVIA });
     await waitFor(() => expect(screen.getByRole("button", { name: "Anexar fatura ou extrato" })).toBeEnabled());
   });
+
+  it("não deixa anexar enquanto uma conversa anterior carrega", async () => {
+    let carregar;
+    aiApi.getSessions.mockResolvedValue({ data: [{ session_id: "old", first_message: "Conversa antiga" }] });
+    aiApi.getSession.mockReturnValue(new Promise((resolve) => { carregar = resolve; }));
+    renderizar();
+
+    fireEvent.click((await screen.findAllByRole("button", { name: "Conversa antiga" }))[0]);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Anexar fatura ou extrato" })).toBeDisabled());
+    // O handler também recusa, não só o botão.
+    fireEvent.change(anexo(), { target: { files: [new File(["x"], "a.csv")] } });
+    expect(importsApi.preview).not.toHaveBeenCalled();
+
+    carregar({ data: { messages: [{ role: "assistant", content: "Histórico recebido" }] } });
+    expect(await screen.findByText("Histórico recebido")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Anexar fatura ou extrato" })).toBeEnabled());
+  });
 });

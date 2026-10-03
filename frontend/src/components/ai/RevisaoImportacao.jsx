@@ -30,6 +30,7 @@ export default function RevisaoImportacao({ previa, carteiras }) {
   const [linhas, setLinhas] = useState(() => linhasIniciais(previa, previa.default_wallet_id ?? ""));
   const carteira = carteiras.find((c) => c.id === walletId);
   const [jaNoSaldo, setJaNoSaldo] = useState(() => jaNoSaldoPorPadrao(carteira, linhas));
+  const [chave] = useState(() => crypto.randomUUID());
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState(null);
   const [resultado, setResultado] = useState(null);
@@ -73,7 +74,7 @@ export default function RevisaoImportacao({ previa, carteiras }) {
     setErro(null);
     setEnviando(true);
     try {
-      const res = await importsApi.confirm(montarConfirmacao(walletId, jaNoSaldo, linhas));
+      const res = await importsApi.confirm(montarConfirmacao(walletId, jaNoSaldo, linhas, chave));
       setResultado(res.data);
     } catch (err) {
       setErro(apiErrorMessage(err, "Não foi possível lançar. Tente novamente."));
@@ -170,7 +171,14 @@ export default function RevisaoImportacao({ previa, carteiras }) {
                 <select
                   aria-label={`Destino: ${linha.description}`}
                   value={linha.transfer_wallet_id ?? ""}
-                  onChange={(e) => alterar(linha.id, { transfer_wallet_id: e.target.value || null })}
+                  onChange={(e) => {
+                    // A duplicata de transferência depende do destino: a marca acompanha a escolha.
+                    const destino = e.target.value || null;
+                    alterar(linha.id, {
+                      transfer_wallet_id: destino,
+                      marcada: !duplicada({ ...linha, transfer_wallet_id: destino }, walletId),
+                    });
+                  }}
                   className={selectCls}
                 >
                   <option value="">Para qual carteira?</option>

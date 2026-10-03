@@ -8,17 +8,32 @@ export const LIMITE_ARQUIVO = 1_048_576; // o mesmo teto do backend
 const centavos = (valor) => Math.round(Number(valor) * 100);
 const vaiSerLancada = (linha) => linha.marcada && linha.launch_as !== "IGNORE";
 
-export const duplicada = (linha, walletId) => linha.duplicate_in.includes(walletId);
+// Transferência: duplicada só no mesmo par (origem, destino) da direção da
+// linha, porque uma transferência para a reserva não paga a fatura do cartão
+// (revisão do Codex, 2026-10-03). Outras linhas: a carteira tem o lançamento,
+// ou tem uma transferência que esta linha virou numa importação anterior.
+export function duplicada(linha, walletId) {
+  const pares = linha.duplicate_pairs ?? [];
+  if (linha.launch_as === "TRANSFER") {
+    const destino = linha.transfer_wallet_id;
+    const [de, para] = linha.direction === "IN" ? [destino, walletId] : [walletId, destino];
+    return pares.some(([f, t]) => f === de && t === para);
+  }
+  return linha.duplicate_in.includes(walletId) || pares.some((par) => par.includes(walletId));
+}
 
-// Recalculada quando "Lançar em" muda: duplicata depende da carteira.
+// Recalculada quando "Lançar em" muda: duplicata depende da carteira. O
+// destino padrão entra ANTES da marcação, que depende dele.
 export function linhasIniciais(previa, walletId) {
-  return previa.items.map((item, indice) => ({
-    ...item,
-    id: indice,
-    marcada: item.launch_as !== "IGNORE" && !duplicada(item, walletId),
-    transfer_wallet_id:
-      item.kind === "CARD_PAYMENT" && item.launch_as === "TRANSFER" ? previa.default_card_id : null,
-  }));
+  return previa.items.map((item, indice) => {
+    const linha = {
+      ...item,
+      id: indice,
+      transfer_wallet_id:
+        item.kind === "CARD_PAYMENT" && item.launch_as === "TRANSFER" ? previa.default_card_id : null,
+    };
+    return { ...linha, marcada: item.launch_as !== "IGNORE" && !duplicada(linha, walletId) };
+  });
 }
 
 export function categoriaPara(launchAs, categoria) {
@@ -70,10 +85,11 @@ export function jaNoSaldoPorPadrao(carteira, linhas) {
   return carteira.created_at.slice(0, 10) > ultima;
 }
 
-export function montarConfirmacao(walletId, jaNoSaldo, linhas) {
+export function montarConfirmacao(walletId, jaNoSaldo, linhas, chave) {
   return {
     wallet_id: walletId,
     already_in_balance: jaNoSaldo,
+    idempotency_key: chave,
     items: linhas.filter(vaiSerLancada).map((l) => ({
       date: l.date,
       description: l.description,

@@ -12,7 +12,7 @@ const CARTAO = { id: "cartao", name: "Cartão Nubank", balance: "-300.00", kind:
 
 const item = (extra = {}) => ({
   date: "2026-08-10", description: "Mercado", amount: "52.30", direction: "OUT",
-  kind: "PURCHASE", launch_as: "EXPENSE", category: "Alimentação", duplicate_in: [],
+  kind: "PURCHASE", launch_as: "EXPENSE", category: "Alimentação", duplicate_in: [], duplicate_pairs: [],
   ...extra,
 });
 
@@ -120,6 +120,31 @@ describe("RevisaoImportacao", () => {
     expect(botao).toHaveAccessibleDescription("Escolha a carteira de destino de 1 transferência.");
   });
 
+  it("com dois cartões, escolher o destino já pago desmarca o pagamento", () => {
+    // Sem cartão padrão o destino nasce vazio; a marca tem de acompanhar a
+    // escolha, senão o pagamento já lançado entraria de novo.
+    const outro = { ...CARTAO, id: "outro", name: "Cartão Inter" };
+    render(
+      <MemoryRouter>
+        <RevisaoImportacao
+          previa={{
+            ...PREVIA, default_card_id: null,
+            items: [item({ description: "Pagamento de fatura", amount: "300.00", kind: "CARD_PAYMENT",
+              launch_as: "TRANSFER", category: null, duplicate_pairs: [["conta", "cartao"]] })],
+          }}
+          carteiras={[CONTA, CARTAO, outro]}
+        />
+      </MemoryRouter>,
+    );
+    const marca = screen.getByRole("checkbox", { name: "Incluir Pagamento de fatura" });
+    const destino = screen.getByRole("combobox", { name: "Destino: Pagamento de fatura" });
+    expect(marca).toBeChecked();
+    fireEvent.change(destino, { target: { value: "cartao" } });
+    expect(marca).not.toBeChecked();
+    fireEvent.change(destino, { target: { value: "outro" } });
+    expect(marca).toBeChecked();
+  });
+
   it("erro ao lançar aparece e permite tentar de novo", async () => {
     importsApi.confirm.mockRejectedValue(new Error("500"));
     renderizar();
@@ -128,5 +153,21 @@ describe("RevisaoImportacao", () => {
 
     expect(await screen.findByText(/Não foi possível lançar/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Lançar 3 lançamentos" })).toBeEnabled();
+  });
+
+  it("tentar de novo depois de um erro manda a mesma chave", async () => {
+    importsApi.confirm
+      .mockRejectedValueOnce(new Error("rede"))
+      .mockResolvedValueOnce({ data: { transactions: 2, transfers: 1 } });
+    renderizar();
+
+    fireEvent.click(screen.getByRole("button", { name: "Lançar 3 lançamentos" }));
+    await screen.findByRole("alert");
+    fireEvent.click(screen.getByRole("button", { name: "Lançar 3 lançamentos" }));
+    await screen.findByText(/3 lançamentos na Conta corrente/);
+
+    const [primeira, segunda] = importsApi.confirm.mock.calls.map(([dados]) => dados.idempotency_key);
+    expect(primeira).toMatch(/^[0-9a-f-]{36}$/);
+    expect(segunda).toBe(primeira);
   });
 });

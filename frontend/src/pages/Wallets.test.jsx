@@ -22,7 +22,7 @@ vi.mock("@/api/wallets", () => ({
 }));
 
 vi.mock("@/api/transfers", () => ({
-  transfersApi: { list: vi.fn(), create: vi.fn(), delete: vi.fn() },
+  transfersApi: { list: vi.fn(), summary: vi.fn(), create: vi.fn(), delete: vi.fn() },
 }));
 
 describe("Wallets", () => {
@@ -195,6 +195,7 @@ describe("Wallets, excluir carteira", () => {
     vi.clearAllMocks();
     walletsApi.list.mockResolvedValue({ data: [NUBANK] });
     transfersApi.list.mockResolvedValue({ data: [] });
+    transfersApi.summary.mockResolvedValue({ data: { count: 0 } });
   });
 
   it("antes de excluir, diz quantos lançamentos e qual saldo vão junto", async () => {
@@ -301,11 +302,11 @@ describe("Wallets, cartão de crédito", () => {
       data: [{ id: "c1", name: "Cartão", balance: "0.00", bank: null, kind: "CREDIT_CARD", created_at: "2026-09-01T00:00:00Z" }],
     });
     transactionsApi.summary.mockResolvedValue({ data: { count: 2, income: "0", expenses: "300" } });
-    transfersApi.list.mockResolvedValue({ data: [{ id: "t1" }] });
+    transfersApi.summary.mockResolvedValue({ data: { count: 130 } });
     render(<Wallets />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Excluir carteira", expanded: false }));
     const dialog = await screen.findByRole("dialog");
-    expect(await within(dialog).findByText(/1 transferência/)).toBeInTheDocument();
+    expect(await within(dialog).findByText(/130 transferências/)).toBeInTheDocument();
   });
 });

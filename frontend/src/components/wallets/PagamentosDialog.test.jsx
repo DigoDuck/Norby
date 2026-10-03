@@ -5,7 +5,7 @@ import { transfersApi } from "@/api/transfers";
 import PagamentosDialog from "./PagamentosDialog";
 
 vi.mock("@/api/transfers", () => ({
-  transfersApi: { list: vi.fn(), create: vi.fn(), delete: vi.fn() },
+  transfersApi: { list: vi.fn(), summary: vi.fn(), create: vi.fn(), delete: vi.fn() },
 }));
 
 const CARTAO = { id: "c1", name: "Cartão", balance: "-300.00", kind: "CREDIT_CARD" };
@@ -24,7 +24,10 @@ function renderizar(onChange = vi.fn()) {
 }
 
 describe("PagamentosDialog", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    transfersApi.summary.mockResolvedValue({ data: { count: 1 } });
+  });
 
   it("busca ao abrir e lista os pagamentos com a conta de origem", async () => {
     transfersApi.list.mockResolvedValue({
@@ -37,10 +40,11 @@ describe("PagamentosDialog", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Pagamentos", expanded: false }));
 
     expect(await screen.findByText(/de Conta/)).toBeInTheDocument();
-    expect(transfersApi.list).toHaveBeenCalledWith({ wallet_id: "c1" });
+    expect(transfersApi.list).toHaveBeenCalledWith({ wallet_id: "c1", limit: 50, offset: 0 });
   });
 
   it("lista vazia diz que não há pagamento, sem inventar linha", async () => {
+    transfersApi.summary.mockResolvedValue({ data: { count: 0 } });
     transfersApi.list.mockResolvedValue({ data: [] });
     renderizar();
 
@@ -94,5 +98,33 @@ describe("PagamentosDialog", () => {
 
     await waitFor(() => expect(transfersApi.list).toHaveBeenCalledTimes(2));
     expect(await screen.findByText("Nenhum pagamento registrado.")).toBeInTheDocument();
+  });
+
+  it("carrega mais páginas até mostrar todos os pagamentos", async () => {
+    const pagina = (inicio, n) => Array.from({ length: n }, (_, i) => ({
+      id: `t${inicio + i}`, from_wallet_id: "a1", to_wallet_id: "c1",
+      amount: "1.00", date: "2026-09-01", description: null,
+    }));
+    transfersApi.summary.mockResolvedValue({ data: { count: 55 } });
+    transfersApi.list
+      .mockResolvedValueOnce({ data: pagina(0, 50) })
+      .mockResolvedValueOnce({ data: pagina(50, 5) });
+    renderizar();
+    fireEvent.click(await screen.findByRole("button", { name: "Pagamentos", expanded: false }));
+
+    expect(await screen.findByText("Mostrando 50 de 55")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Carregar mais" }));
+    await waitFor(() => expect(screen.getAllByRole("button", { name: "Excluir pagamento" })).toHaveLength(55));
+    expect(transfersApi.list).toHaveBeenLastCalledWith({ wallet_id: "c1", limit: 50, offset: 50 });
+    expect(screen.queryByRole("button", { name: "Carregar mais" })).not.toBeInTheDocument();
+  });
+
+  it("a lista rola dentro do diálogo, com título e fechar sempre visíveis", async () => {
+    transfersApi.list.mockResolvedValue({ data: [{ id: "t1", from_wallet_id: "a1", to_wallet_id: "c1", amount: "1.00", date: "2026-09-01", description: null }] });
+    renderizar();
+    fireEvent.click(await screen.findByRole("button", { name: "Pagamentos", expanded: false }));
+    const lista = await screen.findByRole("list", { name: "Pagamentos" });
+    expect(lista.className).toMatch(/overflow-y-auto/);
+    expect(lista.className).toMatch(/max-h-/);
   });
 });
