@@ -55,7 +55,7 @@ describe("AIAnalyst, anexo de fatura ou extrato", () => {
     fireEvent.change(anexo(), { target: { files: [arquivo] } });
 
     expect(screen.getByText("Arquivo: extrato.csv")).toBeInTheDocument();
-    expect(await screen.findByText(/Encontrei 1 lançamento no\s+seu extrato/)).toBeInTheDocument();
+    expect(await screen.findByText(/Encontrei 1 lançamento no seu extrato/)).toBeInTheDocument();
     expect(importsApi.preview).toHaveBeenCalledWith(arquivo);
   });
 

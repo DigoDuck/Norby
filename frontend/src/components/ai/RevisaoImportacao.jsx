@@ -16,7 +16,7 @@ const OPCOES = [
   { value: "TRANSFER", label: "Transferência" },
   { value: "IGNORE", label: "Ignorar" },
 ];
-const TIPO_DOCUMENTO = { CARD_INVOICE: "fatura", ACCOUNT_STATEMENT: "extrato" };
+const TIPO_DOCUMENTO = { CARD_INVOICE: "na sua fatura", ACCOUNT_STATEMENT: "no seu extrato" };
 const selectCls = `${inputCls} h-8 py-0 text-xs`;
 
 /**
@@ -102,8 +102,7 @@ export default function RevisaoImportacao({ previa, carteiras }) {
   return (
     <div className="inset-panel w-full rounded-tl-md p-4 text-[14px] text-content">
       <p className="font-medium">
-        Encontrei {previa.items.length} {previa.items.length === 1 ? "lançamento" : "lançamentos"} no
-        seu {TIPO_DOCUMENTO[previa.document_type]}.
+        Encontrei {previa.items.length} {previa.items.length === 1 ? "lançamento" : "lançamentos"} {TIPO_DOCUMENTO[previa.document_type]}.
       </p>
       {previa.ignored > 0 && (
         <p className="mt-1 text-xs text-content-2">
@@ -206,8 +205,8 @@ export default function RevisaoImportacao({ previa, carteiras }) {
           </label>
           <p className="mt-1 tnum">
             {jaNoSaldo
-              ? `Saldo da ${carteira.name} não muda: ${formatBRL(antes)}`
-              : `Saldo da ${carteira.name}: ${formatBRL(antes)} → ${formatBRL(depois)}`}
+              ? `Saldo (${carteira.name}) não muda: ${formatBRL(antes)}`
+              : `Saldo (${carteira.name}): ${formatBRL(antes)} → ${formatBRL(depois)}`}
           </p>
         </div>
       )}

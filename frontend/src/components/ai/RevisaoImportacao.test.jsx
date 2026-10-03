@@ -50,6 +50,11 @@ describe("RevisaoImportacao", () => {
     expect(screen.getByText(/2 linhas não puderam ser lidas/)).toBeInTheDocument();
   });
 
+  it("usa a frase correta para cada tipo de documento", () => {
+    renderizar({ ...PREVIA, document_type: "CARD_INVOICE" });
+    expect(screen.getByText(/Encontrei 4 lançamentos na sua fatura/)).toBeInTheDocument();
+  });
+
   it("desmarcar uma linha atualiza os totais", () => {
     renderizar();
     fireEvent.click(screen.getByRole("checkbox", { name: "Incluir Mercado" }));
@@ -89,7 +94,7 @@ describe("RevisaoImportacao", () => {
     renderizar();
 
     fireEvent.click(screen.getByRole("checkbox", { name: /já estão no meu saldo atual/ }));
-    expect(screen.getByText(/Saldo da Conta corrente não muda/)).toBeInTheDocument();
+    expect(screen.getByText(/Saldo \(Conta corrente\) não muda/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Lançar 3 lançamentos" }));
 
     await waitFor(() => expect(importsApi.confirm).toHaveBeenCalled());
