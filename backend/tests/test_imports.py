@@ -281,7 +281,7 @@ async def test_invoice_payment_already_registered_is_duplicate(make_auth_client,
 
     itens = (await _enviar(ac)).json()["items"]
 
-    assert conta["id"] in itens[0]["duplicate_in"]
+    assert itens[0]["duplicate_pairs"] == [[conta["id"], cartao["id"]]]
 
 
 @pytest.mark.asyncio
@@ -297,7 +297,7 @@ async def test_transfer_with_same_date_amount_and_description_is_duplicate(make_
 
     itens = (await _enviar(ac)).json()["items"]
 
-    assert {conta["id"], reserva["id"]} <= set(itens[0]["duplicate_in"])
+    assert itens[0]["duplicate_pairs"] == [[conta["id"], reserva["id"]]]
 
 
 @pytest.mark.asyncio
@@ -315,3 +315,87 @@ async def test_another_users_identical_transaction_is_not_a_duplicate(make_auth_
     itens = (await _enviar(alice)).json()["items"]
 
     assert itens[0]["duplicate_in"] == []
+    assert itens[0]["duplicate_pairs"] == []
+
+
+async def _carteira(ac, nome, kind="ACCOUNT", balance="0.00"):
+    res = await ac.post("/wallets/", json={"name": nome, "kind": kind, "balance": balance})
+    assert res.status_code == 201, res.text
+    return res.json()
+
+
+@pytest.mark.asyncio
+async def test_card_payment_does_not_match_a_transfer_to_savings(make_auth_client, ia_devolve):
+    # Repro do Codex: só existe Conta -> Reserva; o pagamento Conta -> Cartão
+    # do mesmo dia e valor não pode vir como "já lançado".
+    ac = await make_auth_client()
+    conta = await _carteira(ac, "Conta", balance="1000.00")
+    reserva = await _carteira(ac, "Reserva")
+    await _carteira(ac, "Cartão", kind="CREDIT_CARD")
+    await ac.post("/transfers/", json={
+        "from_wallet_id": conta["id"], "to_wallet_id": reserva["id"],
+        "amount": "300.00", "date": "2026-08-15", "description": "Guardar dinheiro",
+    })
+    ia_devolve(items=[_item(kind="CARD_PAYMENT", amount=300, date="2026-08-15", description="Pagamento de fatura")])
+
+    pagamento = (await _enviar(ac)).json()["items"][0]
+
+    assert pagamento["duplicate_pairs"] == []
+    assert pagamento["duplicate_in"] == []
+
+
+@pytest.mark.asyncio
+async def test_card_payment_matches_a_transfer_into_the_card(make_auth_client, ia_devolve):
+    ac = await make_auth_client()
+    conta = await _carteira(ac, "Conta", balance="1000.00")
+    cartao = await _carteira(ac, "Cartão", kind="CREDIT_CARD")
+    await ac.post("/transfers/", json={
+        "from_wallet_id": conta["id"], "to_wallet_id": cartao["id"],
+        "amount": "300.00", "date": "2026-08-15",
+    })
+    ia_devolve(items=[_item(kind="CARD_PAYMENT", amount=300, date="2026-08-15", description="Pagamento de fatura")])
+
+    pagamento = (await _enviar(ac)).json()["items"][0]
+
+    assert pagamento["duplicate_pairs"] == [[conta["id"], cartao["id"]]]
+
+
+@pytest.mark.asyncio
+async def test_payment_to_another_card_is_not_a_duplicate(make_auth_client, ia_devolve):
+    # Dois cartões, um pagamento existente para o cartão A: a linha devolve o
+    # par (conta, A); a revisão só desmarca se o destino escolhido for A.
+    ac = await make_auth_client()
+    conta = await _carteira(ac, "Conta", balance="1000.00")
+    cartao_a = await _carteira(ac, "Cartão A", kind="CREDIT_CARD")
+    await _carteira(ac, "Cartão B", kind="CREDIT_CARD")
+    await ac.post("/transfers/", json={
+        "from_wallet_id": conta["id"], "to_wallet_id": cartao_a["id"],
+        "amount": "300.00", "date": "2026-08-15",
+    })
+    ia_devolve(items=[
+        _item(kind="CARD_PAYMENT", amount=300, date="2026-08-15", description="Pagamento A"),
+        _item(kind="CARD_PAYMENT", amount=300, date="2026-08-15", description="Pagamento B"),
+    ])
+
+    itens = (await _enviar(ac)).json()["items"]
+
+    # Um registro existente, uma linha consumida.
+    assert itens[0]["duplicate_pairs"] == [[conta["id"], cartao_a["id"]]]
+    assert itens[1]["duplicate_pairs"] == []
+
+
+@pytest.mark.asyncio
+async def test_one_existing_row_marks_only_one_of_two_identical_lines(make_auth_client, ia_devolve):
+    # Repro do Codex: uma corrida de R$ 5,20 lançada, duas iguais no arquivo.
+    ac = await make_auth_client()
+    conta = await _carteira(ac, "Conta", balance="100.00")
+    await ac.post("/transactions/", json={
+        "wallet_id": conta["id"], "type": "EXPENSE", "amount": "5.20",
+        "date": "2026-08-15", "description": "Transporte", "category": "Transporte",
+    })
+    corrida = _item(description="Transporte", amount=5.2, date="2026-08-15", category="Transporte")
+    ia_devolve(items=[corrida, dict(corrida)])
+
+    itens = (await _enviar(ac)).json()["items"]
+
+    assert [conta["id"] in i["duplicate_in"] for i in itens] == [True, False]

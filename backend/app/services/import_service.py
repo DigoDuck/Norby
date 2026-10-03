@@ -5,6 +5,7 @@ gravado) e `confirmar` grava as linhas que a pessoa revisou. O arquivo nunca é
 salvo e não entra no histórico do chat.
 """
 import json
+from collections import Counter
 from datetime import date
 from decimal import Decimal, InvalidOperation
 
@@ -181,6 +182,7 @@ def normalizar(bruto: dict) -> tuple[str, list[dict], int]:
             "launch_as": launch_as,
             "category": _categoria(launch_as, kind, item.get("category")),
             "duplicate_in": [],
+            "duplicate_pairs": [],
         })
     if not itens:
         raise ArquivoInvalido("Não encontrei lançamentos neste arquivo.")
@@ -192,41 +194,58 @@ def normalizar(bruto: dict) -> tuple[str, list[dict], int]:
 
 
 async def marcar_duplicatas(db: AsyncSession, user: User, itens: list[dict]) -> None:
-    """Carteiras onde cada linha já existe. A revisão desmarca a linha quando a
-    carteira escolhida em "Lançar em" está na lista.
+    """Onde cada linha já existe. Cada registro existente casa com UMA linha só.
 
-    Transação: mesma data, valor e descrição (reimportar o mesmo arquivo).
-    Pagamento de fatura: transferência com mesma data e valor (pago antes pelo
-    botão "Pagar fatura", cuja descrição é outra).
+    Sem a contagem, uma corrida de R$ 5,20 já lançada desmarcava todas as
+    corridas iguais do arquivo (revisão do Codex, 2026-10-03).
+
+    - Transação: mesma data, valor e descrição, por carteira (`duplicate_in`).
+    - Transferência: mesma data, valor e descrição (linha trocada para
+      Transferência numa importação anterior); e, para pagamento de fatura,
+      mesma data e valor SÓ quando o destino é um cartão. Volta como par
+      (origem, destino) em `duplicate_pairs`: a revisão compara com a carteira
+      e o destino escolhidos, e uma transferência para a reserva não esconde
+      mais um pagamento de fatura.
     """
     datas = {i["date"] for i in itens}
     transacoes = (await db.execute(
         select(Transaction.wallet_id, Transaction.date, Transaction.amount, Transaction.description)
         .where(Transaction.user_id == user.id, Transaction.date.in_(datas))
     )).all()
-    por_transacao: dict[tuple, set] = {}
-    for t in transacoes:
-        por_transacao.setdefault((t.date, t.amount, t.description), set()).add(t.wallet_id)
+    restantes = Counter((t.date, t.amount, t.description, t.wallet_id) for t in transacoes)
 
+    cartoes = set((await db.execute(
+        select(Wallet.id).where(Wallet.user_id == user.id, Wallet.kind == WalletKind.CREDIT_CARD)
+    )).scalars().all())
     transferencias = (await db.execute(
-        select(Transfer.from_wallet_id, Transfer.to_wallet_id, Transfer.date, Transfer.amount, Transfer.description)
+        select(Transfer.id, Transfer.from_wallet_id, Transfer.to_wallet_id,
+               Transfer.date, Transfer.amount, Transfer.description)
         .where(Transfer.user_id == user.id, Transfer.date.in_(datas))
+        .order_by(Transfer.created_at, Transfer.id)
     )).all()
-    por_transferencia: dict[tuple, set] = {}
-    por_transf_desc: dict[tuple, set] = {}
-    for t in transferencias:
-        carteiras = {t.from_wallet_id, t.to_wallet_id}
-        por_transferencia.setdefault((t.date, t.amount), set()).update(carteiras)
-        por_transf_desc.setdefault((t.date, t.amount, t.description), set()).update(carteiras)
+    usadas: set = set()
 
     for item in itens:
         chave = (item["date"], item["amount"], item["description"])
-        # Linha trocada para "Transferência" numa importação anterior vira Transfer
-        # com a mesma descrição: vale para qualquer kind.
-        achadas = por_transacao.get(chave, set()) | por_transf_desc.get(chave, set())
-        if item["kind"] == "CARD_PAYMENT":
-            achadas = achadas | por_transferencia.get((item["date"], item["amount"]), set())
-        item["duplicate_in"] = sorted(achadas, key=str)
+        duplicate_in = []
+        for (data_, valor, descricao, wallet_id), quantos in restantes.items():
+            if quantos > 0 and (data_, valor, descricao) == chave:
+                duplicate_in.append(wallet_id)
+        for wallet_id in duplicate_in:
+            restantes[(*chave, wallet_id)] -= 1
+        item["duplicate_in"] = sorted(duplicate_in, key=str)
+
+        pares = []
+        for t in transferencias:
+            if t.id in usadas or t.date != item["date"] or t.amount != item["amount"]:
+                continue
+            mesma_descricao = t.description == item["description"]
+            pagamento_ao_cartao = item["kind"] == "CARD_PAYMENT" and t.to_wallet_id in cartoes
+            if mesma_descricao or pagamento_ao_cartao:
+                usadas.add(t.id)
+                pares.append((t.from_wallet_id, t.to_wallet_id))
+                break
+        item["duplicate_pairs"] = pares
 
 
 async def _extrair(parte: types.Part, prompt: str) -> tuple[str | None, int]:

@@ -29,6 +29,10 @@ class ItemPrevia(BaseModel):
     # Carteiras onde este lançamento já existe (duplicata depende da carteira
     # escolhida em "Lançar em", que só a revisão conhece).
     duplicate_in: list[UUID]
+    # Transferências existentes que esta linha consome, como (origem, destino).
+    # A revisão compara com a carteira e o destino escolhidos (Task 2 do plano
+    # de 2026-10-03): o servidor não sabe qual será.
+    duplicate_pairs: list[tuple[UUID, UUID]]
 
 
 class ImportPreview(BaseModel):
