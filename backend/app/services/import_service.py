@@ -5,6 +5,7 @@ gravado) e `confirmar` grava as linhas que a pessoa revisou. O arquivo nunca é
 salvo e não entra no histórico do chat.
 """
 import json
+import uuid
 from collections import Counter
 from datetime import date
 from decimal import Decimal, InvalidOperation
@@ -326,9 +327,9 @@ async def ler_arquivo(db: AsyncSession, user: User, conteudo: bytes) -> dict:
     }
 
 
-async def _lote_gravado(db: AsyncSession, user: User, chave) -> dict | None:
+async def _lote_gravado(db: AsyncSession, user_id: uuid.UUID, chave: uuid.UUID) -> dict | None:
     lote = await db.scalar(
-        select(ImportBatch).where(ImportBatch.user_id == user.id, ImportBatch.idempotency_key == chave)
+        select(ImportBatch).where(ImportBatch.user_id == user_id, ImportBatch.idempotency_key == chave)
     )
     return {"transactions": lote.transactions, "transfers": lote.transfers} if lote else None
 
@@ -345,9 +346,12 @@ async def confirmar(db: AsyncSession, user: User, payload: ImportConfirm) -> dic
     Com `idempotency_key`, repetir a chave devolve o resultado gravado e não
     escreve nada; o lote é gravado no mesmo commit das linhas.
     """
+    # Capturado antes: depois de um rollback `user` expira e ler `.id` estoura
+    # (MissingGreenlet), como em admin_service.
+    user_id = user.id
     if payload.idempotency_key:
-        anterior = await _lote_gravado(db, user, payload.idempotency_key)
-        if anterior:
+        anterior = await _lote_gravado(db, user_id, payload.idempotency_key)
+        if anterior is not None:
             return anterior
     destinos = (i.transfer_wallet_id for i in payload.items if i.launch_as == "TRANSFER")
     carteiras = {}
@@ -355,6 +359,12 @@ async def confirmar(db: AsyncSession, user: User, payload: ImportConfirm) -> dic
         carteiras[wallet_id] = await get_owned_wallet(
             wallet_id, user, db, for_update=True, for_write=True
         )
+    # Segunda conferência já com as carteiras travadas: a confirmação
+    # concorrente espera aqui e então enxerga o lote da primeira.
+    if payload.idempotency_key:
+        anterior = await _lote_gravado(db, user_id, payload.idempotency_key)
+        if anterior is not None:
+            return anterior
     alvo = carteiras[payload.wallet_id]
     # "Já no saldo": o histórico entra, o saldo fica (spec B, seção Saldo).
     mexe_no_saldo = not payload.already_in_balance
@@ -368,7 +378,7 @@ async def confirmar(db: AsyncSession, user: User, payload: ImportConfirm) -> dic
                 origem.balance -= linha.amount
                 destino.balance += linha.amount
             db.add(Transfer(
-                user_id=user.id, from_wallet_id=origem.id, to_wallet_id=destino.id,
+                user_id=user_id, from_wallet_id=origem.id, to_wallet_id=destino.id,
                 amount=linha.amount, date=linha.date, description=linha.description,
             ))
             transferencias += 1
@@ -377,14 +387,14 @@ async def confirmar(db: AsyncSession, user: User, payload: ImportConfirm) -> dic
             if mexe_no_saldo:
                 apply_delta(alvo, tipo, linha.amount)
             db.add(Transaction(
-                user_id=user.id, wallet_id=alvo.id, type=tipo, amount=linha.amount,
+                user_id=user_id, wallet_id=alvo.id, type=tipo, amount=linha.amount,
                 category=linha.category, description=linha.description, date=linha.date,
             ))
             transacoes += 1
 
     resultado = {"transactions": transacoes, "transfers": transferencias}
     if payload.idempotency_key:
-        db.add(ImportBatch(user_id=user.id, idempotency_key=payload.idempotency_key, **resultado))
+        db.add(ImportBatch(user_id=user_id, idempotency_key=payload.idempotency_key, **resultado))
     try:
         await db.commit()
     except IntegrityError:
@@ -394,7 +404,7 @@ async def confirmar(db: AsyncSession, user: User, payload: ImportConfirm) -> dic
         await db.rollback()
         if not payload.idempotency_key:
             raise
-        anterior = await _lote_gravado(db, user, payload.idempotency_key)
+        anterior = await _lote_gravado(db, user_id, payload.idempotency_key)
         if anterior is None:
             raise
         return anterior
