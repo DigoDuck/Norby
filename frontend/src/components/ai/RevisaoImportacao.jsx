@@ -171,7 +171,14 @@ export default function RevisaoImportacao({ previa, carteiras }) {
                 <select
                   aria-label={`Destino: ${linha.description}`}
                   value={linha.transfer_wallet_id ?? ""}
-                  onChange={(e) => alterar(linha.id, { transfer_wallet_id: e.target.value || null })}
+                  onChange={(e) => {
+                    // A duplicata de transferência depende do destino: a marca acompanha a escolha.
+                    const destino = e.target.value || null;
+                    alterar(linha.id, {
+                      transfer_wallet_id: destino,
+                      marcada: !duplicada({ ...linha, transfer_wallet_id: destino }, walletId),
+                    });
+                  }}
                   className={selectCls}
                 >
                   <option value="">Para qual carteira?</option>

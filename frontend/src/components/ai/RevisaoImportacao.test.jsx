@@ -120,6 +120,31 @@ describe("RevisaoImportacao", () => {
     expect(botao).toHaveAccessibleDescription("Escolha a carteira de destino de 1 transferência.");
   });
 
+  it("com dois cartões, escolher o destino já pago desmarca o pagamento", () => {
+    // Sem cartão padrão o destino nasce vazio; a marca tem de acompanhar a
+    // escolha, senão o pagamento já lançado entraria de novo.
+    const outro = { ...CARTAO, id: "outro", name: "Cartão Inter" };
+    render(
+      <MemoryRouter>
+        <RevisaoImportacao
+          previa={{
+            ...PREVIA, default_card_id: null,
+            items: [item({ description: "Pagamento de fatura", amount: "300.00", kind: "CARD_PAYMENT",
+              launch_as: "TRANSFER", category: null, duplicate_pairs: [["conta", "cartao"]] })],
+          }}
+          carteiras={[CONTA, CARTAO, outro]}
+        />
+      </MemoryRouter>,
+    );
+    const marca = screen.getByRole("checkbox", { name: "Incluir Pagamento de fatura" });
+    const destino = screen.getByRole("combobox", { name: "Destino: Pagamento de fatura" });
+    expect(marca).toBeChecked();
+    fireEvent.change(destino, { target: { value: "cartao" } });
+    expect(marca).not.toBeChecked();
+    fireEvent.change(destino, { target: { value: "outro" } });
+    expect(marca).toBeChecked();
+  });
+
   it("erro ao lançar aparece e permite tentar de novo", async () => {
     importsApi.confirm.mockRejectedValue(new Error("500"));
     renderizar();

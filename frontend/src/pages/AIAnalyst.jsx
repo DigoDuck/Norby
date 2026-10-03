@@ -57,7 +57,8 @@ export default function AIAnalyst() {
   // A leitura roda no evento, não num efeito: com StrictMode o efeito rodaria
   // duas vezes em desenvolvimento, e cada leitura gasta cota de IA.
   async function enviarArquivo(arquivo) {
-    // Loading a past conversation replaces messages and would erase an in-progress import that consumed quota (Codex review, 2026-10-03).
+    // Bloqueado enquanto o histórico carrega: setMessages trocaria a lista e
+    // apagaria a leitura em andamento, que já gastou cota.
     if (!arquivo || lendoArquivo || loading) return;
     const id = crypto.randomUUID();
     setMessages((prev) => [

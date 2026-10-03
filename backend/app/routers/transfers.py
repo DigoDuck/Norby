@@ -40,7 +40,8 @@ async def list_transfers(
         stmt = stmt.where(
             or_(Transfer.from_wallet_id == wallet_id, Transfer.to_wallet_id == wallet_id)
         )
-    stmt = stmt.order_by(Transfer.date.desc(), Transfer.created_at.desc()).limit(limit).offset(offset)
+    # Desempate por id: sem ele, linhas empatadas podem pular ou repetir entre páginas.
+    stmt = stmt.order_by(Transfer.date.desc(), Transfer.created_at.desc(), Transfer.id.desc()).limit(limit).offset(offset)
     return (await db.execute(stmt)).scalars().all()
 
 
