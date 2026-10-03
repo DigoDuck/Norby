@@ -101,7 +101,10 @@ direcional, um `if` a mais no helper.
 
 ### IA: só a geração
 
-Dependency nas **duas rotas que geram**: `GET /ai/insight` e `POST /ai/chat`.
+Dependency nas **rotas que geram**: `GET /ai/insight`, `POST /ai/chat` e, desde
+2026-10-02, `POST /imports/statement` (leitura de fatura ou extrato pela IA). A
+confirmação da importação (`POST /imports/statement/confirm`) não chama a IA e
+fica fora do portão.
 
 `/ai/chat/sessions` e `/ai/chat/sessions/{id}` só **leem** conversas que a
 pessoa já teve, e ficam abertas. Impedir alguém de ler o que ele mesmo produziu

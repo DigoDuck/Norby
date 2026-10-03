@@ -1,6 +1,10 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, Plus, MessageCircle, Shield } from "lucide-react";
+import { Send, Plus, MessageCircle, Shield, Paperclip } from "lucide-react";
 import { aiApi } from "@/api/ai";
+import { importsApi } from "@/api/imports";
+import { walletsApi } from "@/api/wallets";
+import RevisaoImportacao from "@/components/ai/RevisaoImportacao";
+import { LIMITE_ARQUIVO } from "@/lib/importacao";
 import { apiErrorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,6 +47,42 @@ export default function AIAnalyst() {
   const [sessions, setSessions] = useState([]);
   const [insight, setInsight] = useState(null);
   const bottomRef = useRef(null);
+  const arquivoRef = useRef(null);
+  const lendoArquivo = messages.some((m) => m.kind === "importacao" && m.estado === "lendo");
+
+  function atualizarMensagem(id, mudanca) {
+    setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, ...mudanca } : m)));
+  }
+
+  // A leitura roda no evento, não num efeito: com StrictMode o efeito rodaria
+  // duas vezes em desenvolvimento, e cada leitura gasta cota de IA.
+  async function enviarArquivo(arquivo) {
+    if (!arquivo || lendoArquivo) return;
+    const id = crypto.randomUUID();
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", content: `Arquivo: ${arquivo.name}` },
+      { role: "assistant", kind: "importacao", id, estado: "lendo" },
+    ]);
+    if (arquivo.size > LIMITE_ARQUIVO) {
+      atualizarMensagem(id, {
+        estado: "erro",
+        erro: "O arquivo passa de 1 MB. Envie em CSV ou OFX, que são menores, ou divida por período.",
+      });
+      return;
+    }
+    try {
+      // Carteiras antes da leitura paga: se falhar, nada foi gasto.
+      const carteiras = await walletsApi.list();
+      const previa = await importsApi.preview(arquivo);
+      atualizarMensagem(id, { estado: "previa", previa: previa.data, carteiras: carteiras.data });
+    } catch (err) {
+      atualizarMensagem(id, {
+        estado: "erro",
+        erro: apiErrorMessage(err, "Não consegui ler o arquivo. Tente novamente."),
+      });
+    }
+  }
 
   const { iaLiberada } = usePlano();
 
@@ -57,7 +97,7 @@ export default function AIAnalyst() {
   }, [messages]);
 
   function newConversation() {
-    if (loading) return;
+    if (loading || lendoArquivo) return;
     setMessages([WELCOME]);
     setSessionId(null);
   }
@@ -94,7 +134,7 @@ export default function AIAnalyst() {
   }
 
   async function openSession(id) {
-    if (id === sessionId || loading) return;
+    if (id === sessionId || loading || lendoArquivo) return;
     setLoading(true);
     try {
       const res = await aiApi.getSession(id);
@@ -242,18 +282,29 @@ export default function AIAnalyst() {
 
             {messages.map((msg, i) => (
               <div
-                key={i}
+                key={msg.id ?? i}
                 className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
               >
-                <div
-                  className={`inset-panel max-w-[86%] px-4 py-3 text-[14px] leading-relaxed sm:max-w-[78%] ${
-                    msg.role === "user"
-                      ? "rounded-tr-md border-accent/20 bg-accent/10 text-content"
-                      : "rounded-tl-md text-content"
-                  }`}
-                >
-                  {msg.content}
-                </div>
+                {msg.kind === "importacao" && msg.estado === "previa" ? (
+                  <div className="w-full max-w-[640px]">
+                    <RevisaoImportacao previa={msg.previa} carteiras={msg.carteiras} />
+                  </div>
+                ) : (
+                  <div
+                    role={msg.kind === "importacao" ? (msg.estado === "lendo" ? "status" : "alert") : undefined}
+                    className={`inset-panel max-w-[86%] px-4 py-3 text-[14px] leading-relaxed sm:max-w-[78%] ${
+                      msg.role === "user"
+                        ? "rounded-tr-md border-accent/20 bg-accent/10 text-content"
+                        : "rounded-tl-md text-content"
+                    }`}
+                  >
+                    {msg.kind === "importacao"
+                      ? msg.estado === "lendo"
+                        ? "Lendo seu arquivo… pode levar até um minuto e meio."
+                        : msg.erro
+                      : msg.content}
+                  </div>
+                )}
               </div>
             ))}
 
@@ -273,6 +324,29 @@ export default function AIAnalyst() {
         <div className="border-t border-line/[0.08] px-4 pb-5 pt-3 sm:px-6">
           <div className="max-w-[760px] mx-auto">
             <div className="inset-panel flex items-center gap-2 py-2 pl-4 pr-2 transition-colors focus-within:border-focus/60">
+              <input
+                ref={arquivoRef}
+                type="file"
+                accept=".csv,.ofx,.pdf"
+                aria-label="Anexar fatura ou extrato"
+                className="sr-only"
+                onChange={(e) => {
+                  enviarArquivo(e.target.files?.[0]);
+                  e.target.value = "";
+                }}
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-lg"
+                title="Anexar fatura ou extrato. CSV ou OFX são mais precisos que PDF."
+                disabled={lendoArquivo}
+                onClick={() => arquivoRef.current?.click()}
+                className="shrink-0 rounded-xl text-content-2 hover:text-content"
+              >
+                <Paperclip size={17} />
+                <span className="sr-only">Anexar fatura ou extrato</span>
+              </Button>
               <Input
                 aria-label="Mensagem para a Norby"
                 value={input}
@@ -293,8 +367,9 @@ export default function AIAnalyst() {
             </div>
             <p className="mt-2.5 flex items-center justify-center gap-1.5 text-center text-[11px] text-content-3">
               <Shield size={11} />
-              Seus dados financeiros são enviados ao Google Gemini para gerar as
-              respostas. Nunca vendemos nem compartilhamos com terceiros.
+              Seus dados financeiros e os arquivos que você anexar vão para o
+              Google Gemini só para gerar as respostas. Arquivos não são
+              guardados. Nunca vendemos nem compartilhamos com terceiros.
             </p>
           </div>
         </div>

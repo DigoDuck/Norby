@@ -103,3 +103,26 @@ async def test_recurring_run_locks_wallets_in_id_order(db_session):
 
     assert gerados >= 2 and pulados == []
     assert ordem == [str(menor.id), str(maior.id)]
+
+
+@pytest.mark.asyncio
+async def test_import_confirm_locks_wallets_in_id_order(make_auth_client):
+    ac = await make_auth_client()
+    a = (await ac.post("/wallets/", json={"name": "A", "balance": "1000.00"})).json()
+    b = (await ac.post("/wallets/", json={"name": "B", "balance": "1000.00"})).json()
+    # Carteira principal com o id MAIOR e destino da transferência com o MENOR:
+    # travar "principal, depois destino" seria a ordem errada.
+    menor, maior = _em_ordem([a["id"], b["id"]])
+
+    with carteiras_travadas([menor, maior]) as ordem:
+        res = await ac.post("/imports/statement/confirm", json={
+            "wallet_id": maior, "already_in_balance": False,
+            "items": [{
+                "date": "2026-08-10", "description": "Resgate", "amount": "10.00",
+                "direction": "OUT", "launch_as": "TRANSFER", "category": None,
+                "transfer_wallet_id": menor,
+            }],
+        })
+
+    assert res.status_code == 201, res.text
+    assert ordem == [menor, maior]
