@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from uuid import UUID
 from app.dependencies import get_db, get_current_user
-from app.models.sql_models import User, Wallet
+from app.models.sql_models import RecurringTransaction, Transaction, Transfer, User, Wallet
 from app.schemas.wallet import WalletCreate, WalletUpdate, WalletResponse
 from app.services.wallet_service import ensure_can_create_wallet, get_owned_wallet
 
@@ -65,6 +65,27 @@ async def delete_wallet(
     # única saída de quem tem 5 carteiras e virou free — recusar transformaria o
     # teto numa armadilha em vez de um limite (ADR 0002).
     wallet = await get_owned_wallet(wallet_id, current_user, db)
+
+    # Filhos ANTES da carteira, cada grupo em ordem de id: é a ordem de quem
+    # desfaz transferência, edita transação ou roda recorrência (filho, depois
+    # carteira). Deixar a cascata do banco travar os filhos invertia a ordem e
+    # dava deadlock (40P01) contra um "desfazer pagamento" simultâneo.
+    await db.execute(
+        select(RecurringTransaction.id)
+        .where(RecurringTransaction.wallet_id == wallet.id)
+        .order_by(RecurringTransaction.id).with_for_update()
+    )
+    await db.execute(
+        select(Transaction.id)
+        .where(Transaction.wallet_id == wallet.id)
+        .order_by(Transaction.id).with_for_update()
+    )
+    await db.execute(
+        select(Transfer.id)
+        .where(or_(Transfer.from_wallet_id == wallet.id, Transfer.to_wallet_id == wallet.id))
+        .order_by(Transfer.id).with_for_update()
+    )
+    await db.execute(select(Wallet.id).where(Wallet.id == wallet.id).with_for_update())
 
     await db.delete(wallet)
     await db.commit()

@@ -126,3 +126,48 @@ async def test_import_confirm_locks_wallets_in_id_order(make_auth_client):
 
     assert res.status_code == 201, res.text
     assert ordem == [menor, maior]
+
+
+@contextmanager
+def tabelas_travadas():
+    """Tabelas dos SELECT ... FOR UPDATE, na ordem em que chegam ao banco."""
+    ordem = []
+
+    def ouvir(conn, cursor, statement, parameters, context, executemany):
+        if "FOR UPDATE" not in statement:
+            return
+        for tabela in ("recurring_transactions", "transactions", "transfers", "wallets"):
+            if f"FROM {tabela}" in statement:
+                ordem.append(tabela)
+                return
+
+    event.listen(test_engine.sync_engine, "before_cursor_execute", ouvir)
+    try:
+        yield ordem
+    finally:
+        event.remove(test_engine.sync_engine, "before_cursor_execute", ouvir)
+
+
+@pytest.mark.asyncio
+async def test_deleting_a_wallet_locks_its_children_before_the_wallet(make_auth_client):
+    # Desfazer transferência, editar transação e rodar recorrência travam o
+    # filho e depois a carteira; excluir carteira precisa da mesma ordem, senão
+    # o Postgres aborta um dos dois com 40P01 (revisão do Codex, 2026-10-03).
+    ac = await make_auth_client()
+    conta = (await ac.post("/wallets/", json={"name": "Conta", "balance": "100.00"})).json()
+    cartao = (await ac.post("/wallets/", json={"name": "Cartão", "kind": "CREDIT_CARD"})).json()
+    await ac.post("/transfers/", json={
+        "from_wallet_id": conta["id"], "to_wallet_id": cartao["id"], "amount": "10.00", "date": "2026-09-01",
+    })
+    await ac.post("/transactions/", json={
+        "wallet_id": cartao["id"], "type": "EXPENSE", "amount": "5.00",
+        "category": "Alimentação", "date": "2026-09-01",
+    })
+
+    with tabelas_travadas() as ordem:
+        res = await ac.delete(f"/wallets/{cartao['id']}")
+
+    assert res.status_code == 204
+    assert ordem.index("wallets") > max(
+        ordem.index(t) for t in ("recurring_transactions", "transactions", "transfers")
+    )
