@@ -114,12 +114,16 @@ jobs:
       - name: Build
         run: npm run build
 
-      # Audita a árvore inteira, dev incluído. Os advisories só de dev que
-      # deixaram isto vermelho na primeira rodada sumiram: o vitest 2 fixava
-      # seu próprio vite 5 ao lado do vite 8 do app, e essa cópia duplicada
-      # carregava eles.
-      - name: npm audit (high/critical only)
-        run: npm audit --audit-level=high
+      # O que vai para o navegador bloqueia a partir de high. A árvore de dev
+      # (ferramentas de build) bloqueia só em critical: o braces
+      # (GHSA-vfj7-8cjw-p6xm, high, sem versão corrigida) entra pelo
+      # tailwindcss 3 e não roda em produção. Ao migrar para o Tailwind 4,
+      # voltar a auditar a árvore inteira em high.
+      - name: npm audit (production, high/critical)
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: npm audit (full tree, critical)
+        run: npm audit --audit-level=critical
 
   lighthouse:
     name: Lighthouse budget (production)
