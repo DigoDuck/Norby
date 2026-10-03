@@ -85,10 +85,11 @@ export function jaNoSaldoPorPadrao(carteira, linhas) {
   return carteira.created_at.slice(0, 10) > ultima;
 }
 
-export function montarConfirmacao(walletId, jaNoSaldo, linhas) {
+export function montarConfirmacao(walletId, jaNoSaldo, linhas, chave) {
   return {
     wallet_id: walletId,
     already_in_balance: jaNoSaldo,
+    idempotency_key: chave,
     items: linhas.filter(vaiSerLancada).map((l) => ({
       date: l.date,
       description: l.description,

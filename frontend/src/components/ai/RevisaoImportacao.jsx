@@ -30,6 +30,7 @@ export default function RevisaoImportacao({ previa, carteiras }) {
   const [linhas, setLinhas] = useState(() => linhasIniciais(previa, previa.default_wallet_id ?? ""));
   const carteira = carteiras.find((c) => c.id === walletId);
   const [jaNoSaldo, setJaNoSaldo] = useState(() => jaNoSaldoPorPadrao(carteira, linhas));
+  const [chave] = useState(() => crypto.randomUUID());
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState(null);
   const [resultado, setResultado] = useState(null);
@@ -73,7 +74,7 @@ export default function RevisaoImportacao({ previa, carteiras }) {
     setErro(null);
     setEnviando(true);
     try {
-      const res = await importsApi.confirm(montarConfirmacao(walletId, jaNoSaldo, linhas));
+      const res = await importsApi.confirm(montarConfirmacao(walletId, jaNoSaldo, linhas, chave));
       setResultado(res.data);
     } catch (err) {
       setErro(apiErrorMessage(err, "Não foi possível lançar. Tente novamente."));

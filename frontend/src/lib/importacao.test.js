@@ -118,9 +118,10 @@ describe("montarConfirmacao e prontaParaLancar", () => {
   ];
 
   it("manda só as marcadas e não ignoradas, com categoria ou destino", () => {
-    expect(montarConfirmacao("conta", true, linhas)).toEqual({
+    expect(montarConfirmacao("conta", true, linhas, "chave-1")).toEqual({
       wallet_id: "conta",
       already_in_balance: true,
+      idempotency_key: "chave-1",
       items: [
         { date: "2026-08-10", description: "Mercado", amount: "52.30", direction: "OUT",
           launch_as: "EXPENSE", category: "Alimentação" },

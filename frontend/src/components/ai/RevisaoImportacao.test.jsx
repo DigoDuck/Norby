@@ -129,4 +129,20 @@ describe("RevisaoImportacao", () => {
     expect(await screen.findByText(/Não foi possível lançar/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Lançar 3 lançamentos" })).toBeEnabled();
   });
+
+  it("tentar de novo depois de um erro manda a mesma chave", async () => {
+    importsApi.confirm
+      .mockRejectedValueOnce(new Error("rede"))
+      .mockResolvedValueOnce({ data: { transactions: 2, transfers: 1 } });
+    renderizar();
+
+    fireEvent.click(screen.getByRole("button", { name: "Lançar 3 lançamentos" }));
+    await screen.findByRole("alert");
+    fireEvent.click(screen.getByRole("button", { name: "Lançar 3 lançamentos" }));
+    await screen.findByText(/3 lançamentos na Conta corrente/);
+
+    const [primeira, segunda] = importsApi.confirm.mock.calls.map(([dados]) => dados.idempotency_key);
+    expect(primeira).toMatch(/^[0-9a-f-]{36}$/);
+    expect(segunda).toBe(primeira);
+  });
 });
