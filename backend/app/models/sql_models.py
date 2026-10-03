@@ -323,6 +323,24 @@ class Transfer(Base):
     description: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
+class ImportBatch(Base):
+    """Confirmação de importação já gravada, pela chave que a revisão gera.
+
+    Existe para o retry: resposta perdida + "Lançar" de novo gravaria tudo duas
+    vezes e moveria o saldo de novo (revisão do Codex, 2026-10-03). A linha é
+    gravada no MESMO commit dos lançamentos, então ou os dois existem ou nenhum.
+    """
+    __tablename__ = "import_batches"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    idempotency_key: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
+    transactions: Mapped[int] = mapped_column(Integer, nullable=False)
+    transfers: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class RecurringTransaction(Base):
     __tablename__ = "recurring_transactions"
 

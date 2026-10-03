@@ -70,6 +70,9 @@ class ImportConfirm(BaseModel):
     wallet_id: UUID
     already_in_balance: bool
     items: list[LinhaConfirmada] = Field(min_length=1, max_length=MAX_LINHAS)
+    # Gerada pela revisão uma vez por prévia. Opcional só para não quebrar um
+    # cliente antigo durante o deploy; o front atual sempre manda.
+    idempotency_key: UUID | None = None
 
     @model_validator(mode="after")
     def _transferencia_para_outra_carteira(self):

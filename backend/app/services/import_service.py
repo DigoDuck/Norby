@@ -11,11 +11,12 @@ from decimal import Decimal, InvalidOperation
 
 from google.genai import types
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.categories import EXPENSE_CATEGORIES, INCOME_CATEGORIES
 from app.models.sql_models import (
-    Transaction, TransactionType, Transfer, User, Wallet, WalletKind,
+    ImportBatch, Transaction, TransactionType, Transfer, User, Wallet, WalletKind,
 )
 from app.schemas.common import MAX_MONEY
 from app.schemas.imports import MAX_LINHAS, ImportConfirm
@@ -325,6 +326,13 @@ async def ler_arquivo(db: AsyncSession, user: User, conteudo: bytes) -> dict:
     }
 
 
+async def _lote_gravado(db: AsyncSession, user: User, chave) -> dict | None:
+    lote = await db.scalar(
+        select(ImportBatch).where(ImportBatch.user_id == user.id, ImportBatch.idempotency_key == chave)
+    )
+    return {"transactions": lote.transactions, "transfers": lote.transfers} if lote else None
+
+
 async def confirmar(db: AsyncSession, user: User, payload: ImportConfirm) -> dict:
     """Grava as linhas revisadas numa única transação do banco: tudo ou nada.
 
@@ -333,7 +341,14 @@ async def confirmar(db: AsyncSession, user: User, payload: ImportConfirm) -> dic
     (404) ou carteira bloqueada (403) estouram nesse laço, antes de gravar.
     Todas são escrita (`for_write`): recebem linhas novas, mesmo quando o saldo
     não muda.
+
+    Com `idempotency_key`, repetir a chave devolve o resultado gravado e não
+    escreve nada; o lote é gravado no mesmo commit das linhas.
     """
+    if payload.idempotency_key:
+        anterior = await _lote_gravado(db, user, payload.idempotency_key)
+        if anterior:
+            return anterior
     destinos = (i.transfer_wallet_id for i in payload.items if i.launch_as == "TRANSFER")
     carteiras = {}
     for wallet_id in lock_order(payload.wallet_id, *destinos):
@@ -367,5 +382,20 @@ async def confirmar(db: AsyncSession, user: User, payload: ImportConfirm) -> dic
             ))
             transacoes += 1
 
-    await db.commit()
-    return {"transactions": transacoes, "transfers": transferencias}
+    resultado = {"transactions": transacoes, "transfers": transferencias}
+    if payload.idempotency_key:
+        db.add(ImportBatch(user_id=user.id, idempotency_key=payload.idempotency_key, **resultado))
+    try:
+        await db.commit()
+    except IntegrityError:
+        # Duas confirmações simultâneas com a mesma chave: a outra gravou
+        # primeiro. Nada desta foi gravado; devolve o resultado da outra.
+        # Sem chave, o conflito é outro (CHECK, FK) e sobe como antes.
+        await db.rollback()
+        if not payload.idempotency_key:
+            raise
+        anterior = await _lote_gravado(db, user, payload.idempotency_key)
+        if anterior is None:
+            raise
+        return anterior
+    return resultado
