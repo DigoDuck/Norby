@@ -1,16 +1,30 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import get_current_user, get_db
 from app.limiter import limiter, user_key
 from app.models.sql_models import Transfer, User
-from app.schemas.transfer import TransferCreate, TransferResponse
+from app.schemas.transfer import TransferCreate, TransferResponse, TransferSummary
 from app.services.transfer_service import create_transfer, delete_transfer
 
 router = APIRouter(prefix="/transfers", tags=["Transfers"])
+
+
+@router.get("/summary", response_model=TransferSummary)
+async def summarize_transfers(
+    wallet_id: UUID | None = None,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Total de transferências com o mesmo filtro da listagem: o histórico
+    pagina e o aviso de exclusão diz o número real, não o tamanho da página."""
+    stmt = select(func.count()).select_from(Transfer).where(Transfer.user_id == current_user.id)
+    if wallet_id:
+        stmt = stmt.where(or_(Transfer.from_wallet_id == wallet_id, Transfer.to_wallet_id == wallet_id))
+    return {"count": await db.scalar(stmt)}
 
 
 @router.get("/", response_model=list[TransferResponse])

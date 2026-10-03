@@ -252,3 +252,23 @@ async def test_deleting_a_transfer_is_allowed_even_if_destination_became_blocked
         settings.paywall_enabled = antes
 
     assert res.status_code == 204
+
+
+@pytest.mark.asyncio
+async def test_summary_counts_every_transfer_of_the_wallet(make_auth_client):
+    # Repro do Codex: com 101 transferências a lista padrão devolve 100; o
+    # aviso de exclusão e o histórico precisam do total real.
+    ac = await make_auth_client()
+    conta = await _carteira(ac, "Conta", "1000.00")
+    cartao = await _carteira(ac, "Cartão", "0.00", "CREDIT_CARD")
+    res = await ac.post("/imports/statement/confirm", json={
+        "wallet_id": conta["id"], "already_in_balance": True,
+        "items": [{"date": HOJE, "description": f"Pagamento {i}", "amount": "1.00",
+                   "direction": "OUT", "launch_as": "TRANSFER", "transfer_wallet_id": cartao["id"]}
+                  for i in range(101)],
+    })
+    assert res.status_code == 201, res.text
+
+    assert (await ac.get("/transfers/summary", params={"wallet_id": cartao["id"]})).json() == {"count": 101}
+    outra = await _carteira(ac, "Outra", "0.00")
+    assert (await ac.get("/transfers/summary", params={"wallet_id": outra["id"]})).json() == {"count": 0}
