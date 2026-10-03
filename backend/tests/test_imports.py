@@ -399,3 +399,25 @@ async def test_one_existing_row_marks_only_one_of_two_identical_lines(make_auth_
     itens = (await _enviar(ac)).json()["items"]
 
     assert [conta["id"] in i["duplicate_in"] for i in itens] == [True, False]
+
+
+@pytest.mark.asyncio
+async def test_description_match_wins_over_the_card_payment_fallback(make_auth_client, ia_devolve):
+    # L1 (pagamento) vem antes de L2, mas a transferência existente casa com L2
+    # pela descrição: o fallback de L1 não pode roubá-la.
+    ac = await make_auth_client()
+    conta = await _carteira(ac, "Conta", balance="1000.00")
+    cartao = await _carteira(ac, "Cartão", kind="CREDIT_CARD")
+    await ac.post("/transfers/", json={
+        "from_wallet_id": conta["id"], "to_wallet_id": cartao["id"],
+        "amount": "300.00", "date": "2026-08-15", "description": "Pix cartão",
+    })
+    ia_devolve(items=[
+        _item(kind="CARD_PAYMENT", amount=300, date="2026-08-15", description="Pagamento A"),
+        _item(kind="PURCHASE", amount=300, date="2026-08-15", description="Pix cartão"),
+    ])
+
+    itens = (await _enviar(ac)).json()["items"]
+
+    assert itens[0]["duplicate_pairs"] == []
+    assert itens[1]["duplicate_pairs"] == [[conta["id"], cartao["id"]]]

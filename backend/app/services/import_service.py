@@ -200,9 +200,10 @@ async def marcar_duplicatas(db: AsyncSession, user: User, itens: list[dict]) -> 
     corridas iguais do arquivo (revisão do Codex, 2026-10-03).
 
     - Transação: mesma data, valor e descrição, por carteira (`duplicate_in`).
-    - Transferência: mesma data, valor e descrição (linha trocada para
-      Transferência numa importação anterior); e, para pagamento de fatura,
-      mesma data e valor SÓ quando o destino é um cartão. Volta como par
+    - Transferência: primeiro mesma data, valor e descrição (linha trocada para
+      Transferência numa importação anterior), para todas as linhas; depois, para
+      pagamento de fatura ainda sem par, mesma data e valor SÓ quando o destino
+      é um cartão. Volta como par
       (origem, destino) em `duplicate_pairs`: a revisão compara com a carteira
       e o destino escolhidos, e uma transferência para a reserva não esconde
       mais um pagamento de fatura.
@@ -224,8 +225,26 @@ async def marcar_duplicatas(db: AsyncSession, user: User, itens: list[dict]) -> 
         .order_by(Transfer.created_at, Transfer.id)
     )).all()
     usadas: set = set()
+    por_linha: list[list] = [[] for _ in itens]
 
-    for item in itens:
+    def consumir(idx: int, item: dict, casa) -> None:
+        for t in transferencias:
+            if t.id not in usadas and t.date == item["date"] and t.amount == item["amount"] and casa(t, item):
+                usadas.add(t.id)
+                por_linha[idx].append((t.from_wallet_id, t.to_wallet_id))
+                return
+
+    # Passada 1: descrição igual, para todas as linhas. Passada 2: pagamento de
+    # fatura sem par, só com transferência que sobrou e vai para um cartão. Em
+    # duas passadas o fallback nunca rouba a transferência de uma linha que a
+    # casaria pela descrição.
+    for idx, item in enumerate(itens):
+        consumir(idx, item, lambda t, i: t.description == i["description"])
+    for idx, item in enumerate(itens):
+        if item["kind"] == "CARD_PAYMENT" and not por_linha[idx]:
+            consumir(idx, item, lambda t, i: t.to_wallet_id in cartoes)
+
+    for idx, item in enumerate(itens):
         chave = (item["date"], item["amount"], item["description"])
         duplicate_in = []
         for (data_, valor, descricao, wallet_id), quantos in restantes.items():
@@ -234,18 +253,7 @@ async def marcar_duplicatas(db: AsyncSession, user: User, itens: list[dict]) -> 
         for wallet_id in duplicate_in:
             restantes[(*chave, wallet_id)] -= 1
         item["duplicate_in"] = sorted(duplicate_in, key=str)
-
-        pares = []
-        for t in transferencias:
-            if t.id in usadas or t.date != item["date"] or t.amount != item["amount"]:
-                continue
-            mesma_descricao = t.description == item["description"]
-            pagamento_ao_cartao = item["kind"] == "CARD_PAYMENT" and t.to_wallet_id in cartoes
-            if mesma_descricao or pagamento_ao_cartao:
-                usadas.add(t.id)
-                pares.append((t.from_wallet_id, t.to_wallet_id))
-                break
-        item["duplicate_pairs"] = pares
+        item["duplicate_pairs"] = por_linha[idx]
 
 
 async def _extrair(parte: types.Part, prompt: str) -> tuple[str | None, int]:
