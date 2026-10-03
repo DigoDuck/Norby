@@ -12,7 +12,7 @@ const CARTAO = { id: "cartao", name: "Cartão Nubank", balance: "-300.00", kind:
 
 const item = (extra = {}) => ({
   date: "2026-08-10", description: "Mercado", amount: "52.30", direction: "OUT",
-  kind: "PURCHASE", launch_as: "EXPENSE", category: "Alimentação", duplicate_in: [],
+  kind: "PURCHASE", launch_as: "EXPENSE", category: "Alimentação", duplicate_in: [], duplicate_pairs: [],
   ...extra,
 });
 
