@@ -162,6 +162,10 @@ async def _com_cota(db: AsyncSession, user_id: str, chamada) -> str:
     proteger o último minuto de abuso, não as horas.
     """
     await _exigir_cota(db, user_id)
+    # Fecha a transação da leitura antes da rede: a chamada leva até ~90 s e,
+    # aberta, a transação prenderia uma conexão do pool o tempo todo. Quem
+    # chega aqui só leu, então o commit não grava nada antes da hora.
+    await db.commit()
     texto, tokens = await chamada()
     await _debitar_cota(db, user_id, tokens)
     return texto

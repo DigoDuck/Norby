@@ -220,3 +220,19 @@ def test_the_quota_day_turns_at_pacific_midnight():
     assert ai.dia_da_cota(antes) == date(2026, 9, 5)
     assert ai.dia_da_cota(depois) == date(2026, 9, 6)
     assert ai.cota_zera_em(depois) == datetime(2026, 9, 7, 8, 0, tzinfo=timezone.utc)
+
+
+@pytest.mark.asyncio
+async def test_no_transaction_is_held_during_the_ai_call(make_auth_client, db_session):
+    # A chamada ao Gemini leva até ~90 s. Se a leitura da cota deixar a
+    # transação aberta, a conexão fica presa ao pool o tempo todo (issue #218).
+    ac = await make_auth_client()
+    user = await _usuario(ac, db_session)
+    durante = []
+
+    async def chamada():
+        durante.append(db_session.in_transaction())
+        return "ok", 10
+
+    assert await ai._com_cota(db_session, str(user.id), chamada) == "ok"
+    assert durante == [False]
