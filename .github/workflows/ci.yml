@@ -13,9 +13,11 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    # Imagens oficiais do Docker Hub pelo espelho público da AWS: os runners
+    # dividem IP e estouravam o limite de pull anônimo do Docker Hub.
     services:
       postgres:
-        image: postgres:16-alpine
+        image: public.ecr.aws/docker/library/postgres:16-alpine
         env:
           POSTGRES_USER: norby_user
           POSTGRES_PASSWORD: norby_pass
@@ -28,7 +30,7 @@ jobs:
           --health-timeout 5s
           --health-retries 5
       mongodb:
-        image: mongo:7.0
+        image: public.ecr.aws/docker/library/mongo:7.0
         ports:
           - 27017:27017
         options: >-
