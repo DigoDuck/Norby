@@ -341,7 +341,7 @@ export default function AIAnalyst() {
                 type="button"
                 variant="ghost"
                 size="icon-lg"
-                title="Anexar fatura ou extrato. CSV ou OFX são mais precisos que PDF."
+                title="Anexar fatura ou extrato"
                 disabled={lendoArquivo || loading}
                 onClick={() => arquivoRef.current?.click()}
                 className="shrink-0 rounded-xl text-content-2 hover:text-content"
@@ -367,7 +367,10 @@ export default function AIAnalyst() {
                 <span className="sr-only">Enviar</span>
               </Button>
             </div>
-            <p className="mt-2.5 flex items-center justify-center gap-1.5 text-center text-[11px] text-content-3">
+            <p className="mt-2.5 text-center text-[11px] text-content-3">
+              Fatura ou extrato pelo clipe: CSV ou OFX são lidos com mais precisão que PDF.
+            </p>
+            <p className="mt-1 flex items-center justify-center gap-1.5 text-center text-[11px] text-content-3">
               <Shield size={11} />
               Seus dados financeiros e os arquivos que você anexar vão para o
               Google Gemini só para gerar as respostas. Arquivos não são

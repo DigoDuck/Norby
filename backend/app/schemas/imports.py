@@ -85,3 +85,5 @@ class ImportConfirm(BaseModel):
 class ImportResult(BaseModel):
     transactions: int
     transfers: int
+    # Carteira em que o lote entrou; nula num lote guardado antes da coluna.
+    wallet_id: UUID | None = None

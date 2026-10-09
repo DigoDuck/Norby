@@ -47,7 +47,7 @@ async def test_lines_move_the_balance_when_not_already_in_it(make_auth_client, d
     ])
 
     assert res.status_code == 201, res.text
-    assert res.json() == {"transactions": 2, "transfers": 0}
+    assert res.json() == {"transactions": 2, "transfers": 0, "wallet_id": conta["id"]}
     assert await _saldo(ac, conta["id"]) == 1000 - 52.30 + 3000
     assert await _contagem(db_session, Transaction) == 2
 
@@ -75,7 +75,7 @@ async def test_invoice_payment_becomes_a_transfer_to_the_card(make_auth_client, 
         launch_as="TRANSFER", category=None, transfer_wallet_id=cartao["id"],
     )])
 
-    assert res.json() == {"transactions": 0, "transfers": 1}
+    assert res.json() == {"transactions": 0, "transfers": 1, "wallet_id": conta["id"]}
     assert await _saldo(ac, conta["id"]) == 700.0
     assert await _saldo(ac, cartao["id"]) == 0.0
     assert await _contagem(db_session, Transaction) == 0
@@ -198,9 +198,30 @@ async def test_same_key_twice_writes_once(make_auth_client, db_session):
     segundo = await ac.post("/imports/statement/confirm", json=corpo)
 
     assert primeiro.status_code == segundo.status_code == 201
-    assert primeiro.json() == segundo.json() == {"transactions": 1, "transfers": 0}
+    assert primeiro.json() == segundo.json() == {"transactions": 1, "transfers": 0, "wallet_id": conta["id"]}
     assert await _contagem(db_session, Transaction) == 1
     assert await _saldo(ac, conta["id"]) == 90.0
+
+
+@pytest.mark.asyncio
+async def test_a_retry_into_another_wallet_reports_where_the_batch_went(make_auth_client, db_session):
+    # A resposta da primeira tentativa se perdeu e a pessoa trocou "Lançar em"
+    # antes de tentar de novo: a mesma chave devolve o lote guardado, e a tela
+    # precisa nomear a carteira em que ele de fato entrou (issue #217).
+    ac = await make_auth_client()
+    conta = await _carteira(ac, "Conta", "100.00")
+    outra = await _carteira(ac, "Outra", "100.00")
+    corpo = {
+        "already_in_balance": False,
+        "idempotency_key": "9a3e1b2c-4d5f-4e6a-8b7c-1d2e3f4a5b6c",
+        "items": [_linha(amount="10.00")],
+    }
+
+    primeiro = await ac.post("/imports/statement/confirm", json={**corpo, "wallet_id": conta["id"]})
+    segundo = await ac.post("/imports/statement/confirm", json={**corpo, "wallet_id": outra["id"]})
+
+    assert primeiro.json()["wallet_id"] == segundo.json()["wallet_id"] == conta["id"]
+    assert await _saldo(ac, outra["id"]) == 100.0
 
 
 @pytest.mark.asyncio
@@ -238,7 +259,9 @@ async def test_concurrent_duplicate_answers_with_the_stored_result(make_auth_cli
     conta = await _carteira(ac, "Conta", "100.00")
     chave = "7c9e6679-7425-40de-944b-e07fc1f90ae7"
     uid = (await ac.get("/auth/me")).json()["id"]
-    db_session.add(ImportBatch(user_id=uid, idempotency_key=chave, transactions=7, transfers=0))
+    db_session.add(ImportBatch(
+        user_id=uid, idempotency_key=chave, transactions=7, transfers=0, wallet_id=conta["id"]
+    ))
     await db_session.commit()
 
     real, chamadas = import_service._lote_gravado, []
@@ -255,6 +278,6 @@ async def test_concurrent_duplicate_answers_with_the_stored_result(make_auth_cli
     })
 
     assert res.status_code == 201, res.text
-    assert res.json() == {"transactions": 7, "transfers": 0}
+    assert res.json() == {"transactions": 7, "transfers": 0, "wallet_id": conta["id"]}
     assert await _contagem(db_session, Transaction) == 0
     assert await _saldo(ac, conta["id"]) == 100.0

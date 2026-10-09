@@ -5,8 +5,8 @@ import { importsApi } from "@/api/imports";
 import { Button } from "@/components/ui/button";
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from "@/lib/categories";
 import {
-  categoriaPara, duplicada, efeitoNoSaldo, jaNoSaldoPorPadrao, linhasIniciais,
-  montarConfirmacao, prontaParaLancar, totais, totaisDoArquivo,
+  categoriaPara, duplicada, jaNoSaldoPorPadrao, linhasIniciais,
+  montarConfirmacao, prontaParaLancar, saldosAfetados, totais, totaisDoArquivo,
 } from "@/lib/importacao";
 import { apiErrorMessage, formatBRL, formatDateBR, formatSinal, inputCls } from "@/lib/utils";
 
@@ -85,10 +85,13 @@ export default function RevisaoImportacao({ previa, carteiras }) {
 
   if (resultado) {
     const total = resultado.transactions + resultado.transfers;
+    // A carteira vem do servidor: num retry com a mesma chave, o lote pode ter
+    // entrado na escolhida antes da troca. Lote antigo, sem ela: a da tela.
+    const destino = carteiras.find((c) => c.id === resultado.wallet_id) ?? carteira;
     return (
       <div role="status" className="inset-panel rounded-tl-md px-4 py-3 text-[14px] text-content">
         <p>
-          {total} {total === 1 ? "lançamento" : "lançamentos"} na {carteira?.name}.{" "}
+          {total} {total === 1 ? "lançamento" : "lançamentos"} na {destino?.name}.{" "}
           <Link to="/transactions" className="font-medium text-accent underline-offset-2 hover:underline">
             Ver no Extrato
           </Link>
@@ -96,9 +99,6 @@ export default function RevisaoImportacao({ previa, carteiras }) {
       </div>
     );
   }
-
-  const antes = Number(carteira?.balance ?? 0);
-  const depois = antes + efeitoNoSaldo(linhas);
 
   return (
     <div className="inset-panel w-full rounded-tl-md p-4 text-[14px] text-content">
@@ -211,11 +211,13 @@ export default function RevisaoImportacao({ previa, carteiras }) {
             <input type="checkbox" checked={jaNoSaldo} onChange={(e) => setJaNoSaldo(e.target.checked)} />
             Esses lançamentos já estão no meu saldo atual
           </label>
-          <p className="mt-1 tnum">
-            {jaNoSaldo
-              ? `Saldo (${carteira.name}) não muda: ${formatBRL(antes)}`
-              : `Saldo (${carteira.name}): ${formatBRL(antes)} → ${formatBRL(depois)}`}
-          </p>
+          {saldosAfetados(walletId, linhas, carteiras).map(({ id, nome, antes, depois }) => (
+            <p key={id} className="mt-1 tnum">
+              {jaNoSaldo
+                ? `Saldo (${nome}) não muda: ${formatBRL(antes)}`
+                : `Saldo (${nome}): ${formatBRL(antes)} → ${formatBRL(depois)}`}
+            </p>
+          ))}
         </div>
       )}
 
