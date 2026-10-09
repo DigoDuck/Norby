@@ -89,6 +89,24 @@ describe("RevisaoImportacao", () => {
     expect(screen.getByRole("link", { name: "Ver no Extrato" })).toHaveAttribute("href", "/transactions");
   });
 
+  it("o resumo nomeia a carteira em que o servidor gravou o lote", async () => {
+    // Retry com a mesma chave depois de trocar "Lançar em": o servidor devolve
+    // o lote da primeira tentativa, que entrou em outra carteira.
+    importsApi.confirm.mockResolvedValue({ data: { transactions: 2, transfers: 1, wallet_id: "cartao" } });
+    renderizar();
+
+    fireEvent.click(screen.getByRole("button", { name: "Lançar 3 lançamentos" }));
+
+    expect(await screen.findByRole("status")).toHaveTextContent(/3 lançamentos na Cartão Nubank/);
+  });
+
+  it("o saldo mostra também o cartão que recebe o pagamento da fatura", () => {
+    renderizar();
+    // Conta: 3.000 − 52,30 + 3.000 − 300. Cartão: −300 + 300.
+    expect(screen.getByText(/Saldo \(Conta corrente\): R\$\s3\.000,00 → R\$\s5\.647,70/)).toBeInTheDocument();
+    expect(screen.getByText(/Saldo \(Cartão Nubank\): .*300,00 → R\$\s0,00/)).toBeInTheDocument();
+  });
+
   it("já no saldo: o saldo mostrado não muda e vai no envio", async () => {
     importsApi.confirm.mockResolvedValue({ data: { transactions: 2, transfers: 1 } });
     renderizar();

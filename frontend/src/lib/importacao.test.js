@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  categoriaPara, duplicada, efeitoNoSaldo, jaNoSaldoPorPadrao, linhasIniciais,
-  montarConfirmacao, prontaParaLancar, totais, totaisDoArquivo,
+  categoriaPara, duplicada, jaNoSaldoPorPadrao, linhasIniciais,
+  montarConfirmacao, prontaParaLancar, saldosAfetados, totais, totaisDoArquivo,
 } from "./importacao";
 
 const item = (extra = {}) => ({
@@ -73,6 +73,8 @@ it("categoriaPara mantém a categoria válida e cai em Outros", () => {
 });
 
 describe("totais e saldo", () => {
+  // Variação do saldo da conta, partindo de zero.
+  const variacao = (ls) => saldosAfetados("conta", ls, [{ id: "conta", name: "Conta", balance: "0" }])[0].depois;
   const linhas = [
     { ...item({ amount: "0.10" }), marcada: true },
     { ...item({ amount: "0.20" }), marcada: true },
@@ -92,7 +94,44 @@ describe("totais e saldo", () => {
   });
 
   it("efeito no saldo: despesa e transferência de saída descem, receita sobe", () => {
-    expect(efeitoNoSaldo(linhas)).toBe(1000 - 0.3 - 300);
+    expect(variacao(linhas)).toBe(1000 - 0.3 - 300);
+  });
+
+  it("linha reclassificada conta pelo Lançar como, e os totais batem com o saldo", () => {
+    // Um estorno que o banco listou como saída, lançado como Receita: o saldo
+    // sobe, então ele é entrada, não saída.
+    const estorno = { ...item({ amount: "40.00", direction: "OUT", launch_as: "INCOME" }), marcada: true };
+    const { entradas, saidas } = totais([...linhas, estorno]);
+    expect({ entradas, saidas }).toEqual({ entradas: 1040, saidas: 300.3 });
+    expect(entradas - saidas).toBeCloseTo(variacao([...linhas, estorno]), 2);
+  });
+});
+
+describe("saldosAfetados", () => {
+  const carteiras = [
+    { id: "conta", name: "Conta", balance: "1000.00" },
+    { id: "cartao", name: "Cartão", balance: "-300.00" },
+    { id: "reserva", name: "Reserva", balance: "50.00" },
+  ];
+
+  it("a carteira escolhida e a outra ponta de cada transferência, com antes e depois", () => {
+    const linhas = [
+      { ...item({ amount: "52.30" }), marcada: true },
+      { ...item({ amount: "300.00", launch_as: "TRANSFER" }), marcada: true, transfer_wallet_id: "cartao" },
+      { ...item({ amount: "20.00", launch_as: "TRANSFER", direction: "IN" }), marcada: true, transfer_wallet_id: "reserva" },
+      { ...item({ amount: "999.00", launch_as: "TRANSFER" }), marcada: false, transfer_wallet_id: "reserva" },
+    ];
+    expect(saldosAfetados("conta", linhas, carteiras)).toEqual([
+      { id: "conta", nome: "Conta", antes: 1000, depois: 667.7 },
+      { id: "cartao", nome: "Cartão", antes: -300, depois: 0 },
+      { id: "reserva", nome: "Reserva", antes: 50, depois: 30 },
+    ]);
+  });
+
+  it("sem transferência, só a carteira escolhida", () => {
+    expect(saldosAfetados("conta", [{ ...item(), marcada: true }], carteiras)).toEqual([
+      { id: "conta", nome: "Conta", antes: 1000, depois: 947.7 },
+    ]);
   });
 });
 

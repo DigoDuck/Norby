@@ -41,6 +41,16 @@ export function categoriaPara(launchAs, categoria) {
   return lista.includes(categoria) ? categoria : "Outros";
 }
 
+// Quanto a linha mexe no saldo da carteira, em centavos e com sinal. Mesma
+// regra do backend: receita e despesa pelo "Lançar como", transferência pela
+// direção. Totais e saldos saem daqui, então não têm como discordar.
+function efeito(linha) {
+  const valor = centavos(linha.amount);
+  if (linha.launch_as === "EXPENSE") return -valor;
+  if (linha.launch_as === "INCOME") return valor;
+  return linha.direction === "IN" ? valor : -valor;
+}
+
 // Entradas e saídas separadas: um sinal trocado pela IA (visto no PDF) quase
 // não mexe numa soma única, mas salta aos olhos aqui.
 export function totais(linhas) {
@@ -48,8 +58,9 @@ export function totais(linhas) {
   let saidas = 0;
   for (const linha of linhas) {
     if (!vaiSerLancada(linha)) continue;
-    if (linha.direction === "IN") entradas += centavos(linha.amount);
-    else saidas += centavos(linha.amount);
+    const valor = efeito(linha);
+    if (valor > 0) entradas += valor;
+    else saidas -= valor;
   }
   return { entradas: entradas / 100, saidas: saidas / 100 };
 }
@@ -65,16 +76,25 @@ export function totaisDoArquivo(linhas) {
   return { entradas: entradas / 100, saidas: saidas / 100 };
 }
 
-export function efeitoNoSaldo(linhas) {
-  let total = 0;
+// A carteira escolhida e a outra ponta de cada transferência: o pagamento da
+// fatura também muda o saldo do cartão, e a revisão precisa mostrar isso.
+export function saldosAfetados(walletId, linhas, carteiras) {
+  const deltas = new Map([[walletId, 0]]);
   for (const linha of linhas) {
     if (!vaiSerLancada(linha)) continue;
-    const valor = centavos(linha.amount);
-    if (linha.launch_as === "EXPENSE") total -= valor;
-    else if (linha.launch_as === "INCOME") total += valor;
-    else total += linha.direction === "IN" ? valor : -valor;
+    const valor = efeito(linha);
+    deltas.set(walletId, deltas.get(walletId) + valor);
+    if (linha.launch_as === "TRANSFER" && linha.transfer_wallet_id) {
+      const outra = linha.transfer_wallet_id;
+      deltas.set(outra, (deltas.get(outra) ?? 0) - valor);
+    }
   }
-  return total / 100;
+  return [...deltas].flatMap(([id, delta]) => {
+    const carteira = carteiras.find((c) => c.id === id);
+    if (!carteira) return [];
+    const antes = Number(carteira.balance);
+    return [{ id, nome: carteira.name, antes, depois: (centavos(antes) + delta) / 100 }];
+  });
 }
 
 // "Sim" quando a carteira nasceu depois do período do arquivo: o saldo

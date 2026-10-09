@@ -338,6 +338,11 @@ class ImportBatch(Base):
     idempotency_key: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
     transactions: Mapped[int] = mapped_column(Integer, nullable=False)
     transfers: Mapped[int] = mapped_column(Integer, nullable=False)
+    # Onde o lote entrou: o retry pode chegar com outra carteira escolhida, e a
+    # tela precisa nomear a certa (issue #217). Sem FK de propósito: é registro
+    # histórico, e excluir a carteira não deve tocar nesta tabela. Nulo nos
+    # lotes gravados antes da coluna.
+    wallet_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 

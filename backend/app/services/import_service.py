@@ -331,7 +331,9 @@ async def _lote_gravado(db: AsyncSession, user_id: uuid.UUID, chave: uuid.UUID) 
     lote = await db.scalar(
         select(ImportBatch).where(ImportBatch.user_id == user_id, ImportBatch.idempotency_key == chave)
     )
-    return {"transactions": lote.transactions, "transfers": lote.transfers} if lote else None
+    if lote is None:
+        return None
+    return {"transactions": lote.transactions, "transfers": lote.transfers, "wallet_id": lote.wallet_id}
 
 
 async def confirmar(db: AsyncSession, user: User, payload: ImportConfirm) -> dict:
@@ -392,7 +394,7 @@ async def confirmar(db: AsyncSession, user: User, payload: ImportConfirm) -> dic
             ))
             transacoes += 1
 
-    resultado = {"transactions": transacoes, "transfers": transferencias}
+    resultado = {"transactions": transacoes, "transfers": transferencias, "wallet_id": alvo.id}
     if payload.idempotency_key:
         db.add(ImportBatch(user_id=user_id, idempotency_key=payload.idempotency_key, **resultado))
     try:
