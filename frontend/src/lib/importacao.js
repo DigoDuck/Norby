@@ -51,8 +51,9 @@ function efeito(linha) {
   return linha.direction === "IN" ? valor : -valor;
 }
 
-// Entradas e saídas separadas: um sinal trocado pela IA (visto no PDF) quase
-// não mexe numa soma única, mas salta aos olhos aqui.
+// Entradas e saídas separadas, pelo lado em que o saldo se move: um sinal
+// trocado pela IA (visto no PDF) quase não mexe numa soma única, mas salta aos
+// olhos aqui. "No arquivo" (totaisDoArquivo) segue a direção do banco.
 export function totais(linhas) {
   let entradas = 0;
   let saidas = 0;
