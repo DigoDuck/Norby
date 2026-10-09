@@ -47,6 +47,12 @@ describe("AIAnalyst, anexo de fatura ou extrato", () => {
     });
   });
 
+  it("a dica de formato fica visível, não só no tooltip", () => {
+    // No celular não existe hover: um title nunca aparece.
+    renderizar();
+    expect(screen.getByText(/CSV ou OFX são lidos com mais precisão que PDF/)).toBeVisible();
+  });
+
   it("anexar lê o arquivo e mostra a revisão na conversa", async () => {
     importsApi.preview.mockResolvedValue({ data: PREVIA });
     renderizar();
