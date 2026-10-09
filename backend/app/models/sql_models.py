@@ -284,7 +284,7 @@ class Transaction(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"))
-    wallet_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("wallets.id", ondelete="CASCADE"))
+    wallet_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("wallets.id", ondelete="CASCADE"), index=True)
     type: Mapped[TransactionType] = mapped_column(Enum(TransactionType), nullable=False)
     amount: Mapped[Decimal] = mapped_column(Numeric(15, 2), nullable=False)
     category: Mapped[str] = mapped_column(String(100), nullable=False)
@@ -358,7 +358,7 @@ class RecurringTransaction(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"))
-    wallet_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("wallets.id", ondelete="CASCADE"))
+    wallet_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("wallets.id", ondelete="CASCADE"), index=True)
     type: Mapped[TransactionType] = mapped_column(Enum(TransactionType), nullable=False)
     amount: Mapped[Decimal] = mapped_column(Numeric(15, 2), nullable=False)
     category: Mapped[str] = mapped_column(String(100), nullable=False)
