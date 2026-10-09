@@ -5,7 +5,7 @@ import { importsApi } from "@/api/imports";
 import { Button } from "@/components/ui/button";
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from "@/lib/categories";
 import {
-  categoriaPara, duplicada, jaNoSaldoPorPadrao, linhasIniciais,
+  categoriaPara, duplicada, faltaDestino, jaNoSaldoPorPadrao, linhasIniciais,
   montarConfirmacao, prontaParaLancar, saldosAfetados, totais, totaisDoArquivo,
 } from "@/lib/importacao";
 import { apiErrorMessage, formatBRL, formatDateBR, formatSinal, inputCls } from "@/lib/utils";
@@ -37,9 +37,9 @@ export default function RevisaoImportacao({ previa, carteiras }) {
 
   const lancaveis = linhas.filter((l) => l.marcada && l.launch_as !== "IGNORE").length;
   const motivoId = useId();
-  const semDestino = linhas.filter(
-    (l) => l.marcada && l.launch_as === "TRANSFER" && (!l.transfer_wallet_id || l.transfer_wallet_id === walletId),
-  ).length;
+  const destinoId = useId();
+  const pendentes = walletId ? linhas.filter((l) => faltaDestino(l, walletId)) : [];
+  const semDestino = pendentes.length;
   const motivo = !walletId
     ? "Escolha onde lançar."
     : semDestino > 0
@@ -169,7 +169,9 @@ export default function RevisaoImportacao({ previa, carteiras }) {
               )}
               {linha.launch_as === "TRANSFER" && (
                 <select
+                  id={`${destinoId}-${linha.id}`}
                   aria-label={`Destino: ${linha.description}`}
+                  aria-invalid={walletId && faltaDestino(linha, walletId) ? true : undefined}
                   value={linha.transfer_wallet_id ?? ""}
                   onChange={(e) => {
                     // A duplicata de transferência depende do destino: a marca acompanha a escolha.
@@ -179,7 +181,7 @@ export default function RevisaoImportacao({ previa, carteiras }) {
                       marcada: !duplicada({ ...linha, transfer_wallet_id: destino }, walletId),
                     });
                   }}
-                  className={selectCls}
+                  className={`${selectCls} aria-[invalid=true]:border-danger`}
                 >
                   <option value="">Para qual carteira?</option>
                   {carteiras.filter((c) => c.id !== walletId).map((c) => (
@@ -232,7 +234,23 @@ export default function RevisaoImportacao({ previa, carteiras }) {
         {enviando ? "Lançando…" : `Lançar ${lancaveis} ${lancaveis === 1 ? "lançamento" : "lançamentos"}`}
       </Button>
       {motivo && !enviando && (
-        <p id={motivoId} className="mt-1.5 text-xs text-content-2">{motivo}</p>
+        <p className="mt-1.5 text-xs text-content-2">
+          <span id={motivoId}>{motivo}</span>
+          {semDestino > 0 && (
+            <>
+              {" "}
+              {/* O foco rola a lista até o seletor: até 300 linhas, a pendente
+                  some de vista. */}
+              <button
+                type="button"
+                onClick={() => document.getElementById(`${destinoId}-${pendentes[0].id}`)?.focus()}
+                className="font-medium text-accent underline-offset-2 hover:underline"
+              >
+                {semDestino === 1 ? "Ir para a transferência" : "Ir para a primeira"}
+              </button>
+            </>
+          )}
+        </p>
       )}
     </div>
   );

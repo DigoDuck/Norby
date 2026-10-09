@@ -124,13 +124,20 @@ export function montarConfirmacao(walletId, jaNoSaldo, linhas, chave) {
   };
 }
 
+// Transferência que vai ser lançada sem outra carteira válida: sem destino, ou
+// com a própria carteira de lançamento como destino.
+export function faltaDestino(linha, walletId) {
+  return (
+    vaiSerLancada(linha) &&
+    linha.launch_as === "TRANSFER" &&
+    (!linha.transfer_wallet_id || linha.transfer_wallet_id === walletId)
+  );
+}
+
 export function prontaParaLancar(walletId, linhas) {
-  const lancadas = linhas.filter(vaiSerLancada);
   return (
     Boolean(walletId) &&
-    lancadas.length > 0 &&
-    lancadas.every(
-      (l) => l.launch_as !== "TRANSFER" || (l.transfer_wallet_id && l.transfer_wallet_id !== walletId),
-    )
+    linhas.some(vaiSerLancada) &&
+    !linhas.some((l) => faltaDestino(l, walletId))
   );
 }

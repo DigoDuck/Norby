@@ -163,6 +163,20 @@ describe("RevisaoImportacao", () => {
     expect(marca).toBeChecked();
   });
 
+  it("transferência sem destino fica marcada e o aviso leva até ela", () => {
+    // Em 28 linhas que rolam, a pendente some de vista: o aviso precisa dizer qual é.
+    renderizar({ ...PREVIA, default_card_id: null });
+    const destino = screen.getByRole("combobox", { name: "Destino: Pagamento de fatura" });
+    expect(destino).toHaveAttribute("aria-invalid", "true");
+
+    fireEvent.click(screen.getByRole("button", { name: "Ir para a transferência" }));
+    expect(destino).toHaveFocus();
+
+    fireEvent.change(destino, { target: { value: "cartao" } });
+    expect(destino).not.toHaveAttribute("aria-invalid");
+    expect(screen.queryByRole("button", { name: "Ir para a transferência" })).not.toBeInTheDocument();
+  });
+
   it("erro ao lançar aparece e permite tentar de novo", async () => {
     importsApi.confirm.mockRejectedValue(new Error("500"));
     renderizar();
