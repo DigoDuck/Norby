@@ -297,6 +297,19 @@ describe("Wallets, cartão de crédito", () => {
     expect(await screen.findAllByRole("button", { name: "Pagar fatura" })).toHaveLength(1);
   });
 
+  it("a conta também abre o histórico, como Transferências", async () => {
+    // Quem pagou a fatura precisa achar o pagamento pela conta, não só pelo cartão (#219).
+    walletsApi.list.mockResolvedValue({
+      data: [
+        { id: "c1", name: "Cartão", balance: "-300.00", bank: null, kind: "CREDIT_CARD", created_at: "2026-09-01T00:00:00Z" },
+        { id: "a1", name: "Conta", balance: "1000.00", bank: null, kind: "ACCOUNT", created_at: "2026-09-01T00:00:00Z" },
+      ],
+    });
+    render(<Wallets />);
+    expect(await screen.findByRole("button", { name: "Pagamentos da fatura" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Transferências" })).toBeInTheDocument();
+  });
+
   it("o aviso de excluir carteira cita as transferências que vão junto", async () => {
     walletsApi.list.mockResolvedValue({
       data: [{ id: "c1", name: "Cartão", balance: "0.00", bank: null, kind: "CREDIT_CARD", created_at: "2026-09-01T00:00:00Z" }],

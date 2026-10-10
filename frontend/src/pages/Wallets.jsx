@@ -1,5 +1,5 @@
 import { useCallback, useId, useRef, useState } from "react";
-import { Plus, Pencil, Trash2, Wallet, ReceiptText } from "lucide-react";
+import { Plus, Pencil, Trash2, Wallet, ReceiptText, ArrowLeftRight } from "lucide-react";
 import { walletsApi } from "@/api/wallets";
 import { transactionsApi } from "@/api/transactions";
 import { transfersApi } from "@/api/transfers";
@@ -379,23 +379,23 @@ export default function Wallets() {
                   </span>
                 )}
                 <div className="flex items-center gap-1.5 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 focus-within:opacity-100">
-                  {ehCartao(w) && (
-                    <PagamentosDialog
-                      cartao={w}
-                      contas={wallets}
-                      onChange={load}
-                      trigger={
-                        <button
-                          type="button"
-                          title="Pagamentos"
-                          className="w-8 h-8 flex items-center justify-center rounded-lg border border-line/10 text-content-3 hover:text-content hover:border-line/20 transition-colors"
-                        >
-                          <ReceiptText size={14} />
-                          <span className="sr-only">Pagamentos da fatura</span>
-                        </button>
-                      }
-                    />
-                  )}
+                  {/* Toda carteira tem histórico: no cartão são os pagamentos da
+                      fatura; na conta, o que saiu e entrou de outras (#219). */}
+                  <PagamentosDialog
+                    carteira={w}
+                    contas={wallets}
+                    onChange={load}
+                    trigger={
+                      <button
+                        type="button"
+                        title={ehCartao(w) ? "Pagamentos" : "Transferências"}
+                        className="w-8 h-8 flex items-center justify-center rounded-lg border border-line/10 text-content-3 hover:text-content hover:border-line/20 transition-colors"
+                      >
+                        {ehCartao(w) ? <ReceiptText size={14} /> : <ArrowLeftRight size={14} />}
+                        <span className="sr-only">{ehCartao(w) ? "Pagamentos da fatura" : "Transferências"}</span>
+                      </button>
+                    }
+                  />
                   <button
                     type="button"
                     onClick={(e) => openEdit(w, e)}

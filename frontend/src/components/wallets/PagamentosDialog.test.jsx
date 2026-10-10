@@ -11,11 +11,13 @@ vi.mock("@/api/transfers", () => ({
 const CARTAO = { id: "c1", name: "Cartão", balance: "-300.00", kind: "CREDIT_CARD" };
 const CONTA = { id: "a1", name: "Conta", balance: "1000.00", kind: "ACCOUNT" };
 
-function renderizar(onChange = vi.fn()) {
+const RESERVA = { id: "r1", name: "Reserva", balance: "50.00", kind: "ACCOUNT" };
+
+function renderizar(onChange = vi.fn(), carteira = CARTAO) {
   render(
     <PagamentosDialog
-      cartao={CARTAO}
-      contas={[CONTA, CARTAO]}
+      carteira={carteira}
+      contas={[CONTA, CARTAO, RESERVA]}
       onChange={onChange}
       trigger={<button type="button">Pagamentos</button>}
     />,
@@ -41,6 +43,24 @@ describe("PagamentosDialog", () => {
 
     expect(await screen.findByText(/de Conta/)).toBeInTheDocument();
     expect(transfersApi.list).toHaveBeenCalledWith({ wallet_id: "c1", limit: 50, offset: 0 });
+  });
+
+  it("numa conta, mostra as transferências que saíram e as que entraram", async () => {
+    transfersApi.list.mockResolvedValue({
+      data: [
+        { id: "t1", from_wallet_id: "a1", to_wallet_id: "c1", amount: "300.00", date: "2026-09-20" },
+        { id: "t2", from_wallet_id: "r1", to_wallet_id: "a1", amount: "40.00", date: "2026-09-18" },
+      ],
+    });
+    renderizar(vi.fn(), CONTA);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Pagamentos", expanded: false }));
+
+    expect(await screen.findByRole("heading", { name: "Transferências" })).toBeInTheDocument();
+    expect(screen.getByText(/para Cartão/)).toBeInTheDocument();
+    expect(screen.getByText(/de Reserva/)).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Excluir transferência" })).toHaveLength(2);
+    expect(transfersApi.list).toHaveBeenCalledWith({ wallet_id: "a1", limit: 50, offset: 0 });
   });
 
   it("lista vazia diz que não há pagamento, sem inventar linha", async () => {
@@ -117,6 +137,9 @@ describe("PagamentosDialog", () => {
     await waitFor(() => expect(screen.getAllByRole("button", { name: "Excluir pagamento" })).toHaveLength(55));
     expect(transfersApi.list).toHaveBeenLastCalledWith({ wallet_id: "c1", limit: 50, offset: 50 });
     expect(screen.queryByRole("button", { name: "Carregar mais" })).not.toBeInTheDocument();
+    // O botão sumiu com a última página: o foco não pode cair no body, vai
+    // para o primeiro item que acabou de chegar (issue #219).
+    expect(screen.getAllByRole("listitem")[50]).toHaveFocus();
   });
 
   it("a lista rola dentro do diálogo, com título e fechar sempre visíveis", async () => {
