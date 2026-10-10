@@ -53,6 +53,15 @@ async def delete_account(user: User, db: AsyncSession) -> None:
     await ai_insights_collection.delete_many({"user_id": user_id})
     await chat_history_collection.delete_many({"user_id": user_id})
 
+    # Filhos ANTES das carteiras, cada grupo por id: a ordem de quem desfaz
+    # transferência, edita transação ou roda recorrência (filho, depois
+    # carteira), a mesma do delete_wallet. A cascata a partir do usuário trava
+    # de cima para baixo e dava 40P01 contra um "desfazer" em outra aba (#218).
+    for modelo in (RecurringTransaction, Transaction, Transfer, Wallet):
+        await db.execute(
+            select(modelo.id).where(modelo.user_id == user.id).order_by(modelo.id).with_for_update()
+        )
+
     await db.delete(user)
     await db.commit()
 
