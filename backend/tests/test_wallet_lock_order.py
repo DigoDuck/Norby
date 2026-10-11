@@ -174,6 +174,29 @@ async def test_deleting_a_wallet_locks_its_children_before_the_wallet(make_auth_
 
 
 @pytest.mark.asyncio
+async def test_deleting_the_account_locks_children_before_wallets(make_auth_client):
+    # Apagar o usuário deixava a cascata travar de cima para baixo (usuário,
+    # carteiras, filhos), o inverso de desfazer transferência ou editar
+    # transação. Um "desfazer" em outra aba dava 40P01 (issue #218).
+    ac = await make_auth_client()
+    conta = (await ac.post("/wallets/", json={"name": "Conta", "balance": "100.00"})).json()
+    cartao = (await ac.post("/wallets/", json={"name": "Cartão", "kind": "CREDIT_CARD"})).json()
+    await ac.post("/transfers/", json={
+        "from_wallet_id": conta["id"], "to_wallet_id": cartao["id"], "amount": "10.00", "date": "2026-09-01",
+    })
+    await ac.post("/transactions/", json={
+        "wallet_id": conta["id"], "type": "EXPENSE", "amount": "5.00",
+        "category": "Alimentação", "date": "2026-09-01",
+    })
+
+    with tabelas_travadas() as ordem:
+        res = await ac.request("DELETE", "/auth/me", json={"confirm": True, "password": "secret123"})
+
+    assert res.status_code == 204, res.text
+    assert ordem == ["recurring_transactions", "transactions", "transfers", "wallets"]
+
+
+@pytest.mark.asyncio
 async def test_recurring_run_locks_due_templates_in_id_order(db_session):
     # Mesma ordem do delete_wallet (templates por id); sem ORDER BY o lock
     # segue a ordem do heap e pode fechar ciclo com a exclusão da carteira.
