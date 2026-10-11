@@ -183,7 +183,7 @@ export default function RevisaoImportacao({ previa, carteiras }) {
                   }}
                   className={`${selectCls} aria-[invalid=true]:border-danger`}
                 >
-                  <option value="">Para qual carteira?</option>
+                  <option value="">Para onde?</option>
                   {carteiras.filter((c) => c.id !== walletId).map((c) => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
