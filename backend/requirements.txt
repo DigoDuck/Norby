@@ -1,13 +1,13 @@
-fastapi==0.142.2
+fastapi==0.143.0
 uvicorn[standard]==0.54.0
-sqlalchemy[asyncio]==2.1.1
-asyncpg==0.31.0
+sqlalchemy[asyncio]==2.1.4
+asyncpg==0.32.0
 alembic==1.20.0
 motor==3.7.1
 PyJWT==2.15.1  # JWT HS256 do access token. Substituiu o python-jose (issue #29): sem ecdsa, sem cryptography.
 python-dotenv==1.2.4
 pydantic-settings==2.15.0
-google-genai==2.28.0
+google-genai==2.29.0
 # cryptography entra como transitiva do google-auth (dependência do
 # google-genai) — sem pin direto aqui de propósito; quem fixa a versão
 # resolvida é o lock (requirements.lock), checado por scripts/check_locks.py.
@@ -22,5 +22,5 @@ stripe==15.6.1
 
 # Foto de perfil (issue #35): redimensiona no servidor para 128x128 WebP.
 # python-multipart é o que o FastAPI usa para ler multipart/form-data.
-pillow==12.3.0
+pillow==13.0.0
 python-multipart==0.0.32
