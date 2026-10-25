@@ -23,6 +23,10 @@ from app.models.sql_models import StripeWebhookEvent, User
 
 logger = logging.getLogger("norby.billing")
 
+# Contrato usado pelo SDK 15.6.1. Atualizar o SDK não deve migrar a API de
+# cobrança junto; uma migração de API exige validação própria no modo de teste.
+STRIPE_API_VERSION = "2026-08-26.dahlia"
+
 # `created` entrou junto do `updated` depois que a implementação mostrou o furo:
 # o `checkout.session.completed` NÃO traz `current_period_end`, e quem carrega o
 # período da PRIMEIRA assinatura é o `created`. Sem ele, o premium_until da
@@ -56,8 +60,8 @@ def _chave() -> str:
 def _periodo_fim(obj: dict) -> datetime | None:
     """Até quando está pago.
 
-    O campo SAIU do topo da assinatura: na versão de API que o SDK 15 fixa
-    (2026-07-29.dahlia) `current_period_end` mora em cada ITEM. Ler só o topo
+    O campo SAIU do topo da assinatura: na versão de API que preservamos
+    (2026-08-26.dahlia) `current_period_end` mora em cada ITEM. Ler só o topo
     devolveria None e apagaria o `premium_until` de quem paga — o portão
     inteiro do ADR 0001. O topo vem primeiro porque conta com versão antiga
     fixada no endpoint ainda manda ali, e `max` porque assinatura com vários
@@ -226,7 +230,9 @@ async def cancel_subscription(subscription_id: str) -> None:
     faria uma chamada HTTP bloqueante travar o event loop.
     """
     try:
-        await stripe.Subscription.cancel_async(subscription_id, api_key=_chave())
+        await stripe.Subscription.cancel_async(
+            subscription_id, api_key=_chave(), stripe_version=STRIPE_API_VERSION
+        )
     except Exception as erro:  # noqa: BLE001 — rede, credencial ou 4xx do Stripe
         raise GatewayCancelFailed(str(erro)) from erro
 
@@ -256,7 +262,9 @@ async def fetch_subscription(subscription_id: str) -> dict:
     Devolve dict puro: o resto do módulo trata evento como dado, não como
     objeto do SDK, e é isso que mantém a troca de gateway localizada.
     """
-    sub = await stripe.Subscription.retrieve_async(subscription_id, api_key=_chave())
+    sub = await stripe.Subscription.retrieve_async(
+        subscription_id, api_key=_chave(), stripe_version=STRIPE_API_VERSION
+    )
     # `.to_dict()`, NÃO `dict(obj)`: no SDK 15 o StripeObject deixou de ser um
     # mapping e `dict(obj)` levanta TypeError. Como os testes stubavam esta
     # função com um dict, o erro só apareceria contra o Stripe de verdade — e
@@ -404,7 +412,7 @@ async def create_checkout_session(
 
     try:
         sessao = await stripe.checkout.Session.create_async(
-            **parametros, api_key=_chave()
+            **parametros, api_key=_chave(), stripe_version=STRIPE_API_VERSION
         )
     except Exception as erro:  # noqa: BLE001 — rede, credencial ou 4xx do Stripe
         raise GatewayError(str(erro)) from erro
@@ -419,7 +427,8 @@ async def create_portal_session(*, customer_id: str, return_url: str) -> str:
     """
     try:
         sessao = await stripe.billing_portal.Session.create_async(
-            customer=customer_id, return_url=return_url, api_key=_chave()
+            customer=customer_id, return_url=return_url, api_key=_chave(),
+            stripe_version=STRIPE_API_VERSION,
         )
     except Exception as erro:  # noqa: BLE001
         raise GatewayError(str(erro)) from erro
@@ -430,7 +439,7 @@ async def fetch_checkout_session(session_id: str) -> dict:
     """Lê a sessão de Checkout. Saída de rede, e é ela que os testes stubam."""
     try:
         sessao = await stripe.checkout.Session.retrieve_async(
-            session_id, api_key=_chave()
+            session_id, api_key=_chave(), stripe_version=STRIPE_API_VERSION
         )
         # DENTRO do try, e com `.to_dict()`: `dict(obj)` levanta TypeError no
         # SDK 15, e cá fora ele escapava do GatewayError e virava 500 na volta
