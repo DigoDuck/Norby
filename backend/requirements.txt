@@ -6,7 +6,7 @@ alembic==1.20.0
 motor==3.7.1
 PyJWT==2.15.1  # JWT HS256 do access token. Substituiu o python-jose (issue #29): sem ecdsa, sem cryptography.
 python-dotenv==1.2.4
-pydantic-settings==2.15.0
+pydantic-settings==2.16.1
 google-genai==2.29.0
 # cryptography entra como transitiva do google-auth (dependência do
 # google-genai) — sem pin direto aqui de propósito; quem fixa a versão
