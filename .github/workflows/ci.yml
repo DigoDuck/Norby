@@ -6,6 +6,10 @@ on:
   push:
     branches: [main]
 
+# Nenhum job escreve no repositório: o GITHUB_TOKEN fica só leitura.
+permissions:
+  contents: read
+
 jobs:
   backend:
     name: Backend tests + audit
@@ -47,9 +51,9 @@ jobs:
       # credencial: nenhuma chamada sai para o Stripe na suíte.
       STRIPE_WEBHOOK_SECRET: whsec_ci_only_fixture_signing_secret
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
           cache: pip
@@ -96,9 +100,9 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "22"
           cache: npm
@@ -136,7 +140,7 @@ jobs:
     # mesmo assim há uma corrida com o tempo de redeploy do próprio Vercel.
     if: github.event_name == 'push'
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Thresholds calibrados em 2026-08-25 contra essa mesma URL, 3 execuções,
       # Edge headless com a emulação mobile padrão do Lighthouse: performance
@@ -147,7 +151,7 @@ jobs:
       # que 0.70 deixaria passar. Reapertar assim que as primeiras execuções
       # na main mostrarem o que o runner realmente pontua.
       - name: Run Lighthouse CI
-        uses: treosh/lighthouse-ci-action@v12
+        uses: treosh/lighthouse-ci-action@3e7e23fb74242897f95c0ba9cabad3d0227b9b18 # v12.6.2
         with:
           urls: |
             https://norby.com.br/
