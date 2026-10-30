@@ -336,9 +336,10 @@ primeiro IP não confiável, que o cliente não forja. É o caminho se um dia o
 throttle precisar do IP real (#157, opção c), desde que se saiba a faixa dos
 proxies do Railway. Railway também não
 documenta onde fica o IP real nesse header (o próprio suporte deles se
-contradiz), então `app/routers/auth.py` loga o header cru (`_log_xff`) nas 4
-rotas de auth pra decidir com dado — temporário, remover depois de ler os
-logs de produção por algumas semanas.
+contradiz). O log temporário do header cru nas rotas de auth (`_log_xff`) saiu
+em 2026-10-30: gravava IP de todo login/cadastro/refresh sem finalidade ativa
+(LGPD). Se a opção (c) do #157 voltar à mesa, religar por tempo curto e com
+data de remoção.
 
 **Throttle do login: reserva atômica e lockout aceito (#157, 2026-09-23).**
 `reserve_attempt` checa e conta a tentativa num único `INSERT ... ON CONFLICT
