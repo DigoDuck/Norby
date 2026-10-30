@@ -413,6 +413,25 @@ sabendo entrar. Os três passos, nesta ordem:
 A reversão por SQL não grava linha em `admin_actions` (só o passo 3 grava).
 Anotar data, `user_id` e motivo fora do banco até isso virar endpoint.
 
+**Runbook — rotação de credenciais (2026-10-30).** Todas vivem nas env vars do
+Railway; nenhuma está no git (varredura do histórico inteiro em 2026-10-30).
+Regra geral: **criar a nova, trocar no Railway, esperar o redeploy, só então
+revogar a antiga.** Revogar primeiro derruba produção até a variável mudar.
+
+| Variável | Onde gira | Efeito da troca |
+|---|---|---|
+| `SECRET_KEY` | gerar com `python -c "import secrets; print(secrets.token_urlsafe(32))"` | Access tokens antigos viram 401 e o interceptor renova pelo refresh, que é opaco e não depende da chave: ninguém é deslogado. **Também é a chave HMAC do `login_throttles` e do `reset_email_key`**: os baldes em andamento zeram, e as linhas antigas ficam órfãs (inofensivas). Sem sobreposição possível: é corte seco. |
+| `DATABASE_URL` (Neon) | criar role nova com os mesmos grants **ou** resetar a senha da role atual | Resetar a senha derruba o backend até o Railway receber a URL nova (≈1 redeploy). Role nova evita isso, mas as tabelas pertencem à role antiga: o `alembic upgrade` do `start.sh` precisa de permissão de dono, então conferir `GRANT`/ownership antes de revogar a antiga. |
+| `MONGODB_URL` (Atlas) | criar usuário novo de banco, trocar, apagar o antigo | Sem queda se seguir a regra geral. |
+| `STRIPE_SECRET_KEY` | painel → API keys → *Roll key*, com prazo para a antiga expirar | O Stripe mantém as duas válidas no prazo escolhido: sem queda. |
+| `STRIPE_WEBHOOK_SECRET` | painel → Webhooks → endpoint → *Roll secret*, com prazo | No prazo, o Stripe assina com os dois segredos e o `construct_event` aceita qualquer um. Se o prazo vencer antes do Railway mudar, todo webhook vira 400 e só o #46/#48 seguram as compras (ver "QUATRO eventos" acima). |
+| `BREVO_API_KEY` | painel → SMTP & API → nova chave | Sem queda; apagar a antiga depois. |
+| `GEMINI_API_KEY` | AI Studio → nova chave no mesmo projeto | Sem queda. Chave em projeto **diferente** zera a cota RPD compartilhada (ver #21). |
+
+Rotação preventiva não tem prazo fixo. **Gatilhos:** chave vista fora do
+Railway (colada em chat, ferramenta de IA, print, log), saída de alguém com
+acesso aos painéis, ou alerta de secret scanning do GitHub.
+
 Login e cadastro (anônimos) **não seguem mais por IP.** Desde 2026-08-16 usam
 atraso progressivo **por conta**: a chave é o HMAC-SHA256 do email
 normalizado (lower + trim) com o `secret_key` do servidor — o email cru nunca
