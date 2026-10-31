@@ -65,21 +65,6 @@ def _throttled(retry_after: int) -> HTTPException:
     )
 
 
-# Issue #22: Railway não documenta onde fica o IP real no X-Forwarded-For (o
-# próprio suporte deles se contradiz), e a versão do uvicorn pinada aqui só
-# aceita IP exato ou "*" (que usa o item mais à esquerda, controlado pelo
-# cliente — inseguro). Em vez de confiar às cegas, logamos o header cru nas
-# rotas de auth para decidir com dado, não com fórum. Temporário: remover
-# depois de ler os logs de produção por algumas semanas.
-def _log_xff(request: Request) -> None:
-    logger.info(
-        "auth xff=%r client=%s path=%s",
-        request.headers.get("x-forwarded-for"),
-        request.client.host if request.client else None,
-        request.url.path,
-    )
-
-
 def _set_refresh_cookie(response: Response, emitido: RefreshEmitido) -> None:
     # HttpOnly tira o token do alcance de qualquer script na página; Path=/auth
     # mantém o cookie fora de todas as outras rotas. SameSite=Strict, e não
@@ -134,7 +119,6 @@ async def register(
     response: Response,
     payload: UserRegister,
     db: AsyncSession = Depends(get_db),
-    _xff: None = Depends(_log_xff),
 ): # Usa o pydantic dos schemas para validar email e senha
     retry_after = await check_throttle(payload.email, db)
     if retry_after is not None:
@@ -196,7 +180,6 @@ async def login(
     response: Response,
     payload: UserLogin,
     db: AsyncSession = Depends(get_db),
-    _xff: None = Depends(_log_xff),
 ):
     # Reserva ANTES do bcrypt, não check + record depois (issue #157): a
     # tentativa admitida já sai contada, então uma rajada simultânea não passa
@@ -249,7 +232,6 @@ async def refresh_token(
     response: Response,
     raw: str = Depends(_refresh_body),
     db: AsyncSession = Depends(get_db),
-    _xff: None = Depends(_log_xff),
 ):
     result = await rotate_refresh_token(raw, db)
     if result is None:
@@ -276,7 +258,6 @@ async def logout(
     response: Response,
     raw: str = Depends(_refresh_body),
     db: AsyncSession = Depends(get_db),
-    _xff: None = Depends(_log_xff),
 ):
     # Revoga o refresh recebido. Idempotente: token inexistente também retorna 204.
     await revoke_refresh_token(raw, db)
