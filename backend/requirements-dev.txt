@@ -1,7 +1,7 @@
 # Só para desenvolvimento e CI — NÃO entra na imagem de produção.
 -r requirements.txt
 pytest==9.1.1
-pytest-asyncio==1.4.0
+pytest-asyncio==1.4.1
 # httpx virou dep de produção (email_service/Brevo, ver requirements.txt);
 # o AsyncClient de teste é o mesmo pacote, sem pin duplicado aqui.
 pip-audit==2.10.1
