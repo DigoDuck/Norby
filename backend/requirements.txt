@@ -23,4 +23,4 @@ stripe==16.0.0
 # Foto de perfil (issue #35): redimensiona no servidor para 128x128 WebP.
 # python-multipart é o que o FastAPI usa para ler multipart/form-data.
 pillow==13.0.0
-python-multipart==0.0.32
+python-multipart==0.0.33
