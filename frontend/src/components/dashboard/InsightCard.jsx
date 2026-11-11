@@ -19,8 +19,9 @@ function insightIcon(text) {
  *
  * @param {{ summary_text?: string, suggested_action?: string|null } | null} insight
  * @param {boolean} [bloqueada]  plano sem IA: mostra o convite, não um vazio falso
+ * @param {boolean} [carregando]  leitura ainda a caminho: pulso, não "adicione transações"
  */
-export default function InsightCard({ insight, bloqueada = false }) {
+export default function InsightCard({ insight, bloqueada = false, carregando = false }) {
   const navigate = useNavigate();
   const insightItems = insight?.summary_text?.split("|") || [];
 
@@ -39,6 +40,13 @@ export default function InsightCard({ insight, bloqueada = false }) {
           title="A leitura da Norby faz parte do plano Premium"
           text="Assine para receber a análise do seu mês e sugestões práticas."
         />
+      ) : carregando ? (
+        <div className="flex-1 flex flex-col gap-2 motion-safe:animate-pulse">
+          <p role="status" className="sr-only">Carregando a leitura da Norby</p>
+          {["w-full", "w-5/6", "w-2/3"].map((w) => (
+            <div key={w} aria-hidden="true" className={`h-3 rounded-full bg-line/[0.07] ${w}`} />
+          ))}
+        </div>
       ) : insightItems.length === 0 ? (
         <div className="flex-1 flex items-center justify-center text-content-3 text-xs text-center">
           Adicione transações para gerar sua análise de IA
