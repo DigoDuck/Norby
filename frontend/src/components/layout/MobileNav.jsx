@@ -52,7 +52,7 @@ export default function MobileNav() {
           finalFocus={hamburguer}
           showCloseButton={false}
           aria-label="Menu de navegação"
-          className="lg:hidden inset-y-0 left-0 top-0 w-72 max-w-[85vw] translate-x-0 translate-y-0 gap-0 rounded-none bg-transparent p-0 ring-0"
+          className="lg:hidden inset-y-0 left-0 top-0 max-h-none w-72 max-w-[85vw] translate-x-0 translate-y-0 gap-0 rounded-none bg-transparent p-0 ring-0"
         >
           <nav className="relative h-full w-full panel rounded-none flex flex-col px-4 py-6 gap-1">
             <button
