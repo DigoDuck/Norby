@@ -280,6 +280,8 @@ class Transaction(Base):
     # (script, migration, psql) não pode corromper o saldo com valor negativo.
     __table_args__ = (
         CheckConstraint("amount > 0", name="ck_transactions_amount_positive"),
+        # Toda leitura do dashboard filtra por user_id + intervalo de date.
+        Index("ix_transactions_user_id_date", "user_id", "date"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

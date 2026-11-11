@@ -146,8 +146,20 @@ describe("Dashboard, Score financeiro", () => {
     renderDashboard({ plan: PREMIUM });
 
     const saldo = await screen.findByRole("region", { name: "Saldo total" });
+    // A Leitura chega por fora do painel: o Score aparece quando ela resolve.
+    expect(await within(saldo).findByText("72")).toBeInTheDocument();
     expect(within(saldo).getByText("Score financeiro")).toBeInTheDocument();
-    expect(within(saldo).getByText("72")).toBeInTheDocument();
+  });
+
+  it("a Leitura lenta não segura o painel: saldo aparece e o card pulsa", async () => {
+    // O Gemini pode levar segundos; a promessa que nunca resolve simula isso.
+    aiApi.getInsight.mockReturnValue(new Promise(() => {}));
+
+    renderDashboard({ plan: PREMIUM });
+
+    await screen.findByRole("region", { name: "Saldo total" });
+    expect(screen.getByText("Carregando a leitura da Norby")).toBeInTheDocument();
+    expect(screen.queryByText(/Adicione transações/)).not.toBeInTheDocument();
   });
 
   it("free não vê Score em lugar nenhum da tela", async () => {

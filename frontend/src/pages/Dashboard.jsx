@@ -148,14 +148,11 @@ export default function Dashboard() {
   const loadData = useCallback(async () => {
       const streakMonths = monthsForWindow(RITMO_MAX_WEEKS * 7);
       // allSettled: falha de um painel (ex.: IA) não derruba os demais
-      const [wRes, tRes, sRes, iRes, gRes, ...streakRes] =
+      const [wRes, tRes, sRes, gRes, ...streakRes] =
         await Promise.allSettled([
           walletsApi.list(),
           transactionsApi.list({ limit: 5 }),
           dashboardApi.summary(),
-          // Sem IA no plano o backend recusa (AI_REQUIRES_PREMIUM): pedir só
-          // gerava um 403 por visita. O card da Leitura mostra o cadeado.
-          iaLiberada ? aiApi.getInsight() : Promise.resolve({ data: null }),
           goalsApi.list(),
           ...streakMonths.map((m) =>
             transactionsApi.list({ month: m.month, year: m.year, limit: 500 }),
@@ -164,7 +161,6 @@ export default function Dashboard() {
       if (wRes.status === "fulfilled") setWallets(wRes.value.data);
       if (tRes.status === "fulfilled") setTransactions(tRes.value.data);
       if (sRes.status === "fulfilled") setSummary(sRes.value.data);
-      if (iRes.status === "fulfilled") setInsight(iRes.value.data);
       if (gRes.status === "fulfilled") setGoals(gRes.value.data);
       setStreakTx(
         streakRes
@@ -180,13 +176,32 @@ export default function Dashboard() {
         ritmo: streakRes.some(falhou),
       });
       setLoading(false);
-  }, [iaLiberada]);
+  }, []);
 
   useEffect(() => {
     // Falso positivo: loadData só chama setState depois do await.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadData();
   }, [loadData]);
+
+  // A Leitura corre por fora do painel: quando os dados do mês mudaram, o
+  // backend chama o Gemini e a resposta leva segundos. Dentro do allSettled
+  // acima, o esqueleto da tela inteira esperava por ela.
+  // Sem IA no plano o backend recusa (AI_REQUIRES_PREMIUM): pedir só gerava um
+  // 403 por visita. O card da Leitura mostra o cadeado.
+  const [insightCarregando, setInsightCarregando] = useState(iaLiberada);
+  useEffect(() => {
+    if (!iaLiberada) return undefined;
+    let vivo = true;
+    aiApi
+      .getInsight()
+      .then((r) => vivo && setInsight(r.data))
+      .catch(() => {})
+      .finally(() => vivo && setInsightCarregando(false));
+    return () => {
+      vivo = false;
+    };
+  }, [iaLiberada]);
 
   function tentarDeNovo() {
     setLoading(true);
@@ -746,7 +761,7 @@ export default function Dashboard() {
           )}
         </div>
 
-        <InsightCard insight={insight} bloqueada={!iaLiberada} />
+        <InsightCard insight={insight} bloqueada={!iaLiberada} carregando={insightCarregando} />
       </div>
 
       {/* ── Linha 4: movimentações recentes ──────────────────────────── */}
